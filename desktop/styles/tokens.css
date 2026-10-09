@@ -1,0 +1,87 @@
+/* HWP Workbench design tokens — "Proof" direction.
+   Ink black chrome, seal red for the person's edits, blue pencil for agent proposals. */
+:root {
+  color-scheme: light;
+  --font-ui: system-ui, -apple-system, "SF Pro Text", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Menlo", monospace;
+  --font-display: ui-serif, "New York", "AppleMyungjo", serif;
+
+  --desk: #E8E7E3;
+  --desk-dot: rgba(20, 20, 20, 0.075);
+  --paper: #FFFFFF;
+  --paper-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05), 0 12px 32px -8px rgba(30, 28, 24, 0.18);
+
+  --ink: #141414;
+  --ink-2: #5C5B57;
+  --ink-3: #9A9893;
+  --hairline: rgba(20, 20, 20, 0.10);
+  --hairline-strong: rgba(20, 20, 20, 0.18);
+
+  --surface: rgba(252, 251, 249, 0.82);
+  --surface-solid: #FCFBF9;
+  --surface-sunk: rgba(20, 20, 20, 0.04);
+  --surface-blur: saturate(160%) blur(22px);
+  --surface-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.04), 0 16px 40px -12px rgba(30, 28, 24, 0.22);
+
+  --island: #121212;
+  --island-2: #1F1F1E;
+  --island-3: #2C2C2A;
+  --island-ink: #F4F3F0;
+  --island-ink-2: #A3A29D;
+  --island-hairline: rgba(255, 255, 255, 0.09);
+
+  --seal: #E2412B;
+  --seal-ink: #C8341F;
+  --seal-wash: rgba(226, 65, 43, 0.09);
+  --pencil: #2E5BFF;
+  --pencil-wash: rgba(46, 91, 255, 0.08);
+  --moss: #2F8A5B;
+  --moss-wash: rgba(47, 138, 91, 0.10);
+  --amber: #B4790E;
+  --amber-wash: rgba(180, 121, 14, 0.11);
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+  --radius-xl: 22px;
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --fast: 140ms;
+  --base: 220ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --desk: #0F0F0E;
+    --desk-dot: rgba(255, 255, 255, 0.06);
+    --paper: #F5F4F0;
+    --paper-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 18px 48px -10px rgba(0, 0, 0, 0.7);
+    --ink: #F1F0EC;
+    --ink-2: #A9A7A1;
+    --ink-3: #6D6B66;
+    --hairline: rgba(255, 255, 255, 0.09);
+    --hairline-strong: rgba(255, 255, 255, 0.16);
+    --surface: rgba(28, 28, 27, 0.80);
+    --surface-solid: #1C1C1B;
+    --surface-sunk: rgba(255, 255, 255, 0.05);
+    --surface-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 20px 50px -12px rgba(0, 0, 0, 0.8);
+    --island: #050505;
+    --island-2: #181817;
+    --island-3: #262625;
+    --seal: #FF5A41;
+    --seal-wash: rgba(255, 90, 65, 0.14);
+    --pencil: #6C8BFF;
+    --pencil-wash: rgba(108, 139, 255, 0.14);
+    --moss: #4CC38A;
+    --moss-wash: rgba(76, 195, 138, 0.13);
+    --amber: #E3A93B;
+    --amber-wash: rgba(227, 169, 59, 0.14);
+  }
+}
+
+/* Dark-mode fixes found in review */
+@media (prefers-color-scheme: dark) {
+  .island { box-shadow: 0 0 0 0.5px rgba(255,255,255,.14), inset 0 0.5px 0 rgba(255,255,255,.12), 0 10px 30px -8px rgba(0,0,0,.6); }
+  .btn.ink { background: var(--ink); color: #121212; }
+}

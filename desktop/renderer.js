@@ -1,52 +1,471 @@
-const $ = (id) => document.getElementById(id);
-const i18n = {
- en: {private:'PRIVATE WORKSPACE',local:'Local processing',open:'Open document',noDocument:'No document open',undo:'Undo',redo:'Redo',exportPatch:'Export patch',review:'Review changes',save:'Save a copy',alphaNotice:'Development alpha · Original-format text edits. Preview is not Hancom-certified.',outline:'Document outline',searchPlaceholder:'Find text or a node ID',agentNote:'The same document operations, for people and agents.',preview:'STRUCTURE PREVIEW',emptyTitle:'Korean documents. Your workspace.',emptyBody:'Open an HWP or HWPX file. Inspect its structure, edit supported text, and review every change before saving a new copy.',demo:'Open synthetic example',emptyNote:'No accounts. No uploads. No silent format conversion.',selection:'Text inspector',selectionHelp:'Select text on the page or in the outline.',textLabel:'Text',stage:'Stage text edit',copyId:'Copy node ID',compatibility:'Compatibility',warningsEmpty:'Document-specific warnings appear here.',ready:'Ready',footer:'Source preserved · Save-as only · Alpha 0.1',changeReview:'CHANGE REVIEW',reviewTitle:'Know what will change.',riskText:'Formatting data and untouched parts are retained, but layout, font metrics and cached previews may differ. Check the saved document in Hancom before submitting it.',ackText:'I understand these compatibility risks.',cancel:'Cancel',emptyChanges:'No changes staged.',changed:'edits staged',saved:'Verified copy saved',selected:'Text selected',hwpLength:'HWP: keep the same UTF-16 length',hwpxLength:'HWPX: variable-length plain text supported',unsupported:'This element is read-only.',lengthError:'HWP text must keep the original UTF-16 length.',controlError:'Tabs, newlines and control characters need native operations, not plain-text edits.',busy:'Processing locally…',restore:'A matching local draft exists. Restore its edits?',discard:'Discard the current staged edits and open another file?',opaque:'Preserved, not rendered',copied:'Node ID copied',browser:'Desktop bridge unavailable. Launch with npm start.',unsaved:'There are staged or uncommitted edits.'},
- ko: {private:'내부 문서 작업 공간',local:'로컬 처리',open:'문서 열기',noDocument:'열린 문서 없음',undo:'실행 취소',redo:'다시 실행',exportPatch:'패치 내보내기',review:'변경 검토',save:'사본 저장',alphaNotice:'개발 알파 · 원본 형식으로 텍스트 편집 · 미리보기는 한컴 호환 인증을 받지 않았습니다.',outline:'문서 구조',searchPlaceholder:'텍스트 또는 노드 ID 검색',agentNote:'사람과 에이전트가 동일한 문서 작업을 사용합니다.',preview:'구조 미리보기',emptyTitle:'한글 문서, 나만의 작업 공간.',emptyBody:'HWP 또는 HWPX 문서를 열어 구조를 확인하고, 지원되는 텍스트를 편집한 후 변경 내용을 검토하고 사본으로 저장하세요.',demo:'합성 예제 열기',emptyNote:'계정 없음. 문서 업로드 없음. 자동 형식 변환 없음.',selection:'텍스트 편집',selectionHelp:'문서 또는 구조 목록에서 텍스트를 선택하세요.',textLabel:'텍스트',stage:'변경 적용',copyId:'노드 ID 복사',compatibility:'호환성',warningsEmpty:'문서별 호환성 경고가 표시됩니다.',ready:'준비 완료',footer:'원본 보존 · 사본으로만 저장 · 알파 0.1',changeReview:'변경 내용 검토',reviewTitle:'저장 전에 변경 내용을 확인하세요.',riskText:'서식 데이터와 수정하지 않은 부분은 보존되지만, 배치·글꼴·캐시 미리보기는 달라질 수 있습니다. 제출 전에 저장된 문서를 한컴에서 확인하세요.',ackText:'위 호환성 위험을 이해했습니다.',cancel:'취소',emptyChanges:'변경 내용이 없습니다.',changed:'개 변경 대기',saved:'검증된 사본 저장 완료',selected:'텍스트 선택됨',hwpLength:'HWP: 원본 UTF-16 길이를 유지해야 합니다',hwpxLength:'HWPX: 길이가 다른 일반 텍스트 편집 가능',unsupported:'이 요소는 읽기 전용입니다.',lengthError:'HWP 텍스트는 원본 UTF-16 길이를 유지해야 합니다.',controlError:'탭, 줄 바꿈, 제어 문자는 이 편집 방식에서 지원되지 않습니다.',busy:'로컬 처리 중…',restore:'이 문서와 일치하는 로컬 초안이 있습니다. 복원할까요?',discard:'현재 변경 내용을 취소하고 다른 문서를 열까요?',opaque:'보존됨 · 렌더링 안 됨',copied:'노드 ID 복사 완료',browser:'데스크톱 연결이 없습니다. npm start로 실행하세요.',unsaved:'저장하지 않은 변경 내용이 있습니다.'}
-};
-const warningKo={FONT_METRICS_UNVERIFIED:'요청된 글꼴은 확인할 수 있지만 설치 여부와 실제 글자 폭은 검증하지 않았습니다. 글꼴 파일은 포함하지 않습니다.',TABLE_LAYOUT:'표 구조와 속성은 원본 패키지에 유지됩니다. 표의 전체 배치 및 구조 편집은 아직 지원하지 않습니다.',IMAGES:'이미지 데이터는 유지됩니다. 이 미리보기에서는 이미지를 렌더링하거나 편집하지 않습니다.',PREVIEW_CACHE_RETAINED:'원본 미리보기 및 줄 배치 캐시를 유지하므로 편집 후 오래된 내용이 표시될 수 있습니다. 한컴에서 다시 열어 갱신하세요.',LAYOUT_UNVERIFIED:'구조 미리보기는 근사치입니다. 한컴의 페이지 배치·쪽 나눔·글꼴 충실도를 검증하지 않았습니다.',HWP_EQUAL_LENGTH_ONLY:'HWP 알파 편집은 각 텍스트 구간의 UTF-16 길이를 유지해야 합니다. 길이 변경과 구조 편집은 차단됩니다.',HWP_LAYOUT_NOT_RENDERED:'HWP는 페이지가 아닌 구조화 텍스트로 표시됩니다. 표·제어·스타일 데이터는 유지되지만 화면에 재현되지 않습니다.',PROTECTED_OR_ACTIVE_CONTENT:'서명·암호화 또는 스크립트 내용이 감지되었습니다. 편집이 차단되며 문서의 코드는 실행하지 않습니다.'};
-let lang=localStorage.getItem('hwp-language') === 'ko' ? 'ko' : 'en';
-let doc=null, selected=null, edits={}, history=[], future=[], zoom=1, busy=false, inputDirty=false;
-const t=(key)=>i18n[lang][key] || key;
-const current=(node)=>Object.hasOwn(edits,node.id)?edits[node.id]:node.text;
-function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
-function status(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
-function setLanguage() {
- const pendingText=selected?$('textEdit').value:null;
- const wasDirty=inputDirty;
- document.documentElement.lang=lang;
- document.querySelectorAll('[data-i18n]').forEach(e=>e.textContent=t(e.dataset.i18n));
- document.querySelectorAll('[data-placeholder]').forEach(e=>e.placeholder=t(e.dataset.placeholder));
- $('language').textContent=lang==='en'?'한국어':'English';
- localStorage.setItem('hwp-language',lang);
- if(doc){
-  $('filename').textContent=doc.name;
-  renderWarnings();renderOutline();renderPages();
-  if(selected){
-   selectNode(selected,false);
-   if(wasDirty){$('textEdit').value=pendingText;inputDirty=true;lengthInfo();}
-  }
- }
- updateButtons();
+import {applyLanguage, toggleLanguage, t, warningLabel, errorReason} from './i18n.js';
+import {PageView} from './page-view.js';
+import {ProofSlip} from './slip.js';
+import {EditModel} from './edit-model.js';
+import {changeCards} from './changes.js';
+import {renderStructure} from './structure-view.js';
+
+const $ = id => document.getElementById(id);
+let documentData = null;
+let model = null;
+let busy = false;
+let structure = false;
+let substitutions = [];
+let lastStatus = null;
+
+function status(key, values = {}, error = false) {
+  lastStatus = {key, values, error};
+  $('status').textContent = t(key, values);
+  $('status').classList.toggle('error', error);
 }
-function patch(){return {schemaVersion:1,baseSha256:doc.sha256,operations:Object.entries(edits).map(([nodeId,text])=>({op:'set_text',nodeId,expectedText:doc.nodes.find(n=>n.id===nodeId).text,text}))};}
-function updateButtons(){const count=Object.keys(edits).length;$('undo').disabled=!history.length||busy;$('redo').disabled=!future.length||busy;for(const id of ['save','review','exportPatch'])$(id).disabled=!doc||!count||busy;$('open').disabled=busy;$('emptyOpen').disabled=busy;$('demo').disabled=busy;$('dirty').textContent=count?`${count} ${lang==='en'&&count===1?'edit staged':t('changed')}`:'';}
-async function call(method,...args){if(!window.hwp)throw Error(t('browser'));return await window.hwp[method](...args);}
-function hasUncommitted(){return inputDirty||Object.keys(edits).length>0;}
-async function openDocument(demo=false){if(busy)return;if(hasUncommitted()&&!confirm(t('discard')))return;busy=true;updateButtons();status(t('busy'));try{const result=await call(demo?'openDemo':'open');if(!result)return;doc=result.document;selected=null;edits={};history=[];future=[];inputDirty=false;$('filename').textContent=doc.name;$('format').textContent=doc.format.toUpperCase();$('empty').hidden=true;$('editor').hidden=true;$('selectionHelp').hidden=false;$('nodeCount').textContent=doc.nodes.length;$('search').value='';if(result.draft?.baseSha256===doc.sha256&&confirm(t('restore'))){for(const op of result.draft.operations||[]){const node=doc.nodes.find(n=>n.id===op.nodeId);if(node&&node.text===op.expectedText&&node.editable&&typeof op.text==='string')edits[op.nodeId]=op.text;}}renderOutline();renderPages();renderWarnings();status(`${doc.nodes.length} ${lang==='ko'?'텍스트 구간':'text nodes'} · ${doc.format.toUpperCase()}`);}catch(e){status(e.message,true);}finally{busy=false;updateButtons();}}
-function renderWarnings(){$('warnings').replaceChildren();$('warningCount').textContent=doc.warnings.length;for(const w of doc.warnings){const card=el('div','warning '+w.severity);card.append(el('strong','',w.code.replaceAll('_',' ')),el('p','',lang==='ko'?(warningKo[w.code]||'이 요소의 원본 데이터는 보존되지만 전체 동작과 배치는 아직 지원하지 않습니다. '+w.message):w.message));$('warnings').append(card);}}
-function renderOutline(){const parent=$('outlineItems');parent.replaceChildren();const q=$('search').value.toLocaleLowerCase();let part='';for(const n of doc.nodes){if(q&&!current(n).toLocaleLowerCase().includes(q)&&!n.id.toLocaleLowerCase().includes(q))continue;if(n.part!==part){part=n.part;parent.append(el('div','outline-group',part));}const b=el('button','outline-item'+(selected===n.id?' active':'')+(Object.hasOwn(edits,n.id)?' edited':''),current(n)||'[empty / 비어 있음]');b.title=n.id;b.addEventListener('click',()=>selectNode(n.id));parent.append(b);}}
-function renderPages(){const parent=$('pages');parent.replaceChildren();const nodes=new Map(doc.nodes.map(n=>[n.id,n]));function render(v){if(v.type==='text'){const n=nodes.get(v.node);if(!n)return el('span');const e=el('span','text-node'+(selected===n.id?' selected':'')+(Object.hasOwn(edits,n.id)?' edited':''),current(n));e.dataset.nodeId=n.id;e.tabIndex=0;e.setAttribute('role','button');e.setAttribute('aria-label',current(n)||'Empty text node');if(n.style?.bold)e.style.fontWeight='700';if(n.style?.italic)e.style.fontStyle='italic';if(n.style?.size)e.style.fontSize=`${n.style.size/10}em`;e.addEventListener('click',()=>selectNode(n.id));e.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectNode(n.id);}});return e;}if(v.type==='opaque')return el('span','opaque',`${v.label.toUpperCase()} · ${t('opaque')}`);const map={section:'article',paragraph:'div',table:'table',row:'tr',cell:'td'};const e=el(map[v.type]||'div',v.type==='section'?'page':v.type==='table'?'doc-table':v.type);if(v.type==='section')e.append(el('div','page-label',v.label));if(v.type==='cell'){e.colSpan=v.colspan;e.rowSpan=v.rowspan;}for(const child of v.children||[])e.append(render(child));return e;}for(const section of doc.view)parent.append(render(section));}
-function selectNode(id,scroll=true){if(inputDirty&&selected!==id&&!confirm(t('discard')))return;const n=doc.nodes.find(x=>x.id===id);if(!n)return;selected=id;inputDirty=false;$('selectionHelp').hidden=true;$('editor').hidden=false;$('nodeRole').textContent=n.role.toUpperCase();$('textEdit').value=current(n);$('textEdit').disabled=!n.editable;$('nodeId').textContent=n.id;$('editError').textContent=n.editable?'':t('unsupported');renderOutline();document.querySelectorAll('.text-node').forEach(e=>e.classList.toggle('selected',e.dataset.nodeId===id));if(scroll){const target=[...document.querySelectorAll('.text-node')].find(e=>e.dataset.nodeId===id);target?.scrollIntoView({block:'nearest',behavior:'instant'});}lengthInfo();status(t('selected'));}
-function lengthInfo(){if(!doc||!selected)return;const n=doc.nodes.find(n=>n.id===selected),text=$('textEdit').value;$('lengthInfo').textContent=`${text.length} / ${n.text.length} UTF-16 · ${t(doc.format==='hwp'?'hwpLength':'hwpxLength')}`;let error='';if(/[\u0000-\u001f\ufffe\uffff]/u.test(text))error=t('controlError');if(doc.format==='hwp'&&text.length!==n.text.length)error=t('lengthError');$('editError').textContent=error;$('applyText').disabled=!!error||!n.editable||text===current(n)||busy;}
-async function saveDraft(){try{if(doc)await call('saveDraft',patch());}catch(e){status(e.message,true);}}
-function stage(){if(!doc||!selected||$('applyText').disabled)return;const n=doc.nodes.find(n=>n.id===selected);history.push({...edits});future=[];const value=$('textEdit').value;if(value===n.text)delete edits[n.id];else edits[n.id]=value;inputDirty=false;renderOutline();renderPages();updateButtons();lengthInfo();saveDraft();}
-function undo(){if(!history.length)return;future.push({...edits});edits=history.pop();inputDirty=false;refresh();}
-function redo(){if(!future.length)return;history.push({...edits});edits=future.pop();inputDirty=false;refresh();}
-function refresh(){renderOutline();renderPages();if(selected)selectNode(selected,false);updateButtons();saveDraft();}
-async function review(){if(inputDirty){status(t('unsaved'),true);return;}busy=true;updateButtons();try{const result=await call('plan',patch());$('changes').replaceChildren();for(const c of result.changes){const card=el('div','change');card.append(el('code','',c.nodeId),el('div','before',c.before),el('div','after',c.after));$('changes').append(card);}if(!result.changes.length)$('changes').append(el('p','muted',t('emptyChanges')));$('acknowledge').checked=false;$('confirmSave').disabled=true;$('reviewDialog').showModal();}catch(e){status(e.message,true);}finally{busy=false;updateButtons();}}
-async function save(){busy=true;$('confirmSave').disabled=true;updateButtons();try{const result=await call('saveCopy',patch(),$('acknowledge').checked);if(result){$('reviewDialog').close();status(`${t('saved')}: ${result.output}`);}}catch(e){status(e.message,true);}finally{busy=false;updateButtons();$('confirmSave').disabled=!$('acknowledge').checked;}}
-$('language').onclick=()=>{lang=lang==='en'?'ko':'en';setLanguage();};$('open').onclick=()=>openDocument();$('emptyOpen').onclick=()=>openDocument();$('demo').onclick=()=>openDocument(true);$('undo').onclick=undo;$('redo').onclick=redo;$('search').oninput=()=>doc&&renderOutline();$('textEdit').oninput=()=>{inputDirty=true;lengthInfo();};$('applyText').onclick=stage;$('review').onclick=review;$('save').onclick=review;$('confirmSave').onclick=save;$('acknowledge').onchange=()=>{$('confirmSave').disabled=!$('acknowledge').checked||busy;};$('closeReview').onclick=()=>{$('reviewDialog').close();};$('cancelReview').onclick=()=>{$('reviewDialog').close();};$('copyId').onclick=async()=>{try{await call('copyText',selected);status(t('copied'));}catch(e){status(e.message,true);}};$('exportPatch').onclick=async()=>{try{await call('exportPatch',patch());}catch(e){status(e.message,true);}};
-function setZoom(delta){zoom=Math.max(.7,Math.min(1.5,zoom+delta));document.documentElement.style.setProperty('--zoom',zoom);$('zoomValue').textContent=`${Math.round(zoom*100)}%`;}$('zoomIn').onclick=()=>setZoom(.1);$('zoomOut').onclick=()=>setZoom(-.1);
-document.addEventListener('keydown',e=>{if(!(e.metaKey||e.ctrlKey))return;const key=e.key.toLowerCase();if(key==='o'){e.preventDefault();openDocument();}if(key==='s'){e.preventDefault();if(doc&&Object.keys(edits).length)review();}if(key==='f'){e.preventDefault();$('search').focus();}if(key==='z'&&document.activeElement!==$('textEdit')){e.preventDefault();e.shiftKey?redo():undo();}});
-window.addEventListener('beforeunload',e=>{if(hasUncommitted()){e.preventDefault();e.returnValue='';}});
-setLanguage();
+
+async function call(method, ...args) {
+  if (!window.hwp) {
+    throw Error(t('bridge'));
+  }
+  return window.hwp[method](...args);
+}
+
+function hasUnsavedText() {
+  return slip.dirty || Object.keys(model?.edits || {}).length > 0;
+}
+
+const slip = new ProofSlip($('slipHost'), (node, text) => {
+  if (busy || !model.stage(node, text)) {
+    return false;
+  }
+  refreshEdits();
+  return true;
+}, id => revert(id));
+
+function selectNode(node, location) {
+  if (busy || (slip.dirty && !confirm(t('discard')))) {
+    return;
+  }
+  slip.open(node, model.current(node), documentData.format, location);
+}
+
+const pageView = new PageView({
+  pages: $('pages'),
+  thumbnails: $('thumbnails'),
+  canvas: $('canvas'),
+  onSelect: selectNode,
+  onCounter: (page, total) => {
+    $('pageCounter').textContent = `${page} / ${total}`;
+  },
+  onZoom: percent => {
+    $('zoomValue').textContent = `${percent}%`;
+    slip.position();
+  },
+  onFonts: fonts => {
+    substitutions = fonts;
+    renderFonts();
+  },
+  onFailure: () => {
+    structure = true;
+    status('previewFailed');
+    $('structureChip').hidden = false;
+    if (model) {
+      renderFallback();
+    }
+  },
+  translate: t
+});
+
+function renderFonts() {
+  $('fontSubstitutions').replaceChildren(...substitutions.map(({from, to}) => {
+    const row = document.createElement('div');
+    row.className = 'font-substitution';
+    row.textContent = `${from} → ${to}`;
+    return row;
+  }));
+}
+
+function warningCards() {
+  return documentData.warnings.map(warning => {
+    const card = document.createElement('div');
+    card.className = `warning ${warning.severity}`;
+    const code = document.createElement('span');
+    code.className = 'code';
+    code.textContent = warning.code;
+    card.append(code, document.createTextNode(warningLabel(warning)));
+    return card;
+  });
+}
+
+function renderWarnings() {
+  if (documentData) {
+    $('warnings').replaceChildren(...warningCards());
+  }
+  renderFonts();
+}
+
+function updateControls() {
+  const count = Object.keys(model?.edits || {}).length;
+  $('dirty').hidden = !count;
+  $('dirty').textContent = t(count === 1 ? 'edit' : 'edits', {n: count});
+  $('changeCount').textContent = count;
+  $('stagedCount').textContent = t('staged', {n: count});
+  for (const id of ['save', 'review']) {
+    $(id).disabled = !count || busy;
+  }
+  for (const id of ['open', 'emptyOpen', 'demo']) {
+    $(id).disabled = busy;
+  }
+  $('confirmSave').disabled = !$('acknowledge').checked || busy;
+}
+
+function renderOutline() {
+  $('outlineItems').replaceChildren(...documentData.nodes.map(node => {
+    const button = document.createElement('button');
+    button.className = 'outline-item';
+    button.classList.toggle('edited', Object.hasOwn(model.edits, node.id));
+    button.textContent = model.current(node) || t('empty');
+    button.title = node.id;
+    button.onclick = () => {
+      const hit = [...$('pages').querySelectorAll('[data-node-id]')].find(element => element.dataset.nodeId === node.id);
+      if (hit) {
+        hit.scrollIntoView({block: 'center'});
+        hit.click();
+      } else if (!structure) {
+        const entry = pageView.entries.find(entry => entry.mapped.some(item => item.node?.id === node.id));
+        if (entry) {
+          pageView.render(Number(entry.page.dataset.page));
+          const target = [...entry.page.querySelectorAll('[data-node-id]')].find(element => element.dataset.nodeId === node.id);
+          target?.scrollIntoView({block: 'center'});
+          target?.click();
+        }
+      }
+    };
+    return button;
+  }));
+}
+
+function renderFallback() {
+  renderStructure(documentData, model, $('pages'), selectNode);
+  $('thumbnails').replaceChildren();
+  const pages = [...$('pages').children];
+  pages.forEach((page, index) => {
+    const button = document.createElement('button');
+    button.className = 'thumb';
+    const sheet = document.createElement('span');
+    sheet.className = 'sheet';
+    const number = document.createElement('span');
+    number.className = 'n';
+    number.textContent = String(index + 1).padStart(2, '0');
+    button.setAttribute('aria-label', `${t('structure')} ${index + 1}`);
+    button.append(sheet, number);
+    button.onclick = () => page.scrollIntoView({block: 'start'});
+    $('thumbnails').append(button);
+  });
+  $('pageCounter').textContent = `1 / ${pages.length}`;
+  $('canvas').onscroll = () => {
+    const top = $('canvas').getBoundingClientRect().top + 64;
+    let nearest = 0;
+    let distance = Infinity;
+    pages.forEach((page, index) => {
+      const difference = Math.abs(page.getBoundingClientRect().top - top);
+      if (difference < distance) {
+        nearest = index;
+        distance = difference;
+      }
+    });
+    $('pageCounter').textContent = `${nearest + 1} / ${pages.length}`;
+  };
+  zoom(pageView.zoom);
+}
+
+function refreshEdits() {
+  $('changes').replaceChildren(...changeCards(model, revert));
+  renderOutline();
+  if (structure) {
+    renderFallback();
+  } else {
+    pageView.updateEdits(model.edits);
+  }
+  updateControls();
+  call('saveDraft', model.patch()).catch(error => status('failed', {reason: errorReason(error)}, true));
+}
+
+function revert(id) {
+  if (busy || (slip.dirty && !confirm(t('discard')))) {
+    return;
+  }
+  slip.close();
+  model.revert(id);
+  refreshEdits();
+}
+
+function historyAction(redo = false) {
+  if (!model || busy || (slip.dirty && !confirm(t('discard')))) {
+    return;
+  }
+  slip.close();
+  if (redo) {
+    model.redo();
+  } else {
+    model.undo();
+  }
+  refreshEdits();
+}
+
+async function renderRecent() {
+  try {
+    const recent = await call('recent');
+    $('recentItems').replaceChildren(...recent.map((item, index) => {
+      const button = document.createElement('button');
+      button.className = 'doc-card';
+      button.textContent = item.name;
+      button.onclick = () => openDocument('openRecent', index);
+      return button;
+    }));
+  } catch {
+    $('recentItems').replaceChildren();
+  }
+}
+
+function beginOpen() {
+  if (busy || (hasUnsavedText() && !confirm(t('discard')))) {
+    return false;
+  }
+  busy = true;
+  updateControls();
+  status('busy');
+  return true;
+}
+
+async function completeOpen(result, failure = null) {
+  try {
+    if (failure) {
+      throw Error(failure);
+    }
+    if (!result) {
+      $('status').textContent = '';
+      lastStatus = null;
+      return;
+    }
+    slip.close(false);
+    documentData = result.document;
+    model = new EditModel(documentData);
+    structure = false;
+    substitutions = [];
+    $('filename').textContent = documentData.name;
+    $('format').hidden = false;
+    $('format').textContent = documentData.format.toUpperCase();
+    $('empty').hidden = true;
+    $('workspace').hidden = false;
+    $('structureChip').hidden = true;
+    if (result.draft?.baseSha256 === documentData.sha256 && result.draft.operations?.length && confirm(t('restore'))) {
+      model.restore(result.draft);
+    }
+    renderOutline();
+    renderWarnings();
+    const bytes = await call('documentBytes');
+    const rendered = await pageView.open(bytes, documentData.nodes);
+    if (rendered) {
+      pageView.updateEdits(model.edits);
+      $('status').textContent = '';
+      lastStatus = null;
+    }
+    $('changes').replaceChildren(...changeCards(model, revert));
+    renderRecent();
+  } catch (error) {
+    status('openFailed', {reason: errorReason(error)}, true);
+    if (documentData) {
+      pageView.clear();
+      structure = true;
+      $('structureChip').hidden = false;
+      renderFallback();
+    }
+  } finally {
+    busy = false;
+    updateControls();
+  }
+}
+
+async function openDocument(method = 'open', ...args) {
+  if (!beginOpen()) {
+    return;
+  }
+  try {
+    await completeOpen(await call(method, ...args));
+  } catch (error) {
+    await completeOpen(null, error.message);
+  }
+}
+
+async function review() {
+  if (!model || busy || !Object.keys(model.edits).length) {
+    return;
+  }
+  if (slip.dirty) {
+    status('unstaged', {}, true);
+    return;
+  }
+  slip.close();
+  busy = true;
+  updateControls();
+  try {
+    await call('plan', model.patch());
+    $('reviewChanges').replaceChildren(...changeCards(model));
+    $('reviewWarnings').replaceChildren(...warningCards());
+    $('acknowledge').checked = false;
+    $('reviewDialog').showModal();
+  } catch (error) {
+    status('failed', {reason: errorReason(error)}, true);
+  } finally {
+    busy = false;
+    updateControls();
+  }
+}
+
+async function save() {
+  if (busy || !$('acknowledge').checked) {
+    return;
+  }
+  busy = true;
+  updateControls();
+  try {
+    const result = await call('saveCopy', model.patch(), true);
+    if (result) {
+      $('reviewDialog').close();
+      status('saved', {name: result.name});
+      const finder = document.createElement('button');
+      finder.className = 'btn ghost';
+      finder.textContent = t('showInFinder');
+      finder.onclick = () => call('showSaved').catch(error => status('failed', {reason: errorReason(error)}, true));
+      $('status').append(finder);
+    }
+  } catch (error) {
+    status('failed', {reason: errorReason(error)}, true);
+  } finally {
+    busy = false;
+    updateControls();
+  }
+}
+
+function zoom(value) {
+  const percent = pageView.setZoom(value);
+  $('zoomValue').textContent = `${percent}%`;
+  if (structure) {
+    $('pages').querySelectorAll('.structure-page').forEach(page => {
+      page.style.zoom = percent / 100;
+    });
+  }
+  slip.position();
+}
+
+function railMode(outline) {
+  document.body.classList.toggle('outline-mode', outline);
+  document.querySelector('.rail').classList.toggle('outline-mode', outline);
+  $('outlineItems').hidden = !outline;
+  $('thumbnails').hidden = outline;
+  for (const [id, active] of [['pagesToggle', !outline], ['outlineToggle', outline]]) {
+    $(id).classList.toggle('on', active);
+    $(id).setAttribute('aria-pressed', String(active));
+  }
+}
+
+function panelTab(name) {
+  for (const item of ['changes', 'agent', 'checks']) {
+    $(`${item}Panel`).hidden = item !== name;
+    $(`${item}Tab`).classList.toggle('on', item === name);
+    $(`${item}Tab`).setAttribute('aria-selected', String(item === name));
+    $(`${item}Tab`).tabIndex = item === name ? 0 : -1;
+  }
+}
+
+$('open').onclick = () => openDocument();
+$('emptyOpen').onclick = () => openDocument();
+$('demo').onclick = () => openDocument('openDemo');
+$('save').onclick = review;
+$('review').onclick = review;
+$('confirmSave').onclick = save;
+$('acknowledge').onchange = updateControls;
+$('closeReview').onclick = () => $('reviewDialog').close();
+$('cancelReview').onclick = () => $('reviewDialog').close();
+$('pagesToggle').onclick = () => railMode(false);
+$('outlineToggle').onclick = () => railMode(true);
+$('zoomIn').onclick = () => zoom(pageView.stepZoom(1));
+$('zoomOut').onclick = () => zoom(pageView.stepZoom(-1));
+$('zoomValue').onclick = () => zoom('fit');
+$('language').onclick = () => {
+  toggleLanguage();
+  updateControls();
+  slip.relabel();
+  pageView.relabel();
+  if (documentData) {
+    renderOutline();
+    renderWarnings();
+    if (structure) {
+      $('pages').querySelectorAll('.opaque').forEach(element => {
+        element.textContent = t('preserved');
+      });
+      $('pages').querySelectorAll('.text-node').forEach(element => {
+        const node = model.nodes.get(element.dataset.nodeId);
+        element.textContent = model.current(node) || t('empty');
+      });
+      [...$('thumbnails').children].forEach((button, index) => {
+        button.setAttribute('aria-label', `${t('structure')} ${index + 1}`);
+      });
+    }
+    $('changes').replaceChildren(...changeCards(model, revert));
+    $('reviewChanges').replaceChildren(...changeCards(model));
+    $('reviewWarnings').replaceChildren(...warningCards());
+  }
+  if (lastStatus) {
+    status(lastStatus.key, lastStatus.values, lastStatus.error);
+  }
+};
+for (const name of ['changes', 'agent', 'checks']) {
+  $(`${name}Tab`).onclick = () => panelTab(name);
+}
+document.querySelector('.tabs').onkeydown = event => {
+  const tabs = ['changes', 'agent', 'checks'];
+  const current = tabs.findIndex(name => $(`${name}Tab`) === document.activeElement);
+  if (['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) {
+    event.preventDefault();
+    const index = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (current + (event.key === 'ArrowRight' ? 1 : 2)) % 3;
+    panelTab(tabs[index]);
+    $(`${tabs[index]}Tab`).focus();
+  }
+};
+
+document.addEventListener('keydown', event => {
+  if (!(event.metaKey || event.ctrlKey) || event.isComposing) {
+    return;
+  }
+  const key = event.key.toLowerCase();
+  if (key === 'o') {
+    event.preventDefault();
+    openDocument();
+  } else if (key === 's') {
+    event.preventDefault();
+    review();
+  } else if (key === 'z' && document.activeElement !== slip.editor) {
+    event.preventDefault();
+    historyAction(event.shiftKey);
+  } else if (['+', '=', '-', '0'].includes(key) && document.activeElement !== slip.editor) {
+    event.preventDefault();
+    zoom(key === '0' ? 'fit' : pageView.stepZoom(key === '-' ? -1 : 1));
+  }
+});
+window.addEventListener('resize', () => slip.position());
+window.addEventListener('beforeunload', event => {
+  if (hasUnsavedText()) {
+    event.preventDefault();
+    event.returnValue = '';
+  }
+});
+// Preload obtains a dropped file's path only from a trusted OS event.
+// The renderer accepts the switch before main changes the active document.
+window.hwp?.onDrop(beginOpen, completeOpen);
+// A drop never navigates to local document content.
+document.addEventListener('dragover', event => event.preventDefault());
+document.addEventListener('drop', event => {
+  event.preventDefault();
+});
+applyLanguage();
+panelTab('changes');
+updateControls();
+renderRecent();

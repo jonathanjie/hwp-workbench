@@ -142,3 +142,5 @@ Intended output: `dist/mac-arm64/HWP Workbench.app`. The script copies the local
 `docs/TECHNICAL-PLAN.md` contains the implementation plan, engine evaluation, milestones and release gates. `docs/COMPATIBILITY.md` defines exactly what preservation means. `docs/AGENT-INTERFACE.md` documents the patch/CLI/MCP contract. `docs/SECURITY.md` describes implemented controls and remaining risks. `AGENTS.md` guides subsequent implementation work.
 
 The next acceptance gate is successful edit/save/reopen on real HWP/HWPX documents using Hancom as an independent reference, not more cosmetic UI features.
+
+Desktop update: the Proof shell uses rhwp 0.8.7 for page previews, with a structure fallback. The shared engine still edits and saves native copies. Staged edits are marked over the original preview; live preview is a later task. Run `npm run test:desktop` for module tests and `npm run test:electron` for native Electron checks. The old `scripts/test-ui.py` harness targets the previous UI. Hancom layout remains unverified.
