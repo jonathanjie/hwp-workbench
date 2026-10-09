@@ -87,7 +87,7 @@ export class CommandPalette {
         row.setAttribute('aria-selected', String(index === this.selected));
         if (label === 'commandGroup') {
           row.disabled = result.enabled?.() === false;
-          row.append(element('span', 'ic', '›'), element('span', '', labelFor(currentLanguage(), result.label)));
+          row.append(element('span', '', labelFor(currentLanguage(), result.label)));
           if (result.shortcut) {
             const keys = element('span', 'k');
             keys.append(element('kbd', '', result.shortcut));

@@ -14,6 +14,9 @@ const root = path.dirname(desktop);
 async function host(directory, source) {
   const handlers = new Map();
   const revealed = [];
+  const appEvents = new Map();
+  const windowEvents = new Map();
+  const sent = [];
   let window;
   const dialog = {
     showOpenDialog: async () => ({canceled: false, filePaths: [source]}),
@@ -24,15 +27,18 @@ async function host(directory, source) {
       this.webContents = {
         mainFrame: {url: 'app://workbench/index.html'},
         setWindowOpenHandler() {},
-        on() {},
-        send() {}
+        on: (name, callback) => windowEvents.set(name, callback),
+        send: (channel, ...args) => sent.push({channel, args})
       };
       window = this;
     }
     loadURL() {}
+    isMinimized() { return false; }
+    show() {}
+    focus() {}
   }
   const electron = {
-    app: {name: 'Test', commandLine: {getSwitchValue: () => ''}, getPath: () => directory, whenReady: () => Promise.resolve(), on() {}},
+    app: {name: 'Test', commandLine: {getSwitchValue: () => ''}, getPath: () => directory, requestSingleInstanceLock: () => true, whenReady: () => Promise.resolve(), on: (name, callback) => appEvents.set(name, callback)},
     BrowserWindow, dialog,
     ipcMain: {handle: (channel, handler) => handlers.set(channel, handler)},
     session: {defaultSession: {setPermissionRequestHandler() {}, setPermissionCheckHandler() {}, webRequest: {onBeforeRequest() {}}}},
@@ -49,7 +55,7 @@ async function host(directory, source) {
   });
   await new Promise(resolve => setImmediate(resolve));
   const event = {sender: window.webContents, senderFrame: window.webContents.mainFrame};
-  return {handlers, event, dialog, revealed, invoke: (channel, ...args) => handlers.get(channel)(event, ...args)};
+  return {handlers, event, dialog, revealed, appEvents, windowEvents, sent, invoke: (channel, ...args) => handlers.get(channel)(event, ...args)};
 }
 
 test('main IPC enforces sender, id, drop, acknowledgement, reveal and non-overwrite boundaries', async () => {
@@ -76,6 +82,41 @@ test('main IPC enforces sender, id, drop, acknowledgement, reveal and non-overwr
     ]};
     await assert.rejects(app.invoke('document:save', patch, false), /acknowledgement/);
     await app.invoke('document:plan', patch);
+    const preview = await app.invoke('document:preview', patch);
+    assert.ok(Buffer.from(preview.bytesBase64, 'base64').length > 0);
+    await app.invoke('agent:link', true);
+    await app.invoke('agent:selection', {nodeId: node.id, text: node.text});
+    await app.invoke('document:draft', patch);
+    const other = opened.document.nodes.find(item => item.editable && item.id !== node.id);
+    const proposalPatch = {...patch, operations: [...patch.operations, {op: 'set_text', nodeId: other.id, expectedText: other.text, text: other.text + ' 제안'}]};
+    const filename = 'source.hwpx.20261009T120000Z-abcdef.json';
+    const folder = path.join(directory, '.hwp-workbench/proposals');
+    await fs.writeFile(path.join(folder, filename), JSON.stringify({schemaVersion: 1, kind: 'hwp-workbench-proposal',
+      document: {name: 'source.hwpx', sha256: opened.document.sha256}, title: 'Review', author: 'Claude',
+      createdAt: '2026-10-09T12:00:00Z', patch: proposalPatch}));
+    // Turning the switch on again performs a complete engine-validated scan.
+    const staleFile = filename.replace('abcdef', '000001');
+    const invalidFile = filename.replace('abcdef', '000002');
+    const proposalRecord = JSON.parse(await fs.readFile(path.join(folder, filename), 'utf8'));
+    await fs.writeFile(path.join(folder, staleFile), JSON.stringify({...proposalRecord,
+      document: {...proposalRecord.document, sha256: '0'.repeat(64)}, patch: {...proposalPatch, baseSha256: '0'.repeat(64)}}));
+    await fs.writeFile(path.join(folder, invalidFile), JSON.stringify({...proposalRecord,
+      patch: {...proposalPatch, operations: [{...proposalPatch.operations[0], expectedText: 'stale text'}]}}));
+    const inbox = await app.invoke('agent:link', true);
+    assert.equal(inbox.proposals.find(row => row.file === staleFile).status, 'stale');
+    assert.equal(inbox.proposals.find(row => row.file === invalidFile).status, 'unreadable');
+    await assert.rejects(app.invoke('agent:decide', staleFile, [node.id], true), /Stale/);
+    const applied = await app.invoke('agent:decide', filename, [node.id], true);
+    assert.equal(applied.author, 'Claude');
+    assert.deepEqual(applied.operations, patch.operations);
+    await app.invoke('agent:decide', filename, [other.id], false);
+    const outcome = JSON.parse(await fs.readFile(path.join(folder, filename.replace(/\.json$/, '.outcome.json')), 'utf8'));
+    assert.equal(outcome.status, 'partial');
+    assert.deepEqual(outcome.acceptedNodeIds, [node.id]);
+    assert.deepEqual(outcome.declinedNodeIds, [other.id]);
+    await assert.rejects(app.invoke('agent:decide', filename, [other.id], true), /Stale/);
+    await app.invoke('agent:link', false);
+
     const saved = await app.invoke('document:save', patch, true);
     assert.equal(saved.name, 'copy.hwpx');
     await assert.rejects(app.invoke('shell:reveal-output', '/tmp/other'), /arguments/);
@@ -87,6 +128,33 @@ test('main IPC enforces sender, id, drop, acknowledgement, reveal and non-overwr
     assert.deepEqual(await fs.readFile(source), original);
     await app.invoke('document:open-recent', opened.recentId);
     await assert.rejects(app.invoke('shell:reveal-output'), /No saved copy/);
+  } finally {
+    await fs.rm(directory, {recursive: true, force: true});
+  }
+});
+
+
+test('queued handoffs wait for the renderer before switching to the next document', async () => {
+  const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'hwp-handoff-')));
+  try {
+    const first = path.join(directory, 'first.hwpx');
+    const second = path.join(directory, 'second.hwpx');
+    const original = await fs.readFile(path.join(root, 'fixtures/generated/review-form.hwpx'));
+    await fs.writeFile(first, original);
+    await fs.writeFile(second, original);
+    const app = await host(directory, first);
+    app.appEvents.get('second-instance')({}, ['electron', '.', '--open', first]);
+    let prevented = false;
+    app.appEvents.get('open-file')({preventDefault: () => { prevented = true; }}, second);
+    assert.equal(prevented, true);
+    assert.equal(app.sent.length, 0);
+    app.windowEvents.get('did-finish-load')();
+    await app.invoke('document:recent');
+    assert.equal(app.sent.filter(item => item.channel === 'document:handoff').length, 1);
+    await app.invoke('document:handoff-ready');
+    await app.invoke('document:recent');
+    assert.equal(app.sent.filter(item => item.channel === 'document:handoff').length, 2);
+    await app.invoke('document:handoff-ready');
   } finally {
     await fs.rm(directory, {recursive: true, force: true});
   }

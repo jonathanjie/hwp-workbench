@@ -23,6 +23,7 @@ test('replace all groups edits by node, skips locks and undoes in one step', () 
   const edits = model();
   const result = replaceMatches(edits, findMatches(edits, 'cat'), 'kitten');
   assert.equal(result.replaced, 3);
+  assert.equal(result.paragraphs, 2);
   assert.deepEqual(result.skipped.map(item => item.reason), ['locked']);
   assert.equal(edits.current(edits.nodes.get('a')), 'kitten kitten');
   assert.equal(edits.patch().operations.length, 2);

@@ -15,6 +15,7 @@
     <span id="filename" class="doc">HWP Workbench</span>
     <span id="format" class="chip fmt" hidden></span>
     <button id="dirty" class="chip edits" hidden></button>
+    <button id="agentChip" class="chip agent" hidden></button>
     <button id="paletteButton" class="cmd" data-title="commands"><span>⌘</span><span>K</span></button>
     <button id="save" class="save" hidden disabled><span data-label="saveCopy"></span><kbd>⌘S</kbd></button>
   </header>
@@ -31,6 +32,7 @@
         <button id="demo" class="btn line lg" data-label="sample"></button>
       </div>
     </div>
+    <div id="welcomeAgents" class="welcome-agents"></div>
     <div id="recentRow" class="recent" hidden><span class="lbl" data-label="recent"></span><div id="recentItems" class="row"></div></div>
   </section>
   <div id="workspace" hidden>
@@ -61,7 +63,7 @@
         <div class="section-label"><span id="stagedCount"></span><button id="review" class="btn ghost" data-label="reviewAll" disabled></button></div>
         <div id="changes"></div>
       </section>
-      <section id="agentPanel" class="panel-content" role="tabpanel" aria-labelledby="agentTab" hidden><div class="section-label" data-label="agentPending"></div></section>
+      <section id="agentPanel" class="panel-content" role="tabpanel" aria-labelledby="agentTab" hidden><label class="agent-link"><span data-label="agentLink"></span><input id="agentLinkSwitch" type="checkbox" role="switch"></label><div id="agentInbox"></div><div id="panelAgents"></div></section>
       <section id="checksPanel" class="panel-content" role="tabpanel" aria-labelledby="checksTab" hidden><div id="checkTags" class="check-tags"></div><details id="warningDetails"><summary data-label="warningDetails"></summary><div id="warnings"></div></details><div class="section-label" data-label="fontSubstitutions"></div><div id="fontSubstitutions"></div></section>
       <div class="foot"><span class="tag off" data-label="layoutUnverified"></span><span id="structureChip" class="tag part" data-label="structure" hidden></span></div>
     </aside>
@@ -70,16 +72,16 @@
       <button id="zoomValue" class="val" data-title="fitWidth">100%</button>
       <button id="zoomIn" class="icon-btn" data-title="zoomIn">+</button>
       <span class="sep"></span><span id="pageCounter" class="val">1 / 1</span>
-      <span class="sep"></span><span class="note" data-label="preview"></span>
+      <span class="sep"></span><span id="previewStatus" class="note" data-label="preview"></span>
     </div>
   </div>
   <div id="status" class="status" role="status" aria-live="polite"></div>
   <dialog id="reviewDialog" class="sheet review-sheet" data-aria="reviewAll">
-    <header><strong data-label="reviewAll"></strong><button id="closeReview" class="btn ghost" data-title="close">×</button></header>
+    <header><div><strong data-label="reviewAll"></strong><div id="reviewSummary" class="review-summary"></div></div><button id="closeReview" class="btn ghost" data-title="close">×</button></header>
     <div id="reviewChanges"></div>
-    <div id="reviewWarnings"></div>
+    <div class="review-bottom"><details><summary data-label="warningDetails"></summary><div id="reviewWarnings"></div></details>
     <label class="ack"><input id="acknowledge" type="checkbox"><span data-label="ack"></span></label>
-    <footer><button id="cancelReview" class="btn ghost" data-label="cancel"></button><button id="confirmSave" class="btn seal" data-label="saveCopy" disabled></button></footer>
+    <footer><button id="cancelReview" class="btn ghost" data-label="cancel"></button><button id="confirmSave" class="btn seal" data-label="saveCopy" disabled></button></footer></div>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <dialog id="palette" class="palette" data-aria="commands">

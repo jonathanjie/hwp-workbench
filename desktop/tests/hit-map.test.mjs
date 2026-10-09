@@ -37,3 +37,9 @@ test('table-local paragraph indexes do not consume earlier body nodes or merge s
   assert.deepEqual(mapTextRuns(runs, nodes).map(item => item.node?.id), ['body', 'next', 'cell', 'other']);
   assert.equal(paragraphBounds(runs).length, 4);
 });
+
+test('a cleared anchored paragraph keeps its identity for proof marks and later editing', () => {
+  const node = {id: 'empty', text: '', anchor: {section: 0, paragraph: 1, charOffset: 0, inCell: false}};
+  const run = {text: '', secIdx: 0, paraIdx: 1, charStart: 0, x: 20, y: 30, w: 0, h: 12, charX: [0]};
+  assert.equal(mapTextRuns([run], [node])[0].node?.id, 'empty');
+});

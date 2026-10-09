@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
-import {spawnSync} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -53,6 +53,80 @@ async function invokeMain(channel, ...args) {
   }, {channel, args});
 }
 
+function engineRequest(directory, method, args) {
+  const python = process.env.HWP_WORKBENCH_PYTHON || 'python3';
+  const result = spawnSync(python, ['-m', 'hwp_workbench', 'rpc', '--root', directory], {
+    cwd: root, shell: false, encoding: 'utf8',
+    env: {...process.env, PYTHONPATH: path.join(root, 'engine'), PYTHONUTF8: '1'},
+    input: JSON.stringify({method, args})
+  });
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
+}
+
+async function waitForMain(predicate, timeout = 15000) {
+  const deadline = Date.now() + timeout;
+  while (!(await application.evaluate(predicate))) {
+    assert.ok(Date.now() < deadline, 'Timed out waiting for the main process');
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
+// Main writes agent files after the click handler returns.
+async function waitForFile(file, timeout = 15000) {
+  const deadline = Date.now() + timeout;
+  while (true) {
+    try {
+      return await fs.readFile(file, 'utf8');
+    } catch (error) {
+      if (error.code !== 'ENOENT' || Date.now() > deadline) {
+        throw error;
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
+async function waitPreviewText(text) {
+  await window.waitForFunction(async text => {
+    for (const image of document.querySelectorAll('.page-image')) {
+      let svg;
+      try {
+        svg = await (await fetch(image.src)).text();
+      } catch {
+        // A newer preview can revoke this page while the assertion polls.
+        continue;
+      }
+      const layout = new DOMParser().parseFromString(svg, 'image/svg+xml');
+      const renderedText = [...layout.querySelectorAll('text')].map(node => node.textContent).join('');
+      if (renderedText.includes(text)) {
+        return true;
+      }
+    }
+    return false;
+  }, text);
+}
+
+async function secondLaunch(file) {
+  const child = spawn(require('electron'), [root, `--user-data-dir=${temporary}`, '--open', file], {
+    cwd: root, shell: false, stdio: 'ignore'
+  });
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(Error('Secondary Electron did not exit'));
+    }, 15000);
+    child.on('error', error => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('exit', code => {
+      clearTimeout(timer);
+      code === 0 ? resolve() : reject(Error(`Secondary Electron exit ${code}`));
+    });
+  });
+}
+
 function lockedFixture(file) {
   // A self-authored UI regression fixture with one editable and one locked
   // field match. This fixture is not public-corpus or Hancom qualification.
@@ -88,7 +162,8 @@ try {
   window = await application.firstWindow();
   const errors = [];
   window.on('pageerror', error => errors.push(error.message));
-  window.on('dialog', dialog => dialog.accept());
+  // A dialog can close before the handler runs (for example on a document switch).
+  window.on('dialog', dialog => dialog.accept().catch(() => {}));
   await window.waitForSelector('#emptyOpen');
   await window.evaluate(() => {
     localStorage.setItem('hwp-language', 'en');
@@ -180,6 +255,29 @@ try {
   await shortcut('z');
   await window.waitForFunction(() => document.querySelectorAll('#changes .change').length === 0);
   checks.push('Korean IME keys: Enter adds no line break, ⌘↵ during composition stages once after commit');
+
+  // CDP lets Chromium commit actual composition text into the focused control.
+  // The real OS-key sequence above remains a separate regression replay.
+  await window.locator('.text-hit[data-node-id]:not([data-node-id=""]), .text-node').first().click();
+  const cdpOriginal = await window.locator('#textEdit').inputValue();
+  await window.locator('#textEdit').focus();
+  await window.locator('#textEdit').evaluate(editor => {
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+  });
+  const cdp = await window.context().newCDPSession(window);
+  await cdp.send('Input.insertText', {text: ' '});
+  await cdp.send('Input.imeSetComposition', {text: '한글', selectionStart: 2, selectionEnd: 2});
+  await cdp.send('Input.insertText', {text: '한글'});
+  assert.equal(await window.locator('#textEdit').inputValue(), cdpOriginal + ' 한글');
+  await window.locator('#applyText').click();
+  assert.equal(await window.locator('#changes .change').count(), 1);
+  assert.equal(await window.locator('#changes ins').innerText(), ' 한글');
+  await cdp.detach();
+  await waitPreviewText('한글');
+  await shortcut('z');
+  await window.waitForFunction(() => document.querySelectorAll('#changes .change').length === 0);
+  checks.push('CDP Korean composition commits once; memory preview renders the composed text');
+
 
   for (const theme of ['Dark', 'Light']) {
     await command(`Theme ${theme}`);
@@ -283,6 +381,8 @@ try {
   assert.ok((await fs.stat(output)).size > 0);
   assert.match(await window.locator('#toast').innerText(), /Saved review-copy.hwpx/);
   await window.locator('#toast button').click();
+  // Main runs IPC requests in order, so the reveal can wait behind a preview render.
+  await waitForMain(() => globalThis.testRevealedOutput);
   assert.equal(await application.evaluate(() => globalThis.testRevealedOutput), output);
   await assert.rejects(invokeMain('shell:reveal-output', '/tmp/other.hwpx'), /arguments/);
   assert.deepEqual(await fs.readFile(source), before);
@@ -318,6 +418,71 @@ try {
   await window.locator('#recentItems .doc-card').first().click();
   await waitDocument(path.basename(source));
   checks.push('Recent list persistence and reopen by id, PNG cache, drop extension rejection and Korean persistence');
+
+  await command('Language');
+  const inboxSource = path.join(temporary, 'agent-review.hwpx');
+  await fs.copyFile(path.join(root, 'fixtures/generated/review-form.hwpx'), inboxSource);
+  await openFile(inboxSource);
+  await command('Agent');
+  await window.locator('#agentLinkSwitch').check();
+  const inspected = engineRequest(temporary, 'inspect', {path: path.basename(inboxSource)});
+  const proposalNodes = inspected.nodes.filter(node => node.editable).slice(0, 2);
+  assert.equal(proposalNodes.length, 2);
+  const proposedPatch = {schemaVersion: 1, baseSha256: inspected.sha256, operations: proposalNodes.map((node, index) => ({
+    op: 'set_text', nodeId: node.id, expectedText: node.text, text: node.text + ` C3 agent ${index}`
+  }))};
+  const proposed = engineRequest(temporary, 'propose', {path: path.basename(inboxSource), patch: proposedPatch,
+    title: 'C3 <review>', author: 'Claude'});
+  const proposalCard = window.locator('#agentInbox .proposal').first();
+  await proposalCard.waitFor();
+  assert.equal(await proposalCard.locator('.proposal-title').innerText(), 'C3 <review>');
+  assert.equal(await proposalCard.locator('.steps span').count(), 3);
+  assert.match(await window.locator('#toast').innerText(), /Claude proposed 2 edits/);
+  await proposalCard.locator('.proposal-change').first().locator('.acts button').first().click();
+  await window.waitForFunction(() => document.querySelectorAll('#changes .change.agent').length === 1);
+  assert.match(await window.locator('#changes .who').innerText(), /Claude/);
+  await waitPreviewText('C3 agent 0');
+  // Marks are drawn after the preview page image loads and its hit map is
+  // rebuilt, which is later than the SVG text becoming available.
+  await window.waitForSelector('.mark-line.agent.range');
+  await window.waitForSelector('.margin-mark.agent');
+  await proposalCard.locator('.proposal-change').nth(1).locator('.acts button').nth(1).click();
+  const outcomePath = path.join(temporary, proposed.proposal.replace(/\.json$/, '.outcome.json'));
+  const outcome = JSON.parse(await waitForFile(outcomePath));
+  assert.equal(outcome.status, 'partial');
+  assert.deepEqual(outcome.acceptedNodeIds, [proposalNodes[0].id]);
+  assert.deepEqual(outcome.declinedNodeIds, [proposalNodes[1].id]);
+  assert.equal(await window.locator('#changes .change').count(), 1);
+  await window.locator('#agentLinkSwitch').uncheck();
+  checks.push('Watched proposal, blue partial apply, rendered text and exclusive outcome node IDs');
+
+  const handoffSource = path.join(temporary, 'handoff.hwpx');
+  await fs.copyFile(path.join(root, 'fixtures/generated/review-form.hwpx'), handoffSource);
+  await application.evaluate(({dialog}) => {
+    globalThis.testHandoffQuestions = 0;
+    dialog.showMessageBox = async () => {
+      globalThis.testHandoffQuestions += 1;
+      return {response: 0};
+    };
+  });
+  await secondLaunch(handoffSource);
+  await application.evaluate(async () => {
+    const deadline = Date.now() + 10000;
+    while (!globalThis.testHandoffQuestions && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    if (!globalThis.testHandoffQuestions) {
+      throw Error('Native handoff question missing');
+    }
+  });
+  assert.equal(await window.locator('#filename').innerText(), path.basename(inboxSource));
+  assert.equal(await window.locator('#changes .change').count(), 1);
+  await application.evaluate(({dialog}) => { dialog.showMessageBox = async () => ({response: 1}); });
+  await secondLaunch(handoffSource);
+  await waitDocument(path.basename(handoffSource));
+  assert.equal(await window.locator('#changes .change').count(), 0);
+  checks.push('Second launch --open preserves staged edits on cancel and switches after native approval');
+
 
   for (const url of ['app://workbench/../package.json', 'app://workbench/unknown.xyz']) {
     const response = await serveAppRequest({url, method: 'GET'}, {

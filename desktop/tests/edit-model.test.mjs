@@ -33,3 +33,17 @@ test('draft recovery refuses stale expected text, controls and read-only edits',
   assert.equal(textError('😀', 'a', false), 'lengthError');
   assert.equal(textError('\ud800', '', true), 'controls');
 });
+
+test('agent authors survive undo/redo and a human edit replaces the origin', () => {
+  const model = new EditModel(document);
+  assert.equal(model.stageBatch([{node, text: 'Agent changed', author: 'Claude'}]), true);
+  assert.equal(model.origins[node.id], 'Claude');
+  model.undo();
+  assert.equal(model.origins[node.id], undefined);
+  model.redo();
+  assert.equal(model.origins[node.id], 'Claude');
+  model.stage(node, 'Human changed');
+  assert.equal(model.origins[node.id], undefined);
+  model.undo();
+  assert.equal(model.origins[node.id], 'Claude');
+});

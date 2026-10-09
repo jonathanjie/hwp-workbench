@@ -1,3 +1,4 @@
+import {changedRanges} from './preview.js';
 import {matchBounds} from './search-layout.js';
 import {createFontMapper} from './fonts.js';
 import {mapTextRuns, paragraphBounds} from './hit-map.js';
@@ -35,12 +36,19 @@ export class PageView {
     this.resize.observe(canvas);
   }
 
-  clear() {
+  suspend() {
     this.observer?.disconnect();
+    this.resize.disconnect();
     if (this.idleRender) {
       cancelIdleCallback(this.idleRender);
       this.idleRender = null;
     }
+  }
+
+  clear(clearDom = true) {
+    this.suspend();
+    this.releasePrevious?.();
+    this.releasePrevious = null;
     for (const entry of this.entries) {
       if (entry.url) {
         URL.revokeObjectURL(entry.url);
@@ -49,12 +57,16 @@ export class PageView {
     this.document?.free();
     this.document = null;
     this.entries = [];
-    this.pages.replaceChildren();
-    this.thumbnails.replaceChildren();
+    if (clearDom) {
+      this.pages.replaceChildren();
+      this.thumbnails.replaceChildren();
+    }
   }
 
-  async open(bytes, nodes) {
+  async open(bytes, nodes, {detached = false, visible = [0]} = {}) {
     this.clear();
+    this.detached = detached;
+    this.resize.observe(this.canvas);
     this.nodes = nodes;
     this.edits = {};
     this.searchMatches = [];
@@ -99,31 +111,44 @@ export class PageView {
         this.entries.push({page, thumbnail, sheet, runs: layouts[index], mapped: mapTextRuns(layouts[index], nodes, allRuns), width: 794, height: 1123});
       }
       this.setZoom(this.fit ? 'fit' : this.zoom);
-      this.render(0);
-      this.scheduleThumbnails();
-      this.observer = new IntersectionObserver(entries => {
-        for (const item of entries) {
-          if (item.isIntersecting) {
-            try {
-              this.render(Number(item.target.dataset.page));
-            } catch (error) {
-              this.clear();
-              this.onFailure(error);
-              break;
-            }
-          }
-        }
-      }, {root: this.canvas, rootMargin: '400px 0px'});
-      this.entries.forEach(entry => this.observer.observe(entry.page));
-      this.canvas.onscroll = () => this.updateCounter();
-      this.updateCounter();
+      for (const index of visible) {
+        this.render(Math.min(index, count - 1));
+      }
+      if (!detached) {
+        this.activate();
+      }
       return true;
     } catch (error) {
       this.clear();
+      if (detached) {
+        throw error;
+      }
       this.onFailure(error);
       return false;
     }
   }
+
+  activate() {
+    this.detached = false;
+    this.resize.observe(this.canvas);
+    this.scheduleThumbnails();
+    this.observer = new IntersectionObserver(entries => {
+      for (const item of entries) {
+        if (item.isIntersecting) {
+          try {
+            this.render(Number(item.target.dataset.page));
+          } catch (error) {
+            this.onFailure(error);
+            break;
+          }
+        }
+      }
+    }, {root: this.canvas, rootMargin: '400px 0px'});
+    this.entries.forEach(entry => this.observer.observe(entry.page));
+    this.canvas.onscroll = () => this.updateCounter();
+    this.updateCounter();
+  }
+
 
   async thumbnail() {
     const entry = this.entries[0];
@@ -156,7 +181,6 @@ export class PageView {
         this.render(index);
         this.scheduleThumbnails();
       } catch (error) {
-        this.clear();
         this.onFailure(error);
       }
     }, {timeout: 500});
@@ -180,7 +204,9 @@ export class PageView {
     image.src = entry.url;
     image.alt = `${this.translate('pages')} ${index + 1}`;
     image.onerror = () => {
-      this.clear();
+      if (this.detached || !this.entries.includes(entry)) {
+        return;
+      }
       this.onFailure(Error('Page image unavailable'));
     };
     const thumb = image.cloneNode();
@@ -198,7 +224,8 @@ export class PageView {
       hit.dataset.nodeId = node?.id || '';
       hit.setAttribute('aria-label', node?.text || this.translate('locked'));
       hit.setAttribute('aria-readonly', String(!node?.editable));
-      rectangle(hit, run, entry.width, entry.height);
+      // Empty native paragraphs still need a target for insertion and review.
+      rectangle(hit, {...run, w: Math.max(12, run.w)}, entry.width, entry.height);
       const group = entry.groups.find(group => group.runs.includes(run));
       hit.onmouseenter = () => this.hover(entry, group, node);
       hit.onmouseleave = () => this.drawMarks(entry);
@@ -260,9 +287,18 @@ export class PageView {
       if (!changed.length) {
         continue;
       }
-      this.overlay(entry, group.bounds, 'human');
+      const origin = this.origins?.[changed[0].node.id] ? 'agent' : 'human';
+      for (const {run, node} of changed) {
+        const original = this.originalNodes?.get(node.id)?.text ?? node.text;
+        for (const range of changedRanges(original, this.edits[node.id])) {
+          const bounds = matchBounds(run, node, {node, text: node.text, ...range}, true);
+          if (bounds) {
+            this.overlay(entry, bounds, `${origin} range`);
+          }
+        }
+      }
       const margin = document.createElement('div');
-      margin.className = 'mm human margin-mark';
+      margin.className = `mm ${origin} margin-mark`;
       margin.style.top = `${group.bounds.y / entry.height * 100}%`;
       const number = document.createElement('span');
       number.textContent = ids.indexOf(changed[0].node.id) + 1;
@@ -277,8 +313,10 @@ export class PageView {
     this.entries.forEach(entry => this.drawMarks(entry));
   }
 
-  updateEdits(edits) {
+  updateEdits(edits, originalNodes = this.nodes, origins = {}) {
     this.edits = edits;
+    this.originalNodes = new Map(originalNodes.map(node => [node.id, node]));
+    this.origins = origins;
     this.entries.forEach(entry => this.drawMarks(entry));
   }
 
@@ -290,7 +328,7 @@ export class PageView {
   setZoom(value) {
     this.fit = value === 'fit';
     const width = this.entries[0]?.width || 794;
-    this.zoom = this.fit ? Math.max(50, Math.min(200, (this.canvas.clientWidth - 108) / width * 100)) : value;
+    this.zoom = this.fit ? Math.max(10, Math.min(200, (this.canvas.clientWidth - 108) / width * 100)) : value;
     this.entries.forEach(entry => this.sizePage(entry));
     const percent = Math.round(this.zoom);
     this.onZoom(percent);

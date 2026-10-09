@@ -1,3 +1,5 @@
+import {nativeLength, nativeSlice} from './native-text.js';
+
 export function sectionIndex(node) {
   if (Number.isInteger(node.anchor?.section)) {
     return node.anchor.section;
@@ -74,31 +76,31 @@ export function mapTextRuns(runs, nodes, documentRuns = runs) {
     }
   }
   return runs.map(run => {
-    if (!run.text || !Number.isInteger(run.secIdx) || !Number.isInteger(run.paraIdx)) {
+    if (!Number.isInteger(run.secIdx) || !Number.isInteger(run.paraIdx)) {
       return {run, node: null};
     }
     const paragraphIndex = run.parentParaIdx ?? run.paraIdx;
     const inCell = run.inCell ?? (run.cellIdx !== undefined || run.cellPath !== undefined);
-    const anchored = nodes.filter(node => node.anchor?.section === run.secIdx && node.anchor.paragraph === paragraphIndex &&
+    const anchored = nodes.filter(node => (run.text || node.text === '') && node.anchor?.section === run.secIdx && node.anchor.paragraph === paragraphIndex &&
       node.anchor.inCell === inCell &&
-      run.charStart >= node.anchor.charOffset &&
-      run.charStart + run.text.length <= node.anchor.charOffset + node.text.length &&
-      node.text.slice(run.charStart - node.anchor.charOffset, run.charStart - node.anchor.charOffset + run.text.length) === run.text);
+      Number.isInteger(node.anchor.charOffset) && run.charStart >= node.anchor.charOffset &&
+      run.charStart + nativeLength(run.text) <= node.anchor.charOffset + nativeLength(node.text) &&
+      nativeSlice(node.text, run.charStart - node.anchor.charOffset, nativeLength(run.text)) === run.text);
     if (anchored.length) {
       return {run, node: anchored.length === 1 ? anchored[0] : null};
     }
-    // Anchored nodes never fall back to a weaker text-only identity.
+    // Nodes with a complete native text anchor never fall back to text matching.
+    // Table anchors have no character offset; use their ordered cell text.
     const paragraph = assignments.get(paragraphKey(run));
     let offset = 0;
     const candidates = [];
     for (const node of paragraph?.nodes || []) {
-      if (!node.anchor && node.text.includes(run.text)) {
+      if (!Number.isInteger(node.anchor?.charOffset) && node.text.includes(run.text)) {
         candidates.push({node, offset});
       }
-      offset += node.text.length;
+      offset += nativeLength(node.text);
     }
-    const exact = candidates.filter(candidate => candidate.node.text.slice(run.charStart - candidate.offset,
-      run.charStart - candidate.offset + run.text.length) === run.text);
+    const exact = candidates.filter(candidate => nativeSlice(candidate.node.text, run.charStart - candidate.offset, nativeLength(run.text)) === run.text);
     const node = exact.length === 1 ? exact[0].node : candidates.length === 1 ? candidates[0].node : null;
     return {run, node};
   });

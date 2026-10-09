@@ -20,6 +20,7 @@ export class EditModel {
     this.lengthChangingText = document.capabilities?.lengthChangingText === true;
     this.nodes = new Map(document.nodes.map(node => [node.id, node]));
     this.edits = {};
+    this.origins = {};
     this.history = [];
     this.future = [];
   }
@@ -34,9 +35,14 @@ export class EditModel {
 
   stageBatch(changes) {
     const next = {...this.edits};
-    for (const {node, text} of changes) {
+    const origins = {...this.origins};
+    for (const {node, text, author} of changes) {
       if (this.nodes.get(node.id) !== node || !node.editable || textError(text, node.text, this.lengthChangingText)) {
         return false;
+      }
+      delete origins[node.id];
+      if (text !== node.text && author) {
+        origins[node.id] = author;
       }
       if (text === node.text) {
         delete next[node.id];
@@ -47,32 +53,43 @@ export class EditModel {
     if (Object.keys(next).length > 1000 || JSON.stringify(next) === JSON.stringify(this.edits)) {
       return false;
     }
-    this.history.push({...this.edits});
+    this.history.push(this.snapshot());
     this.future = [];
     this.edits = next;
+    this.origins = origins;
     return true;
   }
 
   revert(id) {
     if (Object.hasOwn(this.edits, id)) {
-      this.history.push({...this.edits});
+      this.history.push(this.snapshot());
       this.future = [];
       delete this.edits[id];
+      delete this.origins[id];
     }
   }
 
   undo() {
     if (this.history.length) {
-      this.future.push({...this.edits});
-      this.edits = this.history.pop();
+      this.future.push(this.snapshot());
+      this.restoreSnapshot(this.history.pop());
     }
   }
 
   redo() {
     if (this.future.length) {
-      this.history.push({...this.edits});
-      this.edits = this.future.pop();
+      this.history.push(this.snapshot());
+      this.restoreSnapshot(this.future.pop());
     }
+  }
+
+  snapshot() {
+    return {edits: {...this.edits}, origins: {...this.origins}};
+  }
+
+  restoreSnapshot(snapshot) {
+    this.edits = snapshot.edits;
+    this.origins = snapshot.origins;
   }
 
   restore(draft) {

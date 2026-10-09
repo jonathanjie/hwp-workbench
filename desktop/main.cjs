@@ -7,6 +7,9 @@ const crypto = require('node:crypto');
 const {serveAppRequest} = require('./protocol.cjs');
 const {RecentStore, validateDroppedFile} = require('./recent-store.cjs');
 const {OutputReveal} = require('./output-reveal.cjs');
+const {OpenHandoff, openArgument, requestedOpen} = require('./open-handoff.cjs');
+const {AgentTools} = require('./agent-tools.cjs');
+const {AgentInbox} = require('./agent-inbox.cjs');
 const {readDocumentBytes} = require('./document-bytes.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -16,11 +19,29 @@ const profileDirectory = app.commandLine.getSwitchValue('user-data-dir');
 if (profileDirectory) {
   app.setPath('userData', path.resolve(profileDirectory));
 }
+const initialOpen = openArgument(process.argv);
+const primaryInstance = app.requestSingleInstanceLock({open: initialOpen});
+if (!primaryInstance) {
+  app.quit();
+}
+let rendererReady = false;
+let handoffActive = false;
+const pendingOpen = initialOpen ? [initialOpen] : [];
+let handoff;
+let editing = false;
 let win;
 let current = null;
+const agentTools = new AgentTools({
+  documentRoot: () => current?.root,
+  copy: text => clipboard.writeText(text),
+  reveal: file => shell.showItemInFolder(file)
+});
 const outputReveal = new OutputReveal(file => shell.showItemInFolder(file));
 let queue = Promise.resolve();
 let recentStore;
+let agentInbox;
+let stagedPatch = null;
+let selection = null;
 function recents() {
   const directory = app.getPath('userData');
   if (!recentStore || recentStore.directory !== directory) {
@@ -75,7 +96,7 @@ function callEngine(root, method, args) {
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', data => {
       size += Buffer.byteLength(data);
-      if (size > 32 * 1024 * 1024) {
+      if (size > (method === 'preview' ? 90 : 32) * 1024 * 1024) {
         child.kill('SIGKILL');
         finish(Error('Response too large'));
       } else {
@@ -124,8 +145,11 @@ function validatePatch(patch) {
   return patch;
 }
 
+// Key drafts by file and content: a copied file with the same bytes must not
+// offer another file's staged edits.
 function draftPath() {
-  return path.join(app.getPath('userData'), 'drafts', current.sha256 + '.json');
+  const file = crypto.createHash('sha256').update(current.file).digest('hex').slice(0, 32);
+  return path.join(app.getPath('userData'), 'drafts', `${file}-${current.sha256}.json`);
 }
 
 // Recent files are a convenience. A failure to record one must not block
@@ -144,13 +168,19 @@ async function load(file) {
   const root = path.dirname(file);
   const document = await callEngine(root, 'inspect', {path: path.basename(file)});
   const recentId = await recordRecent(file, document.format);
-  current = {file, root, sha256: document.sha256, recentId};
+  current = {file, root, name: document.name, format: document.format, sha256: document.sha256, recentId};
+  stagedPatch = null;
+  editing = false;
+  selection = null;
+  if (agentInbox) {
+    await agentInbox.setDocument(current);
+  }
   outputReveal.clear();
   let draft = null;
   try {
     draft = JSON.parse(await fs.readFile(draftPath(), 'utf8'));
   } catch {}
-  return {document, draft, recentId};
+  return {document, draft, recentId, agentLink: agentInbox?.state()};
 }
 
 function register(channel, fn) {
@@ -190,6 +220,10 @@ register('document:cache-thumbnail', (id, png) => {
 register('document:plan', patch => {
   validatePatch(patch);
   return callEngine(current.root, 'plan', {path: path.basename(current.file), patch});
+});
+register('document:preview', patch => {
+  validatePatch(patch);
+  return callEngine(current.root, 'preview', {path: path.basename(current.file), patch});
 });
 register('document:save', async (patch, acknowledgement) => {
   validatePatch(patch);
@@ -238,6 +272,8 @@ register('document:export-patch', async patch => {
 });
 register('document:draft', async patch => {
   validatePatch(patch);
+  stagedPatch = patch;
+  agentInbox?.update(selection, patch);
   const destination = draftPath();
   await fs.mkdir(path.dirname(destination), {recursive: true, mode: 0o700});
   const temporary = destination + '.' + crypto.randomBytes(8).toString('hex') + '.tmp';
@@ -249,6 +285,35 @@ register('document:draft', async patch => {
   }
   return true;
 });
+register('agents:status', (...args) => agentTools.status(...args));
+register('agents:install-skill', target => agentTools.install(target));
+register('agents:copy-mcp', client => agentTools.copyMcp(client));
+register('agents:reveal-bundle', (...args) => agentTools.bundle(...args));
+register('document:handoff-ready', (...args) => {
+  if (args.length) {
+    throw Error('Handoff readiness accepts no arguments');
+  }
+  handoffActive = false;
+  flushOpenRequests();
+  return true;
+});
+register('document:editing', value => {
+  if (typeof value !== 'boolean') {
+    throw Error('Invalid edit state');
+  }
+  editing = value;
+  return true;
+});
+register('agent:link', enabled => agentInbox.toggle(enabled));
+register('agent:selection', value => {
+  if (!current || (value !== null && (!value || typeof value.nodeId !== 'string' || typeof value.text !== 'string' || value.text.length > 200000))) {
+    throw Error('Invalid selection');
+  }
+  selection = value;
+  agentInbox.update(selection, stagedPatch);
+  return true;
+});
+register('agent:decide', (file, ids, accepted) => agentInbox.decide(file, ids, accepted));
 register('clipboard:copy', text => {
   if (typeof text !== 'string' || text.length > 4096) {
     throw Error('Invalid clipboard text');
@@ -257,63 +322,131 @@ register('clipboard:copy', text => {
   return true;
 });
 
-app.whenReady().then(() => {
-  protocol.handle('app', request => serveAppRequest(request, {
-    desktop: __dirname,
-    vendor: path.join(ROOT, 'node_modules', '@rhwp', 'core')
-  }));
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  session.defaultSession.setPermissionCheckHandler(() => false);
-  session.defaultSession.webRequest.onBeforeRequest({urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*']}, (_details, callback) => callback({cancel: true}));
-  win = new BrowserWindow({
-    width: 1400,
-    height: 930,
-    minWidth: 1100,
-    minHeight: 720,
-    title: 'HWP Workbench',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: {x: 18, y: 18},
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0F0F0E' : '#E8E7E3',
-    icon: fsSync.existsSync(path.join(__dirname, 'assets', 'icon.png')) ? path.join(__dirname, 'assets', 'icon.png') : undefined,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-      webSecurity: true,
-      allowRunningInsecureContent: false,
-      spellcheck: false
+function focusWindow() {
+  if (win?.isMinimized()) {
+    win.restore();
+  }
+  win?.show();
+  win?.focus();
+}
+
+function flushOpenRequests() {
+  if (!rendererReady || !handoff || handoffActive || !pendingOpen.length) {
+    return;
+  }
+  handoffActive = true;
+  const file = pendingOpen.shift();
+  const task = queue.then(async () => {
+    if (!(await handoff.open(file))) {
+      handoffActive = false;
+      // Schedule after this queue entry settles; a cancelled open needs no
+      // renderer acknowledgement because the current view did not change.
+      setTimeout(flushOpenRequests, 0);
     }
   });
-  win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
-  win.webContents.on('will-navigate', event => event.preventDefault());
-  win.webContents.on('will-prevent-unload', async () => {
-    const result = await dialog.showMessageBox(win, {
-      type: 'question',
-      buttons: ['Keep editing / 계속 편집', 'Close / 닫기'],
-      defaultId: 0,
-      cancelId: 0,
-      message: 'Unsaved text / 저장하지 않은 텍스트',
-      detail: 'Staged draft retained · unstaged text unsaved / 적용된 초안 보관 · 미적용 텍스트 미저장'
-    });
-    if (result.response === 1) {
-      win.destroy();
-    }
+  queue = task.catch(error => {
+    focusWindow();
+    win.webContents.send('document:handoff', null, error.message);
   });
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    {label: app.name, submenu: [{role: 'about'}, {type: 'separator'}, {role: 'quit'}]},
-    {label: 'Edit / 편집', submenu: [
-      {id: 'undo', label: 'Undo / 실행 취소', accelerator: 'CommandOrControl+Z', click: () => win.webContents.send('app:command', 'undo')},
-      {id: 'redo', label: 'Redo / 다시 실행', accelerator: 'CommandOrControl+Shift+Z', click: () => win.webContents.send('app:command', 'redo')},
-      {type: 'separator'}, {role: 'cut'}, {role: 'copy'}, {role: 'paste'}, {role: 'selectAll'}
-    ]},
-    {label: 'View / 보기', submenu: [
-      {label: 'Commands / 명령', click: () => win.webContents.send('app:command', 'palette')},
-      {label: 'Language / 언어', click: () => win.webContents.send('app:command', 'language')},
-      {label: 'Keyboard shortcuts / 키보드 단축키', click: () => win.webContents.send('app:command', 'shortcuts')},
-      {role: 'togglefullscreen'}
-    ]}
-  ]));
-  win.loadURL(INDEX);
+}
+
+app.on('second-instance', (_event, argv, _directory, additionalData) => {
+  const file = requestedOpen(argv, additionalData);
+  if (file) {
+    pendingOpen.push(file);
+    flushOpenRequests();
+  }
+  focusWindow();
 });
-app.on('window-all-closed', () => app.quit());
+app.on('open-file', (event, file) => {
+  event.preventDefault();
+  pendingOpen.push(file);
+  flushOpenRequests();
+});
+
+if (primaryInstance) {
+  app.whenReady().then(() => {
+    protocol.handle('app', request => serveAppRequest(request, {
+      desktop: __dirname,
+      vendor: path.join(ROOT, 'node_modules', '@rhwp', 'core')
+    }));
+    session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+    session.defaultSession.setPermissionCheckHandler(() => false);
+    session.defaultSession.webRequest.onBeforeRequest({urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*']}, (_details, callback) => callback({cancel: true}));
+    win = new BrowserWindow({
+      width: 1400,
+      height: 930,
+      minWidth: 1100,
+      minHeight: 720,
+      title: 'HWP Workbench',
+      titleBarStyle: 'hiddenInset',
+      trafficLightPosition: {x: 18, y: 18},
+      backgroundColor: nativeTheme.shouldUseDarkColors ? '#0F0F0E' : '#E8E7E3',
+      icon: fsSync.existsSync(path.join(__dirname, 'assets', 'icon.png')) ? path.join(__dirname, 'assets', 'icon.png') : undefined,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.cjs'),
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+        webSecurity: true,
+        allowRunningInsecureContent: false,
+        spellcheck: false
+      }
+    });
+    handoff = new OpenHandoff({
+      hasStaged: () => !!stagedPatch?.operations.length || editing,
+      confirm: async () => (await dialog.showMessageBox(win, {
+        type: 'question', buttons: ['Keep editing / 계속 편집', 'Open document / 문서 열기'],
+        defaultId: 0, cancelId: 0,
+        message: 'Unsaved text / 저장하지 않은 텍스트'
+      })).response === 1,
+      load,
+      complete: result => win.webContents.send('document:handoff', result),
+      focus: focusWindow
+    });
+    win.webContents.on('did-finish-load', () => {
+      rendererReady = true;
+      flushOpenRequests();
+    });
+    win.webContents.on('did-start-loading', () => { rendererReady = false; });
+    agentInbox = new AgentInbox({
+      preferences: path.join(app.getPath('userData'), 'agent-links.json'),
+      plan: (document, patch) => callEngine(document.root, 'plan', {path: document.name, patch}),
+      send: state => win.webContents.send('agent:inbox', state)
+    });
+    win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
+    win.webContents.on('will-navigate', event => event.preventDefault());
+    win.webContents.on('will-prevent-unload', async () => {
+      const result = await dialog.showMessageBox(win, {
+        type: 'question',
+        buttons: ['Keep editing / 계속 편집', 'Close / 닫기'],
+        defaultId: 0,
+        cancelId: 0,
+        message: 'Unsaved text / 저장하지 않은 텍스트',
+        detail: 'Staged draft retained · unstaged text unsaved / 적용된 초안 보관 · 미적용 텍스트 미저장'
+      });
+      if (result.response === 1) {
+        win.destroy();
+      }
+    });
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      {label: app.name, submenu: [{role: 'about'}, {type: 'separator'}, {role: 'quit'}]},
+      {label: 'Edit / 편집', submenu: [
+        {id: 'undo', label: 'Undo / 실행 취소', accelerator: 'CommandOrControl+Z', click: () => win.webContents.send('app:command', 'undo')},
+        {id: 'redo', label: 'Redo / 다시 실행', accelerator: 'CommandOrControl+Shift+Z', click: () => win.webContents.send('app:command', 'redo')},
+        {type: 'separator'}, {role: 'cut'}, {role: 'copy'}, {role: 'paste'}, {role: 'selectAll'}
+      ]},
+      {label: 'View / 보기', submenu: [
+        {label: 'Commands / 명령', click: () => win.webContents.send('app:command', 'palette')},
+        {label: 'Language / 언어', click: () => win.webContents.send('app:command', 'language')},
+        {label: 'Keyboard shortcuts / 키보드 단축키', click: () => win.webContents.send('app:command', 'shortcuts')},
+        {role: 'togglefullscreen'}
+      ]}
+    ]));
+    win.loadURL(INDEX);
+  });
+}
+app.on('window-all-closed', () => {
+  agentInbox?.stop();
+  app.quit();
+});

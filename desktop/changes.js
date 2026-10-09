@@ -68,7 +68,8 @@ export function changeCards(model, onRevert, ids = Object.keys(model.edits), act
     const node = model.nodes.get(id);
     const text = model.edits[id];
     const card = document.createElement('article');
-    card.className = 'change';
+    const author = model.origins?.[id];
+    card.className = author ? 'change agent' : 'change';
     card.dataset.nodeId = id;
     const header = document.createElement('div');
     header.className = 'head';
@@ -76,6 +77,12 @@ export function changeCards(model, onRevert, ids = Object.keys(model.edits), act
     number.className = 'num';
     number.textContent = index + 1;
     header.append(number, document.createTextNode(`P${(node.anchor?.paragraph ?? node.paragraph ?? 0) + (node.anchor ? 1 : 0)} · ${roleLabel(node.role)}`));
+    if (author) {
+      const who = document.createElement('span');
+      who.className = 'who';
+      who.textContent = author;
+      header.append(who);
+    }
     const diff = document.createElement('div');
     diff.className = 'diff';
     for (const segment of wordDiffSegments(node.text, text)) {

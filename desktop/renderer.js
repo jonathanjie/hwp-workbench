@@ -10,6 +10,11 @@ import {FindBar} from './find-bar.js';
 import {findMatches} from './search.js';
 import {CommandPalette} from './palette.js';
 import {element} from './dom.js';
+import {AgentsCard} from './agents-card.js';
+import {AgentPanel} from './agent-panel.js';
+import {textError} from './edit-model.js';
+import {previewNodes, commitPagePreview} from './preview.js';
+import {PanelZoom} from './panel-zoom.js';
 import {renderStructure} from './structure-view.js';
 
 const $ = id => document.getElementById(id);
@@ -56,12 +61,15 @@ function selectNode(node, location) {
   if (busy || (slip.dirty && !confirm(t('discard')))) {
     return;
   }
+  node = model.nodes.get(node.id);
+  call('agentSelection', {nodeId: node.id, text: model.current(node)}).catch(error => status('failed', {reason: errorReason(error)}, true));
   slip.open(node, model.current(node), documentData.format, location, model.lengthChangingText);
 }
 
-const pageView = new PageView({
-  pages: $('pages'),
-  thumbnails: $('thumbnails'),
+function pageOptions(pages = $('pages'), thumbnails = $('thumbnails')) {
+  return {
+  pages,
+  thumbnails,
   canvas: $('canvas'),
   onSelect: selectNode,
   onCounter: (page, total) => {
@@ -76,6 +84,7 @@ const pageView = new PageView({
     renderFonts();
   },
   onFailure: () => {
+    pageView.clear();
     structure = true;
     status('previewFailed');
     $('structureChip').hidden = false;
@@ -84,6 +93,77 @@ const pageView = new PageView({
     }
   },
   translate: t
+  };
+}
+let pageView = new PageView(pageOptions());
+
+const panelZoom = new PanelZoom(pageView);
+
+const agentsCard = new AgentsCard([$('welcomeAgents'), $('panelAgents')], call, toast, error => status('failed', {reason: errorReason(error)}, true));
+
+const agentPanel = new AgentPanel({
+  host: $('agentInbox'), switchControl: $('agentLinkSwitch'), chip: $('agentChip'), toast,
+  toggle: async enabled => {
+    try {
+      agentPanel.update(await call('agentLink', enabled), false);
+    } catch (error) {
+      agentPanel.render();
+      status('agentLinkFailed', {}, true);
+    }
+  },
+  decide: decideProposal
+});
+
+async function decideProposal(file, ids, accepted) {
+  if (busy || (slip.dirty && !confirm(t('discard')))) {
+    return;
+  }
+  const row = agentPanel.state.proposals.find(row => row.file === file);
+  const changes = (row?.patch?.operations || []).filter(operation => ids.includes(operation.nodeId));
+  if (accepted && changes.some(operation => {
+    const node = model.nodes.get(operation.nodeId);
+    return !node?.editable || operation.expectedText !== node.text || Object.hasOwn(model.edits, node.id) ||
+      textError(operation.text, node.text, model.lengthChangingText);
+  })) {
+    status('proposalConflict', {}, true);
+    return;
+  }
+  if (accepted && new Set([...Object.keys(model.edits), ...ids]).size > 1000) {
+    status('tooManyEdits', {}, true);
+    return;
+  }
+  slip.close();
+  busy = true;
+  agentPanel.busy = true;
+  agentPanel.render();
+  updateControls();
+  try {
+    const result = await call('agentDecide', file, ids, accepted);
+    if (result.operations.length) {
+      model.stageBatch(result.operations.map(operation => ({node: model.nodes.get(operation.nodeId), text: operation.text, author: result.author})));
+      panelDismissed = false;
+      refreshEdits();
+    }
+  } catch (error) {
+    status('failed', {reason: errorReason(error)}, true);
+  } finally {
+    busy = false;
+    agentPanel.busy = false;
+    agentPanel.render();
+    updateControls();
+  }
+}
+
+$('agentChip').onclick = () => {
+  panelTab('agent');
+  updatePanel();
+};
+window.hwp?.onAgentInbox(state => {
+  if (documentData && !busy) {
+    agentPanel.update(state);
+  } else if (documentData) {
+    agentPanel.update(state, false);
+  }
 });
 
 function renderFonts() {
@@ -173,7 +253,7 @@ function refreshEdits() {
   if (structure) {
     renderFallback();
   } else {
-    pageView.updateEdits(model.edits);
+    pageView.updateEdits(model.edits, documentData.nodes, model.origins);
   }
   updateControls();
   findBar.refresh();
@@ -182,7 +262,94 @@ function refreshEdits() {
     renderReview();
     updateControls();
   }
+  schedulePreview();
   call('saveDraft', model.patch()).catch(error => status('failed', {reason: errorReason(error)}, true));
+}
+
+let previewTimer;
+let previewRevision = 0;
+
+function schedulePreview() {
+  const revision = ++previewRevision;
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => renderPreview(revision), 300);
+}
+
+async function renderPreview(revision) {
+  const activeModel = model;
+  const patch = activeModel.patch();
+  let candidate;
+  try {
+    const result = patch.operations.length ? await call('preview', patch) : null;
+    const bytes = result ? Uint8Array.from(atob(result.bytesBase64), character => character.charCodeAt(0)) : await call('documentBytes');
+    if (revision !== previewRevision || activeModel !== model) {
+      return;
+    }
+    const scrollTop = $('canvas').scrollTop;
+    const scrollLeft = $('canvas').scrollLeft;
+    const canvasBounds = $('canvas').getBoundingClientRect();
+    const visible = pageView.entries.flatMap((entry, index) => {
+      const bounds = entry.page.getBoundingClientRect();
+      return bounds.bottom >= canvasBounds.top && bounds.top <= canvasBounds.bottom ? [index] : [];
+    });
+    candidate = new PageView(pageOptions(element('div'), element('div')));
+    candidate.zoom = pageView.zoom;
+    candidate.fit = pageView.fit;
+    await candidate.open(bytes, previewNodes(documentData.nodes, activeModel.edits), {detached: true, visible: visible.length ? visible : [0]});
+    await Promise.all(candidate.entries.flatMap(entry => entry.url ? [entry.page.querySelector('.page-image').decode()] : []));
+    if (revision !== previewRevision || activeModel !== model) {
+      candidate.clear();
+      return;
+    }
+    candidate.updateEdits(activeModel.edits, documentData.nodes, activeModel.origins);
+    const previous = pageView;
+    const previousStructure = structure;
+    previous.onFailure = pageOptions().onFailure;
+    $('previewStatus').textContent = t('preview');
+    commitPagePreview(previous, candidate, {
+      pages: $('pages'), thumbnails: $('thumbnails'),
+      onMount: view => {
+        pageView = view;
+        panelZoom.view = view;
+        globalThis.measureTextWidth = view.fonts.measure;
+        structure = view === previous ? previousStructure : false;
+        $('structureChip').hidden = !structure;
+        $('canvas').scrollTop = scrollTop;
+        $('canvas').scrollLeft = scrollLeft;
+        reanchorSlip();
+        findBar.refresh();
+      },
+      onRollback: error => previewFailure(error)
+    });
+  } catch (error) {
+    candidate?.clear();
+    if (revision === previewRevision) {
+      previewFailure(error);
+    }
+  }
+}
+
+function previewFailure(error) {
+  $('previewStatus').textContent = t('livePreviewFailed');
+  status('failed', {reason: errorReason(error)}, true);
+}
+
+function reanchorSlip() {
+  if (!slip.slip) {
+    return;
+  }
+  for (const entry of pageView.entries) {
+    const mapped = entry.mapped.find(item => item.node?.id === slip.node.id);
+    if (!mapped) {
+      continue;
+    }
+    pageView.render(Number(entry.page.dataset.page));
+    const group = entry.groups.find(group => group.runs.includes(mapped.run));
+    const focus = [...entry.hits.children].find(hit => hit.dataset.nodeId === slip.node.id);
+    slip.location = {page: entry.page, bounds: group.bounds, width: entry.width, height: entry.height, focus, paragraph: mapped.run.paraIdx};
+    slip.position();
+    return;
+  }
 }
 
 function revert(id) {
@@ -254,11 +421,18 @@ async function completeOpen(result, failure = null) {
       lastStatus = null;
       return;
     }
+    previewRevision += 1;
+    clearTimeout(previewTimer);
+    if ($('reviewDialog').open) {
+      $('reviewDialog').close();
+    }
     slip.close(false);
     findBar.close();
     documentData = result.document;
+    agentsCard.refresh();
     model = new EditModel(documentData);
     locations = nodeLocations(documentData.view);
+    agentPanel.reset(result.agentLink);
     activeTab = 'changes';
     panelDismissed = false;
     panelTab('changes');
@@ -279,9 +453,12 @@ async function completeOpen(result, failure = null) {
     const bytes = await call('documentBytes');
     const rendered = await pageView.open(bytes, documentData.nodes);
     if (rendered) {
-      pageView.updateEdits(model.edits);
+      pageView.updateEdits(model.edits, documentData.nodes, model.origins);
       $('status').textContent = '';
       lastStatus = null;
+    }
+    if (Object.keys(model.edits).length) {
+      schedulePreview();
     }
     $('changes').replaceChildren(...changeCards(model, revert));
     if (rendered && result.recentId) {
@@ -320,9 +497,9 @@ async function openDocument(method = 'open', ...args) {
   }
 }
 
-function stagedToast(count) {
+function stagedToast(count, paragraphs) {
   const history = model.history.length;
-  toast.show('stagedToast', {n: count}, {label: 'undo', run: () => {
+  toast.show(paragraphs === undefined ? 'stagedToast' : 'replacedToast', {n: count, paragraphs}, {label: 'undo', run: () => {
     if (model.history.length === history) {
       historyAction();
     }
@@ -353,6 +530,7 @@ function renderReview() {
     group.append(...changeCards(model, revert, ids, 'remove'));
     return group;
   }));
+  $('reviewSummary').textContent = t('reviewSummary', {n: Object.keys(model.edits).length, pages: pageView.entries.length || $('pages').children.length});
   $('reviewWarnings').replaceChildren(...compatibilityTags(documentData));
 }
 
@@ -407,6 +585,7 @@ async function save() {
 }
 
 function zoom(value) {
+  panelZoom.changed();
   const percent = pageView.setZoom(value);
   $('zoomValue').textContent = `${percent}%`;
   if (structure) {
@@ -440,10 +619,11 @@ function panelTab(name) {
 }
 
 function updatePanel() {
-  const content = Object.keys(model?.edits || {}).length > 0 || activeTab === 'checks';
+  const content = Object.keys(model?.edits || {}).length > 0 || ['checks', 'agent'].includes(activeTab);
   const visible = !!documentData && content && !panelDismissed;
   $('panel').hidden = !visible;
   document.body.classList.toggle('panel-open', visible);
+  panelZoom.update(visible);
   slip.position();
 }
 
@@ -524,10 +704,10 @@ const findBar = new FindBar($('findBar'), () => busy ? null : model, {
   },
   onHighlight: highlightMatches,
   onLocate: match => locateNode(match.node, false),
-  onStaged: count => {
+  onStaged: (count, paragraphs) => {
     panelDismissed = false;
     refreshEdits();
-    stagedToast(count);
+    stagedToast(count, paragraphs);
   },
   location: nodeLocation
 });
@@ -657,6 +837,8 @@ function changeLanguage() {
     $('changes').replaceChildren(...changeCards(model, revert));
   }
   toast.render();
+  agentPanel.render();
+  agentsCard.render();
   findBar.refresh();
   if ($('reviewDialog').open) {
     renderReview();
@@ -728,6 +910,21 @@ window.addEventListener('beforeunload', event => {
     event.returnValue = '';
   }
 });
+window.hwp?.onHandoff(async (result, error) => {
+  busy = true;
+  updateControls();
+  await completeOpen(result, error);
+  await call('handoffReady');
+});
+document.addEventListener('input', event => {
+  if (event.target.id === 'textEdit') {
+    call('editing', slip.dirty).catch(() => {});
+  }
+});
+$('slipHost').addEventListener('click', () => {
+  call('editing', slip.dirty).catch(() => {});
+});
+
 // Preload obtains a dropped file's path only from a trusted OS event.
 // The renderer accepts the switch before main changes the active document.
 window.hwp?.onDrop(beginOpen, completeOpen);
@@ -778,3 +975,5 @@ applyLanguage();
 panelTab('changes');
 updateControls();
 renderRecent();
+
+agentsCard.refresh();

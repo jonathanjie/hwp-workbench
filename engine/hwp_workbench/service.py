@@ -1,4 +1,5 @@
 """Shared document operations for CLI, MCP and desktop RPC."""
+import base64
 from pathlib import Path
 
 from . import agent_ops, agent_link
@@ -6,6 +7,8 @@ from .document import Document, sha, patch_input
 from .independent import check_output
 from .errors import require
 from .workspace import Workspace
+
+MAX_PREVIEW_BYTES = 64 * 1024 * 1024
 
 CAPABILITIES = {
     'version': '0.1.0-alpha.1',
@@ -56,7 +59,7 @@ def invoke(root, method: str, args: dict) -> dict:
     require(isinstance(method, str), 'BAD_ARGUMENTS', 'method must be a string.')
     if method == 'capabilities':
         return CAPABILITIES
-    require(method in CAPABILITIES['operations'], 'UNKNOWN_METHOD', 'Unknown operation: ' + method)
+    require(method in CAPABILITIES['operations'] or method == 'preview', 'UNKNOWN_METHOD', 'Unknown operation: ' + method)
     ws = Workspace(root)
     path = args.get('path')
     doc = Document(ws.read(path), Path(path).name)
@@ -98,4 +101,12 @@ def invoke(root, method: str, args: dict) -> dict:
     result = doc.diff()
     if method == 'plan':
         return result
+    # Desktop RPC only: do not advertise this through CLI or MCP capabilities.
+    if method == 'preview':
+        content = doc.serialize(True)
+        require(len(content) <= MAX_PREVIEW_BYTES, 'LIMIT', 'Preview exceeds 64 MiB.')
+        require(sha(ws.read(path)) == doc.hash, 'STALE_DOCUMENT',
+                'Source changed during preview; reopen the document.')
+        return {'sha256': sha(content), 'bytesBase64': base64.b64encode(content).decode('ascii'),
+                'warnings': doc.warnings}
     return _publish(ws, path, doc, args, result)

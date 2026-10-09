@@ -11,6 +11,25 @@ contextBridge.exposeInMainWorld('hwp', Object.freeze({
     ipcRenderer.on('app:command', listener);
     return () => ipcRenderer.removeListener('app:command', listener);
   },
+  agentsStatus: () => ipcRenderer.invoke('agents:status'),
+  installSkill: target => ipcRenderer.invoke('agents:install-skill', target),
+  copyMcp: client => ipcRenderer.invoke('agents:copy-mcp', client),
+  revealBundle: () => ipcRenderer.invoke('agents:reveal-bundle'),
+  handoffReady: () => ipcRenderer.invoke('document:handoff-ready'),
+  editing: value => ipcRenderer.invoke('document:editing', value),
+  onHandoff: callback => {
+    const listener = (_event, result, error) => callback(result, error);
+    ipcRenderer.on('document:handoff', listener);
+    return () => ipcRenderer.removeListener('document:handoff', listener);
+  },
+  agentLink: enabled => ipcRenderer.invoke('agent:link', enabled),
+  agentSelection: selection => ipcRenderer.invoke('agent:selection', selection),
+  agentDecide: (file, ids, accepted) => ipcRenderer.invoke('agent:decide', file, ids, accepted),
+  onAgentInbox: callback => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('agent:inbox', listener);
+    return () => ipcRenderer.removeListener('agent:inbox', listener);
+  },
   open: () => ipcRenderer.invoke('document:open'),
   onDrop: (acceptDrop, completeDrop) => {
     const listener = async event => {
@@ -40,6 +59,7 @@ contextBridge.exposeInMainWorld('hwp', Object.freeze({
   recent: () => ipcRenderer.invoke('document:recent'),
   openRecent: id => ipcRenderer.invoke('document:open-recent', id),
   cacheThumbnail: (id, png) => ipcRenderer.invoke('document:cache-thumbnail', id, png),
+  preview: patch => ipcRenderer.invoke('document:preview', patch),
   plan: patch => ipcRenderer.invoke('document:plan', patch),
   saveCopy: (patch, acknowledgement) => ipcRenderer.invoke('document:save', patch, acknowledgement),
   showSaved: () => ipcRenderer.invoke('shell:reveal-output'),

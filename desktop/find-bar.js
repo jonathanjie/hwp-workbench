@@ -112,7 +112,7 @@ export class FindBar {
     button.hidden = !result.skipped.length;
     button.textContent = t('skipped', {n: result.skipped.length});
     if (result.replaced) {
-      this.onStaged(result.replaced);
+      this.onStaged(result.replaced, result.paragraphs);
     } else if (result.skipped.length) {
       this.move(1);
     }

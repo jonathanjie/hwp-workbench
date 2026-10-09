@@ -49,5 +49,5 @@ export function replaceMatches(model, matches, replacement) {
   if (changes.length && !model.stageBatch(changes)) {
     return {replaced: 0, skipped: [...skipped, ...matches.filter(match => changes.some(change => change.node.id === match.node.id)).map(match => ({...match, reason: 'tooManyEdits'}))]};
   }
-  return {replaced, skipped};
+  return {replaced, paragraphs: changes.length, skipped};
 }

@@ -73,3 +73,21 @@
 - **Trigger:** Simulated composition passed, but real 2-Set Korean typing on macOS showed two defects: Enter arrives twice (composing, then plain) and added a line break; ⌘↵ arrives once with `isComposing` set, so the slip ignored it.
 - **Rule:** Qualify text entry with `scripts/qa/real-ime.mjs` (real HID key events, a bare control textarea, nobody typing). Record the event sequence and replay it in `scripts/test-electron.mjs`. A request made during composition (such as ⌘↵) runs after `compositionend`.
 - **Why:** Synthetic events copy what we expect; the input method decides the real order.
+
+### Pass single-instance requests as lock data
+- **Date:** 2026-10-10
+- **Trigger:** `--open <file>` from a second launch was ignored: Chromium reordered the argv that `second-instance` receives (switches before paths), so the file no longer followed `--open`.
+- **Rule:** The second instance parses its own `process.argv` and passes the request through `app.requestSingleInstanceLock(additionalData)`; the first instance reads `additionalData` and uses argv only as a fallback.
+- **Why:** Electron documents that Chromium may add or reorder second-instance arguments.
+
+### Key per-document state by file and content
+- **Date:** 2026-10-10
+- **Trigger:** Drafts were stored by content hash only, so opening a copied form offered the original file's staged edits.
+- **Rule:** Key drafts, sessions and similar state by the canonical file path and the content hash together.
+- **Why:** Copies of official forms are common and share identical bytes.
+
+### Wait for effects in Electron tests, not for the click
+- **Date:** 2026-10-10
+- **Trigger:** Three checks read state right after a click: marks drawn after a preview loads, a reveal queued behind a preview render, and an outcome file written by main. They passed or failed by timing.
+- **Rule:** Wait for the observable effect (selector, main-process flag, file) with a deadline. Main serializes IPC requests, so any slow request delays later ones.
+- **Why:** Live preview added long-running work to the same queue.
