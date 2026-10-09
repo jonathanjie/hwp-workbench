@@ -53,9 +53,9 @@
 - **Why:** A semantic XML tree and record ancestry omit details that rhwp uses to build text and object structure.
 
 ### Verify deleted HWP runs on the native record axis
-- **Date:** 2026-10-09
-- **Trigger:** Deleting one run can change the segment IDs of later runs when the saved paragraph is parsed again; empty runs also made corpus anchor checks pass without nonempty text evidence.
-- **Rule:** Keep source revision IDs stable for patches. Verify complete edited native sections on reopen, including controls and metadata. Emit an existing empty paragraph run for insertion, but exclude empty text from corpus body-anchor evidence. Preserve pre-existing duplicate shape starts; drop only starts that newly collapse during an edit.
+- **Date:** 2026-10-10
+- **Trigger:** Deleting one run can change the segment IDs of later runs when the saved paragraph is parsed again; empty runs also made corpus anchor checks pass without nonempty text evidence. Keeping the first collapsed shape changed the style of surviving controls and text.
+- **Rule:** Keep source revision IDs stable for patches. Verify complete edited native sections on reopen, including controls and metadata. Emit an existing empty paragraph run for insertion, but exclude empty text from corpus body-anchor evidence. At a collapsed shape boundary, keep the last original start so surviving text and controls retain their style. Keep all pre-existing duplicate groups, including earlier groups at a collapsed boundary; the surviving-content shape must remain last.
 - **Why:** Printable-run IDs describe a source revision, and an empty substring alone does not test a reader's text-position agreement.
 
 ### Keep real LibreOffice checks opt-in
@@ -87,3 +87,38 @@
 - **Trigger:** A DOCX fixture stamped zip members with the current time; a test that compared a written source with a fresh fixture failed when the run crossed a clock second.
 - **Rule:** Fixtures that tests rebuild and compare must not depend on time, randomness or the environment. Set fixed zip member times.
 - **Why:** Slow or loaded runs cross time boundaries; the failure looks random.
+
+### Keep external revisions during save recovery
+- **Trigger:** Post-publication rollback overwrote another writer's revision.
+- **Rule:** Check both the publication inode and output hash before rollback. On conflict, keep the external file and a named recovery copy.
+- **Why:** Publication does not grant ownership of later revisions at the path.
+
+### Retain backups per source path
+- **Trigger:** Same-named sources in a shared backup folder pruned each other's versions.
+- **Rule:** Put a stable canonical-path identity in new backup names and pruning patterns. Leave ambiguous older names untouched.
+- **Why:** A basename does not identify a document.
+
+### Count non-text content in merged cells
+- **Trigger:** An image-only merge continuation was silently discarded.
+- **Rule:** Check mapped images, tables, breaks and text before treating a continuation as empty. Keep its content and report nonemptyMergeContinuation.
+- **Why:** Empty paragraph text does not imply an empty cell.
+
+### Bound actual archive inflation
+- **Trigger:** Forged ZIP size fields hid expansion beyond the parser budget.
+- **Rule:** Inflate in bounded chunks, count actual bytes against part and total limits, and check stream completion, length and CRC.
+- **Why:** ZIP headers are untrusted; ZipExtFile can truncate oversized inflation to the declared length.
+
+### Enforce XML policy at every parser
+- **Trigger:** UTF-16 bytes hid DTD declarations from text regex checks.
+- **Rule:** Reject alternate encodings and NUL bytes; use expat declaration handlers on all XML entry points, including unsupported parts and token parsing.
+- **Why:** Validating one decoded form while parsing different bytes can bypass the policy.
+
+### Bind review outcomes to proposal bytes
+- **Trigger:** An old outcome marked a replaced proposal as accepted.
+- **Rule:** Require the current proposal byte SHA-256 and an exact, disjoint accepted/declined node partition. Treat unbound outcomes as needsReview.
+- **Why:** A filename and well-typed JSON do not bind a decision to the reviewed content.
+
+### Index styles by immutable values
+- **Trigger:** Many distinct styles made conversion take quadratic time.
+- **Rule:** Keep ordered output lists and dictionary indexes keyed by immutable style, font, fill and numbering values.
+- **Why:** Membership and index scans repeat work for each distinct item.

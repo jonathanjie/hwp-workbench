@@ -4,6 +4,7 @@ from xml.etree import ElementTree as ET
 from ..document import HP, HC, HH
 from .model import Paragraph, Table, paragraphs
 from .package import element, encoded, write_package
+from .style_index import immutable_value, indexed_value
 
 HS = 'http://www.hancom.co.kr/hwpml/2011/section'
 OPF = 'http://www.idpf.org/2007/opf/'
@@ -29,33 +30,35 @@ class Writer:
         self.fonts = ['Arial']
         self.fills = [({}, None)]
         self.numbers = []
+        self.char_style_ids = {immutable_value({}): 0}
+        self.para_style_ids = {immutable_value({}): 0}
+        self.font_ids = {'Arial': 0}
+        self.fill_ids = {immutable_value(({}, None)): 0}
+        self.number_ids = {}
+        # HWPX numbers and bullets each have a separate one-based ID space.
+        self.decimal_ids = {}
+        self.bullet_ids = {}
         self.parts = {'mimetype': b'application/hwp+zip'}
         self.object_id = 1
         self.paragraph_id = 0
 
-    @staticmethod
-    def _index(items, item):
-        if item not in items:
-            items.append(item)
-        return items.index(item)
-
     def _fill_id(self, borders, shading):
-        return self._index(self.fills, (borders, shading)) + 1
+        return indexed_value(self.fills, self.fill_ids, (borders, shading)) + 1
 
     def _paragraph(self, paragraph, prefix=None, *, container_only=False):
         para_style = dict(paragraph.style)
         if paragraph.numbering:
             para_style['numbering'] = paragraph.numbering
-            self._index(self.numbers, paragraph.numbering)
-        para_id = self._index(self.para_styles, para_style)
+            indexed_value(self.numbers, self.number_ids, paragraph.numbering)
+        para_id = indexed_value(self.para_styles, self.para_style_ids, para_style)
         root = ET.Element('{' + HP + '}p', dict(id=str(self.paragraph_id), paraPrIDRef=str(para_id),
                           styleIDRef=str(paragraph.heading), pageBreak=str(int(paragraph.page_break)), columnBreak='0', merged='0'))
         self.paragraph_id += 1
         if prefix is not None:
             root.append(prefix)
         for run in paragraph.runs:
-            char_id = self._index(self.char_styles, dict(run.style))
-            self._index(self.fonts, run.style.get('font', 'Arial'))
+            char_id = indexed_value(self.char_styles, self.char_style_ids, dict(run.style))
+            indexed_value(self.fonts, self.font_ids, run.style.get('font', 'Arial'))
             native_run = element(root, HP, 'run', charPrIDRef=char_id)
             if run.image:
                 self._image(native_run, run.image)
@@ -174,7 +177,7 @@ class Writer:
         for index, style in enumerate(self.char_styles):
             char = element(characters, HH, 'charPr', id=index, height=round(style.get('size', 11) * 100),
                            textColor='#' + style.get('colour', '000000'), shadeColor='none', useFontSpace=0, useKerning=0)
-            font_id = self.fonts.index(style.get('font', 'Arial'))
+            font_id = self.font_ids[style.get('font', 'Arial')]
             for tag, val in [('fontRef', font_id), ('ratio', 100), ('spacing', 0), ('relSz', 100), ('offset', 0)]:
                 element(char, HH, tag, **{key: val for key in FONT_KEYS})
             if style.get('bold'):
@@ -214,8 +217,9 @@ class Writer:
         return root
 
     def _number_id(self, number):
-        same_kind = [item for item in self.numbers if (item['kind'] == 'bullet') == (number['kind'] == 'bullet')]
-        return same_kind.index(number) + 1
+        indices = self.bullet_ids if number['kind'] == 'bullet' else self.decimal_ids
+        key = immutable_value(number)
+        return indices.setdefault(key, len(indices) + 1)
 
     def _numbering(self, refs):
         numberings = element(refs, HH, 'numberings', itemCnt=sum(number['kind'] != 'bullet' for number in self.numbers))

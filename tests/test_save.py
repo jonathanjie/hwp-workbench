@@ -105,6 +105,28 @@ class WorkspaceReplaceTests(WorkspaceFixture, unittest.TestCase):
 
 
 class PreviousVersionTests(WorkspaceFixture, unittest.TestCase):
+    def test_shared_backup_folder_isolates_same_named_sources(self):
+        directory = self.root / 'backups'
+        directory.mkdir()
+        legacy = directory / 'form.20260101T000000Z-abcdef.hwpx'
+        legacy.write_bytes(b'legacy previous version')
+        saved = {}
+        for source in ('a/form.hwpx', 'b/form.hwpx'):
+            path = self.root / source
+            path.parent.mkdir()
+            path.write_bytes(source.encode())
+            saved[source] = []
+            for revision in range(12):
+                payload = f'{source} revision {revision}'.encode()
+                name = self.workspace.backup_existing(source, payload, 'backups')
+                saved[source].append((self.root / name, payload))
+        for source, backups in saved.items():
+            kept = [(path, payload) for path, payload in backups if path.exists()]
+            self.assertEqual(len(kept), 10, source)
+            for path, payload in kept:
+                self.assertEqual(path.read_bytes(), payload)
+        self.assertEqual(legacy.read_bytes(), b'legacy previous version')
+
     def backup(self, directory=None):
         return self.workspace.backup_existing('form.hwpx', self.original, directory)
 
@@ -113,7 +135,7 @@ class PreviousVersionTests(WorkspaceFixture, unittest.TestCase):
                         'Workspace.backup_existing is required')
         result = self.backup()
         backup = self.root / result
-        self.assertRegex(backup.name, r'^form\.[0-9]{8}T[0-9]{6}Z-[0-9a-f]{6}\.hwpx$')
+        self.assertRegex(backup.name, r'^form\.[0-9a-f]{8}\.[0-9]{8}T[0-9]{6}Z-[0-9a-f]{6}\.hwpx$')
         self.assertEqual(backup.read_bytes(), self.original)
         self.assertEqual(stat.S_IMODE(backup.stat().st_mode), 0o600)
         self.assertEqual(stat.S_IMODE(backup.parent.stat().st_mode), 0o700)
@@ -123,9 +145,10 @@ class PreviousVersionTests(WorkspaceFixture, unittest.TestCase):
     def test_retention_keeps_newest_ten_and_preserves_other_entries(self):
         directory = self.root / 'backups'
         directory.mkdir()
+        identity = digest(os.fsencode(self.path.resolve()))[:8]
         old = []
         for index in range(12):
-            name = f'form.20260101T000000Z-{index:06x}.hwpx'
+            name = f'form.{identity}.20260101T000000Z-{index:06x}.hwpx'
             entry = directory / name
             entry.write_bytes(str(index).encode())
             os.utime(entry, ns=(index + 1, index + 1))
@@ -452,6 +475,41 @@ class HwpIndependentSaveTests(SaveSafetyTests):
 
 
 class ReplacementFailureTests(WorkspaceFixture, unittest.TestCase):
+    def test_concurrent_writer_after_publish_keeps_revision_and_recovery(self):
+        for change in ('write', 'replace', 'same-bytes-replace'):
+            with self.subTest(change=change):
+                self.path.write_bytes(self.original)
+                real_replace = os.replace
+                published = False
+
+                def publish_then_change(*args, **kwargs):
+                    nonlocal published
+                    result = real_replace(*args, **kwargs)
+                    if not published:
+                        published = True
+                        external = b'edited bytes' if change == 'same-bytes-replace' else b'external edit'
+                        if change == 'write':
+                            self.path.write_bytes(external)
+                        else:
+                            writer = self.root / 'external.tmp'
+                            writer.write_bytes(external)
+                            real_replace(writer, self.path)
+                    return result
+
+                with patch('hwp_workbench.workspace.os.replace', side_effect=publish_then_change):
+                    with self.assertRaises(WorkbenchError) as caught:
+                        self.replace()
+                self.assertEqual(caught.exception.code, 'SOURCE_CHANGED')
+                expected = b'edited bytes' if change == 'same-bytes-replace' else b'external edit'
+                self.assertEqual(self.path.read_bytes(), expected)
+                recovery_files = list((self.root / '.hwp-workbench/backups').glob('*recovery*'))
+                self.assertTrue(recovery_files)
+                recovery = next(entry for entry in recovery_files
+                                if str(entry.relative_to(self.root)) in str(caught.exception))
+                self.assertEqual(recovery.read_bytes(), self.original)
+                self.assertIn(str(recovery.relative_to(self.root)), str(caught.exception))
+                self.assertEqual(list(self.root.glob('*.tmp')), [])
+
     def test_final_source_check_catches_change_during_temporary_write(self):
         private_file = self.workspace._private_file
         calls = 0

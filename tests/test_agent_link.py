@@ -277,19 +277,49 @@ class SessionTests(AgentLinkCase):
         self.assertFalse(self.session()['linked'])
         self.assertIsNone(self.session()['session'])
 
+    def test_outcome_binds_exact_proposal_bytes_and_node_partition(self):
+        from hwp_workbench.document import sha
+        proposal_path = self.proposal()
+        content = proposal_path.read_bytes()
+        proposal = json.loads(content)
+        ids = [operation['nodeId'] for operation in proposal['patch']['operations']]
+        outcome_path = proposal_path.with_suffix('.outcome.json')
+        valid = {'schemaVersion': 1, 'status': 'accepted', 'decidedAt': 'now',
+                 'proposalSha256': sha(content), 'acceptedNodeIds': ids, 'declinedNodeIds': []}
+        invalid = [
+            {key: value for key, value in valid.items() if key != 'proposalSha256'},
+            valid | {'proposalSha256': '0' * 64},
+            valid | {'acceptedNodeIds': ['unrelated-old-node']},
+            valid | {'acceptedNodeIds': ids[:-1]},
+            valid | {'acceptedNodeIds': ids + [ids[0]]},
+            valid | {'declinedNodeIds': [ids[0]]},
+        ]
+        for outcome in invalid:
+            with self.subTest(outcome=outcome):
+                outcome_path.write_text(json.dumps(outcome))
+                self.assertEqual(self.session()['proposals'][0]['status'], 'needsReview')
+        outcome_path.write_text(json.dumps(valid))
+        self.assertEqual(self.session()['proposals'][0]['status'], 'accepted')
+        proposal['patch']['operations'][0]['text'] = 'replacement proposal text'
+        proposal_path.write_text(json.dumps(proposal))
+        self.assertEqual(self.session()['proposals'][0]['status'], 'needsReview')
+
     def test_accepted_declined_partial_outcomes_and_unreadable(self):
         proposal_path = self.proposal()
-        operation = json.loads(proposal_path.read_text())['patch']['operations'][0]
+        from hwp_workbench.document import sha
+        content = proposal_path.read_bytes()
+        ids = [operation['nodeId'] for operation in json.loads(content)['patch']['operations']]
         outcome_path = proposal_path.with_suffix('.outcome.json')
         for status in ['accepted', 'declined', 'partial']:
             outcome = {'schemaVersion': 1, 'status': status,
-                       'acceptedNodeIds': [operation['nodeId']] if status != 'declined' else [],
-                       'declinedNodeIds': [operation['nodeId']] if status == 'declined' else [],
+                       'proposalSha256': sha(content),
+                       'acceptedNodeIds': ids if status == 'accepted' else (ids[:1] if status == 'partial' else []),
+                       'declinedNodeIds': ids if status == 'declined' else (ids[1:] if status == 'partial' else []),
                        'decidedAt': '2026-10-09T10:20:30Z'}
             outcome_path.write_text(json.dumps(outcome))
             self.assertEqual(self.session()['proposals'][0]['status'], status)
         outcome_path.write_text('{bad')
-        self.assertEqual(self.session()['proposals'][0]['status'], 'unreadable')
+        self.assertEqual(self.session()['proposals'][0]['status'], 'needsReview')
         self.assertEqual(len(self.session()['proposals']), 1)
 
     def test_broken_oversized_symlink_and_nonregular_files_are_unreadable(self):
@@ -479,13 +509,13 @@ class LinkSafetyRegressionTests(AgentLinkCase):
         self.assertEqual(temporary.read_bytes(), b'user data')
         self.assertFalse((self.root / 'new.json').exists())
 
-    def test_null_outcome_is_unreadable_not_pending(self):
+    def test_null_outcome_requires_review(self):
         preview = invoke(self.root, 'set', {'path': 'form.hwpx', 'nodeId': 's0:t0', 'text': 'new'})
         result = invoke(self.root, 'propose', {'path': 'form.hwpx', 'patch': preview, 'title': 'Review'})
         proposal = self.root / result['proposal']
         proposal.with_suffix('.outcome.json').write_text('null')
         report = invoke(self.root, 'session', {'path': 'form.hwpx'})
-        self.assertEqual(report['proposals'][0]['status'], 'unreadable')
+        self.assertEqual(report['proposals'][0]['status'], 'needsReview')
 
     def test_marked_skill_is_backed_up_before_replacement(self):
         home = self.root / 'home'

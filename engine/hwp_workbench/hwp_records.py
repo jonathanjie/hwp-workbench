@@ -201,8 +201,19 @@ def rewrite_section(section, edits):
             require(0 <= count <= 0x7fffffff, 'LIMIT', 'HWP paragraph character count exceeds bounds.')
             if delta == 0:
                 continue
-            previous_shape_start = None
-            previous_original_start = None
+            # The last original boundary at each shifted position determines
+            # the style of surviving content. Retain every pre-existing duplicate
+            # group as well, including groups across separate shape records.
+            shape_boundaries = {}
+            shape_start_counts = {}
+            for child_index in paragraph.children:
+                child = section.records[child_index]
+                if child.tag == PARA_CHAR_SHAPE:
+                    data = changed.get(child_index, child.data)
+                    for old_start, shape in struct.iter_unpack('<II', data):
+                        new_start = shift_position(old_start, text_start, text_end, length)
+                        shape_boundaries[new_start] = old_start
+                        shape_start_counts[old_start] = shape_start_counts.get(old_start, 0) + 1
             for child_index in paragraph.children:
                 child = section.records[child_index]
                 if child.tag not in {PARA_CHAR_SHAPE, PARA_RANGE_TAG, PARA_LINE_SEG}:
@@ -216,13 +227,8 @@ def rewrite_section(section, edits):
                     new_start = shift_position(old_start, text_start, text_end, length)
                     struct.pack_into('<I', entry, 0, new_start)
                     if child.tag == PARA_CHAR_SHAPE:
-                        # Entries stay ordered. Keep pre-existing duplicate starts.
-                        # At a newly collapsed boundary, retain the first shape,
-                        # which applied at the earlier position.
-                        if new_start == previous_shape_start and old_start != previous_original_start:
+                        if old_start != shape_boundaries[new_start] and shape_start_counts[old_start] == 1:
                             continue
-                        previous_shape_start = new_start
-                        previous_original_start = old_start
                     elif child.tag == PARA_RANGE_TAG:
                         old_end = struct.unpack_from('<I', entry, 4)[0]
                         new_end = shift_position(old_end, text_start, text_end, length)

@@ -4,6 +4,7 @@ from xml.etree import ElementTree as ET
 from .docx_read import W, R, A, WP, REL, CT
 from .model import Paragraph
 from .package import element, encoded, write_package
+from .style_index import indexed_value
 
 PIC = 'http://schemas.openxmlformats.org/drawingml/2006/picture'
 XML = 'http://www.w3.org/XML/1998/namespace'
@@ -35,6 +36,7 @@ class Writer:
         self.rels = ET.Element('{' + REL + '}Relationships')
         self.types = ET.Element('{' + CT + '}Types')
         self.numbers = []
+        self.number_ids = {}
         self.image_count = 0
 
     def _run(self, parent, run):
@@ -88,11 +90,10 @@ class Writer:
             word(properties, 'pageBreakBefore')
         if paragraph.numbering:
             number = dict(paragraph.numbering)
-            if number not in self.numbers:
-                self.numbers.append(number)
+            number_id = indexed_value(self.numbers, self.number_ids, number) + 1
             numbering = word(properties, 'numPr')
             word(numbering, 'ilvl', val=number['level'])
-            word(numbering, 'numId', val=self.numbers.index(number) + 1)
+            word(numbering, 'numId', val=number_id)
         for run in paragraph.runs:
             self._run(node, run)
         return node
