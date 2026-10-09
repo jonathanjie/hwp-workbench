@@ -3,13 +3,14 @@ from pathlib import Path
 
 from . import agent_ops, agent_link
 from .document import Document, sha
+from .independent import check_output
 from .errors import require
 from .workspace import Workspace
 
 CAPABILITIES = {
     'version': '0.1.0-alpha.1',
     'formats': {
-        'hwp': 'HWP 5.x: existing text, equal UTF-16 length only',
+        'hwp': 'HWP 5.x: existing plain text runs; variable length; Hancom reflow unverified',
         'hwpx': 'Existing plain text nodes; variable length; same-format save',
     },
     'operations': ['inspect', 'extract', 'validate', 'plan', 'apply',
@@ -29,12 +30,14 @@ def _publish(ws: Workspace, path: str, doc: Document, args: dict, result: dict) 
     require(args.get('acknowledgeRisks') is True, 'RISK_ACK_REQUIRED',
             'Pass acknowledgeRisks: true to save edited output.')
     content = doc.serialize(True)
+    independent_check = check_output(content, doc.edits)
     # Re-read immediately before publication. Original sources never get overwritten.
     require(sha(ws.read(path)) == doc.hash, 'STALE_DOCUMENT',
             'Source changed during processing; output was not published.')
     ws.write_new(output, content)
     return result | {'output': output, 'outputSha256': sha(content),
-                     'reopenedAndVerified': True, 'sourceUntouched': True}
+                     'reopenedAndVerified': True, 'sourceUntouched': True,
+                     'independentCheck': independent_check}
 
 
 def _agent_edit(doc: Document, method: str, args: dict) -> dict:

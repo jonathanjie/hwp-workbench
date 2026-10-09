@@ -140,8 +140,10 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(Document(saved).nodes[0].text, '마리나체인 검토 완')
         self.assertEqual(streams['DocInfo'], document.parts['DocInfo'])
 
-    def test_hwp_length_change_blocked(self):
-        d=Document(make_hwp());self.expect_code('HWP_LENGTH_CHANGE_BLOCKED',lambda:d.patch(patch(d,text='짧음')))
+    def test_hwp_length_change_reopens(self):
+        document = Document(make_hwp())
+        document.patch(patch(document, text='짧음'))
+        self.assertEqual(Document(document.serialize(True)).nodes[0].text, '짧음')
     def test_hwp_encrypted_blocked(self):self.expect_code('PROTECTED_HWP',lambda:Document(make_hwp(flags=2)))
     def test_hwp_distribution_blocked(self):self.expect_code('PROTECTED_HWP',lambda:Document(make_hwp(flags=4)))
     def hwp_with_default_scripts(self, change=None, compressed=True):

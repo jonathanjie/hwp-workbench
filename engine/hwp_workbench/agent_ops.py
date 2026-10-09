@@ -227,8 +227,6 @@ def _edit_error(doc: Document, node: TextNode, text: str) -> str | None:
         return 'SAVE_BLOCKED'
     if not node.editable:
         return 'UNSUPPORTED_ELEMENT'
-    if doc.format == 'hwp' and len(text.encode('utf-16le')) != len(node.text.encode('utf-16le')):
-        return 'HWP_LENGTH_CHANGE_BLOCKED'
     return None
 
 
@@ -273,15 +271,8 @@ def replace(doc: Document, find: str, replace_with: str, regex: bool = False,
             continue
         remaining -= len(matches)
         code = _edit_error(doc, node, node.text)
-        if code is None and doc.format == 'hwp':
-            removed_bytes = sum(len(match.group().encode('utf-16le')) for match in matches)
-            added_bytes = len(matches) * len(replace_with.encode('utf-16le'))
-            if removed_bytes != added_bytes:
-                code = 'HWP_LENGTH_CHANGE_BLOCKED'
         if code:
-            skipped.append({'nodeId': node.id, 'code': code,
-                            'reason': 'Read-only text or protected document.' if code != 'HWP_LENGTH_CHANGE_BLOCKED'
-                            else 'Replacement must keep the same UTF-16 code-unit length.'})
+            skipped.append({'nodeId': node.id, 'code': code, 'reason': 'Read-only text or protected document.'})
             continue
         after = _replacement_text(node.text, matches, replace_with)
         check_text(after)

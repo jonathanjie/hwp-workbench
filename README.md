@@ -11,7 +11,7 @@ The product requirement remains full HWP/HWPX editing with close official-docume
 | Capability | This build |
 |---|---|
 | HWPX | Open, inspect, extract, edit existing plain text (including table-cell text), save a new HWPX copy. Text length may change. |
-| HWP | Open supported HWP 5.x containers, inspect/extract text, replace existing text with the same UTF-16 length, save a new HWP copy. |
+| HWP | Open supported HWP 5.x containers, inspect/extract text, make length-changing text edits in existing plain text runs, save a new HWP copy. Hancom reflow is unverified. |
 | Desktop | English/Korean UI; outline/search; selectable structured preview; text inspector; staged undo/redo; change review; local staged-patch recovery; native open/save-dialog wiring. |
 | Preservation | Original file never overwritten; untouched payloads retained; changes bound to the source hash and expected text; output reopened by this engine before publication. |
 | Agents | Shared native read/search/edit/plan/apply operations, bounded proposals and session reports, plus an installable Claude Code/Codex skill. CLI and MCP use the same engine as the desktop. |
@@ -67,7 +67,7 @@ Run from the project directory. Paths are constrained to the current directory u
 
 JSON is the default output. Errors are JSON on stderr with exit code 2. `validate` checks bounded parsing and container structure; it is **not** a full HWPX schema or Hancom-rendering validation. Re-running the final command with an existing output fails instead of replacing the file.
 
-A corresponding equal-length HWP example is in `examples/legacy.patch.json`:
+A corresponding HWP example is in `examples/legacy.patch.json`:
 
 ```bash
 ./scripts/hwp-workbench apply fixtures/generated/legacy-review.hwp \

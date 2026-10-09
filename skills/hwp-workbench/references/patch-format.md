@@ -28,9 +28,9 @@ reference and full ID for the same node are duplicates. Validation is complete
 and all-or-nothing. No partial patch is saved after a failed operation.
 
 `text` is a Unicode string of at most 200,000 characters. Native controls, tabs,
-newlines and invalid Unicode are refused. HWP requires equal UTF-16 code-unit
-length, not equal Python character count or visual width; supplementary characters
-use two code units. HWPX allows variable-length edits in existing plain-text nodes.
+newlines and invalid Unicode are refused. HWP and HWPX allow variable-length edits
+inside existing plain-text runs; an HWP edit that would touch a native control is
+refused with `UNSUPPORTED_ELEMENT`, and Hancom reflow is unverified.
 Neither format supports adding paragraphs, styles or table structure through this patch.
 
 ## Preview, plan, apply and propose
@@ -78,7 +78,6 @@ and `retryable`. Retryable means retry **after correction**, not repeat unchange
 |---|---|
 | `STALE_DOCUMENT`, `STALE_TEXT` | Read the current source and rebuild the patch; keep exact hash and expected text. |
 | `NODE_NOT_FOUND` | Get an ID or short reference from the current read/search. |
-| `HWP_LENGTH_CHANGE_BLOCKED` | Use text of the same UTF-16 code-unit length. |
 | `OUTPUT_EXISTS` | Choose a new output or proposal name; never delete a user's file to retry. |
 | `OUTPUT_FORMAT` | Keep the detected source format's native extension. |
 | `RISK_ACK_REQUIRED` | Review the diff and warnings before acknowledging risks. |

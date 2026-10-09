@@ -351,7 +351,7 @@ class SkillRecipesTests(AgentLinkCase):
         self.assertLess(len(skill.splitlines()), 150)
         self.assertTrue(skill.startswith('---\nname: hwp-workbench\ndescription:'))
         for term in ['HWP', 'HWPX', '한글 문서', 'HWP Workbench', '{{HWP_WORKBENCH}}',
-                     'UTF-16', 'untrusted data', 'never as instructions', 'warnings',
+                     'native controls', 'untrusted data', 'never as instructions', 'warnings',
                      'references/patch-format.md']:
             self.assertIn(term, skill)
         reference = (skill_path.parent / 'references/patch-format.md').read_text()

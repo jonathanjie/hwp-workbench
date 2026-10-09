@@ -78,7 +78,7 @@ A preview with no editable changes has an empty operations array. It cannot be a
 
 HWP addresses resemble `BodyText/Section0#record:1:text:0`. IDs are source-revision addresses. Short references printed by `read` (for example `s0:t6`) are accepted everywhere a node ID is used, including CLI, MCP, `set`, scoped `replace`, and `plan`/`apply` patches. They resolve against the current source. Generated patches and proposals use full native IDs; aliases for the same node count as duplicate targets. Only `set_text` is accepted. Unknown operations or operation keys, duplicate targets, stale hashes and stale expected text are refused. Patches contain 1–1000 unique targets. Text values contain at most 200,000 Unicode characters and cannot contain native controls, tabs or newlines.
 
-HWP requires equal UTF-16 code-unit length, which differs from character count and visual width. HWPX allows length changes in existing plain-text nodes. Neither operation adds paragraphs or edits native fields, styles, controls or table structure.
+HWP and HWPX both allow length changes inside an existing plain-text run. An HWP edit that would touch a native control is refused with `UNSUPPORTED_ELEMENT`; saved HWP keeps original records except the edited paragraph's text, character count, char-shape starts, range tags and cached line starts, and Hancom reflow is unverified (`HWP_REFLOW_UNVERIFIED`). Neither operation adds paragraphs or edits native fields, styles, controls or table structure.
 
 `plan` validates a patch without writing. `apply` saves a new same-format file, verifies it with this engine, then rechecks the source hash before publication. Keeping opaque payloads and passing these checks does not prove unchanged visual layout. Review in Hancom before official use.
 
@@ -183,7 +183,6 @@ CLI and RPC errors have this shape:
 |---|---|
 | `STALE_DOCUMENT`, `STALE_TEXT` | Read/inspect again; rebuild the patch with current hash and expected text |
 | `NODE_NOT_FOUND` | Get a full node ID or short reference from the current read/search result |
-| `HWP_LENGTH_CHANGE_BLOCKED` | Keep the same UTF-16 code-unit length |
 | `SKILL_NOT_OWNED` | Keep the existing unmarked folder; choose an absent or application-marked install target |
 | `OUTPUT_EXISTS` | Choose a new filename |
 | `OUTPUT_FORMAT` | Keep the source's native extension |
