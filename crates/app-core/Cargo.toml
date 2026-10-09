@@ -11,8 +11,6 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-hwp-workbench.workspace = true
-hwp-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
@@ -21,6 +19,8 @@ base64.workspace = true
 time.workspace = true
 getrandom.workspace = true
 notify.workspace = true
+rustix = { workspace = true, features = ["process"] }
+tempfile.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

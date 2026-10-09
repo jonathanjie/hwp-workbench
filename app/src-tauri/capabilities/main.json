@@ -1,0 +1,38 @@
+{
+  "identifier": "main",
+  "description": "Only the Workbench backend and event subscriptions. No filesystem, process, dialog, clipboard or network plugin IPC.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "allow-document-open",
+    "allow-document-open-dropped",
+    "allow-document-demo",
+    "allow-document-bytes",
+    "allow-document-recent",
+    "allow-document-open-recent",
+    "allow-document-cache-thumbnail",
+    "allow-document-preview",
+    "allow-document-format",
+    "allow-document-plan",
+    "allow-document-save",
+    "allow-document-save-in-place",
+    "allow-document-export-patch",
+    "allow-document-draft",
+    "allow-shell-reveal-previous",
+    "allow-shell-reveal-output",
+    "allow-agents-status",
+    "allow-agents-install-skill",
+    "allow-agents-copy-mcp",
+    "allow-agents-reveal-bundle",
+    "allow-document-handoff-ready",
+    "allow-document-editing",
+    "allow-agent-link",
+    "allow-agent-selection",
+    "allow-agent-decide",
+    "allow-keyboard-scheme",
+    "allow-clipboard-copy",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
+  ]
+}

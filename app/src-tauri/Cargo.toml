@@ -7,6 +7,10 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
 [lints]
 workspace = true
 
@@ -15,10 +19,13 @@ tauri-build.workspace = true
 
 [dependencies]
 app-core.workspace = true
-hwp-workbench.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tauri.workspace = true
 tauri-plugin-single-instance.workspace = true
 tauri-plugin-dialog.workspace = true
 tauri-plugin-clipboard-manager.workspace = true
+
+[dev-dependencies]
+tauri = { workspace = true, features = ["test"] }
+tempfile.workspace = true

@@ -63,15 +63,14 @@ export class ProofSlip {
     this.host.append(this.slip);
     this.editor.oninput = () => this.update();
     this.stageAfterComposition = false;
-    // A Korean IME sends ⌘↵ with isComposing set and no second key, so stage
-    // once the composition has committed its syllable.
+    this.composing = false;
+    this.editor.addEventListener('compositionstart', () => {
+      this.composing = true;
+    });
     this.editor.addEventListener('compositionend', () => {
+      this.composing = false;
       if (this.stageAfterComposition) {
-        this.stageAfterComposition = false;
-        setTimeout(() => {
-          this.update();
-          this.stage();
-        });
+        this.queueCompositionStage();
       }
     });
     this.slip.onkeydown = event => this.keydown(event);
@@ -82,20 +81,39 @@ export class ProofSlip {
 
   keydown(event) {
     const command = event.metaKey || event.ctrlKey;
-    if (event.key === 'Escape' && !event.isComposing) {
+    const composing = event.isComposing || event.keyCode === 229;
+    if (event.key === 'Escape' && !composing) {
       event.preventDefault();
       event.stopPropagation();
       this.close();
-    } else if (event.key === 'Enter' && command && event.isComposing) {
+    } else if (event.key === 'Enter' && command && composing) {
       this.stageAfterComposition = true;
+      // WebKit commits before this keydown; Chromium commits after it.
+      if (!event.isComposing && !this.composing) {
+        this.queueCompositionStage();
+      }
     } else if (event.key === 'Enter' && command) {
       event.preventDefault();
       this.stage();
-    } else if (event.key === 'Enter' && !event.isComposing && !event.altKey && !event.shiftKey && !command) {
+    } else if (event.key === 'Enter' && !composing && !event.altKey && !event.shiftKey && !command) {
       // Paragraph text has no line breaks. macOS Korean input also sends a
       // plain Enter after the Enter that commits a syllable.
       event.preventDefault();
     }
+  }
+
+  queueCompositionStage() {
+    clearTimeout(this.compositionStageTimer);
+    const editor = this.editor;
+    this.compositionStageTimer = setTimeout(() => {
+      this.compositionStageTimer = null;
+      if (!editor || this.editor !== editor || !this.stageAfterComposition) {
+        return;
+      }
+      this.stageAfterComposition = false;
+      this.update();
+      this.stage();
+    });
   }
 
   position() {
@@ -144,6 +162,10 @@ export class ProofSlip {
   }
 
   close(returnFocus = true) {
+    clearTimeout(this.compositionStageTimer);
+    this.compositionStageTimer = null;
+    this.stageAfterComposition = false;
+    this.composing = false;
     const focus = this.location?.focus;
     this.host.replaceChildren();
     this.slip = null;

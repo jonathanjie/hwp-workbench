@@ -15,7 +15,8 @@
     "package:mac": "node scripts/package-mac.cjs",
     "test:electron": "node scripts/test-electron.mjs",
     "test:desktop": "node --test desktop/tests/*.test.*",
-    "test:differential": "python3 scripts/differential.py --candidate \"python3 -m hwp_workbench\""
+    "test:differential": "python3 scripts/differential.py --candidate \"python3 -m hwp_workbench\"",
+    "build:frontend": "node scripts/build-frontend.mjs"
   },
   "devDependencies": {
     "electron": "44.5.1",
