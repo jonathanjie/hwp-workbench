@@ -189,3 +189,9 @@
 - **Trigger:** The first Tauri window captured as an empty dark frame in five attempts. The page had loaded and sent IPC calls; the screen was locked, and earlier a leftover Electron test window covered it. WebKit does not paint views that are not visible.
 - **Rule:** Before native visual QA, check `CGSessionCopyCurrentDictionary()` for a locked screen and list the windows in front. Use headless WebKit for visual checks while the user is away. Stop every test app you start, and confirm that it exited (`kill -0`); an unsaved-changes prompt can block a normal quit.
 - **Why:** Playwright's Electron screenshots render without the screen; native window captures do not.
+
+### Refuse table layouts that the writer cannot represent
+- **Date:** 2026-10-10
+- **Trigger:** The R6 port found that the Python DOCX writer keeps only one of two model cells that occupy the same grid position, with no loss report. Python integers also let an absurd border width pass, and one 1 MiB text run of tabs produced a million XML objects.
+- **Rule:** When cells overlap, refuse the conversion with an error; never keep one and drop the other. Check generated control counts against the node budget before you allocate XML. Range-check numeric conversions and report `LIMIT` instead of saturating.
+- **Why:** Writers that resolve conflicts quietly lose content that the loss report never mentions.
