@@ -27,3 +27,8 @@ outputs/mac-arm64/
 
 # Rust builds (workers use a shared target folder outside the repo)
 /target/
+
+# Self-authored, deterministic inputs for the Rust differential oracle
+!tests/data/*.hwp
+!tests/data/*.hwpx
+!tests/data/*.docx
