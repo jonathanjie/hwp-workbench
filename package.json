@@ -14,7 +14,8 @@
     "check": "node desktop/check.cjs && node --check scripts/package-mac.cjs && bash -n scripts/hwp-workbench",
     "package:mac": "node scripts/package-mac.cjs",
     "test:electron": "node scripts/test-electron.mjs",
-    "test:desktop": "node --test desktop/tests/*.test.*"
+    "test:desktop": "node --test desktop/tests/*.test.*",
+    "test:differential": "python3 scripts/differential.py --candidate \"python3 -m hwp_workbench\""
   },
   "devDependencies": {
     "electron": "44.5.1",
