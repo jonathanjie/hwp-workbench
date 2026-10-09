@@ -1,4 +1,4 @@
-import copy,io,json,os,struct,tempfile,unittest,zipfile
+import copy,io,json,os,struct,tempfile,unittest,zipfile,zlib
 from pathlib import Path
 from fixtures import make_hwpx,make_hwp,cfb_from_streams,record
 from hwp_workbench.document import Document,HP,sha
@@ -98,10 +98,108 @@ class EngineTests(unittest.TestCase):
             d=Document(make_hwp(comp));d.patch(patch(d,text='마리나체인 검토 완'));r=Document(d.serialize(True));self.assertEqual(r.nodes[0].text,'마리나체인 검토 완')
             for part in d.parts:
                 if not part.startswith('BodyText/'):self.assertEqual(d.parts[part],r.parts[part])
+    def hwp_with_trailer(self, trailer_change=None):
+        streams = dict(CompoundFile(make_hwp()).streams)
+        for name in ['BodyText/Section0', 'DocInfo']:
+            # DocInfo is opaque in the old fixture; use a compressed payload here.
+            if name == 'DocInfo':
+                compressor = zlib.compressobj(wbits=-15)
+                streams[name] = compressor.compress(b'DocInfo test') + compressor.flush()
+            payload = zlib.decompress(streams[name], -15)
+            trailer = struct.pack('<II', zlib.crc32(payload), len(payload))
+            if trailer_change is not None and name == 'BodyText/Section0':
+                trailer = trailer_change(trailer)
+            streams[name] += trailer
+        return cfb_from_streams(streams)
+
+    def test_hwp_valid_compression_trailer_opens(self):
+        raw = self.hwp_with_trailer()
+        document = Document(raw)
+        self.assertEqual(document.nodes[0].text, '마리나체인 검토 중')
+        self.assertEqual(document.serialize(), raw)
+
+    def test_hwp_bad_compression_trailer_rejected(self):
+        changes = [
+            lambda trailer: bytes([trailer[0] ^ 1]) + trailer[1:],
+            lambda trailer: trailer[:4] + struct.pack('<I', 1),
+            lambda trailer: trailer + b'extra',
+            lambda trailer: trailer[:-1],
+        ]
+        for change in changes:
+            with self.subTest(change=change):
+                self.expect_code('LIMIT', lambda: Document(self.hwp_with_trailer(change)))
+
+    def test_hwp_compression_trailer_refreshed_after_edit(self):
+        document = Document(self.hwp_with_trailer())
+        document.patch(patch(document, text='마리나체인 검토 완'))
+        saved = document.serialize(True)
+        streams = CompoundFile(saved).streams
+        decompressor = zlib.decompressobj(-15)
+        payload = decompressor.decompress(streams['BodyText/Section0'])
+        self.assertEqual(decompressor.unused_data, struct.pack('<II', zlib.crc32(payload), len(payload)))
+        self.assertEqual(Document(saved).nodes[0].text, '마리나체인 검토 완')
+        self.assertEqual(streams['DocInfo'], document.parts['DocInfo'])
+
     def test_hwp_length_change_blocked(self):
         d=Document(make_hwp());self.expect_code('HWP_LENGTH_CHANGE_BLOCKED',lambda:d.patch(patch(d,text='짧음')))
     def test_hwp_encrypted_blocked(self):self.expect_code('PROTECTED_HWP',lambda:Document(make_hwp(flags=2)))
     def test_hwp_distribution_blocked(self):self.expect_code('PROTECTED_HWP',lambda:Document(make_hwp(flags=4)))
+    def hwp_with_default_scripts(self, change=None, compressed=True):
+        streams = dict(CompoundFile(make_hwp(compressed)).streams)
+        first = 'var Documents = XHwpDocuments;\r\nvar Document = Documents.Active_XHwpDocument;\r\n'
+        second = 'function OnDocument_New()\r\n{\r\n\t//todo : \r\n}\r\n\r\n'
+        stub = struct.pack('<I', len(first)) + first.encode('utf-16le')
+        stub += struct.pack('<I', len(second)) + second.encode('utf-16le')
+        stub += b'\0' * 8 + b'\xff' * 4
+        scripts = {
+            'Scripts/DefaultJScript': stub,
+            'Scripts/JScriptVersion': struct.pack('<Q', 1),
+        }
+        if change is not None:
+            change(scripts)
+        for name, payload in scripts.items():
+            if compressed:
+                compressor = zlib.compressobj(wbits=-15)
+                streams[name] = compressor.compress(payload) + compressor.flush()
+                streams[name] += struct.pack('<II', zlib.crc32(payload), len(payload))
+            else:
+                streams[name] = payload
+        return cfb_from_streams(streams)
+
+    def test_hwp_default_scripts_editable_and_preserved(self):
+        for compressed in [True, False]:
+            with self.subTest(compressed=compressed):
+                document = Document(self.hwp_with_default_scripts(compressed=compressed))
+                self.assertFalse(document.block_save)
+                warning = next(item for item in document.warnings if item['code'] == 'DEFAULT_SCRIPT_STUB')
+                self.assertEqual(warning['severity'], 'info')
+                document.patch(patch(document, text='마리나체인 검토 완'))
+                saved = Document(document.serialize(True))
+                for name in ['Scripts/DefaultJScript', 'Scripts/JScriptVersion']:
+                    self.assertEqual(saved.parts[name], document.parts[name])
+
+    def test_hwp_nondefault_scripts_block_editing(self):
+        def changed_stub(scripts):
+            name = 'Scripts/DefaultJScript'
+            scripts[name] = scripts[name][:-1] + b'\0'
+
+        def changed_version(scripts):
+            scripts['Scripts/JScriptVersion'] = struct.pack('<Q', 2)
+
+        def extra_script(scripts):
+            scripts['Scripts/Extra'] = b'extra'
+
+        def missing_version(scripts):
+            del scripts['Scripts/JScriptVersion']
+
+        for change in [changed_stub, changed_version, extra_script, missing_version]:
+            with self.subTest(change=change):
+                document = Document(self.hwp_with_default_scripts(change))
+                self.assertTrue(document.block_save)
+                self.assertFalse(document.nodes[0].editable)
+                self.expect_code('SAVE_BLOCKED', lambda: document.patch(patch(document)))
+                self.assertNotIn('DEFAULT_SCRIPT_STUB', [item['code'] for item in document.warnings])
+
     def test_hwp_signature_blocked(self):
         d=Document(make_hwp(flags=64));self.assertTrue(d.block_save)
     def test_cfb_v4(self):
