@@ -2,7 +2,7 @@
   "name": "hwp-workbench",
   "version": "0.1.0-alpha.1",
   "private": true,
-  "description": "Internal HWP/HWPX editing workbench \u2014 preservation-first development alpha",
+  "description": "Internal HWP/HWPX editing workbench — preservation-first development alpha",
   "main": "desktop/main.cjs",
   "engines": {
     "node": ">=22"
@@ -15,7 +15,11 @@
     "package:mac": "node scripts/package-mac.cjs"
   },
   "devDependencies": {
-    "electron": "44.5.1"
+    "electron": "44.5.1",
+    "playwright": "1.64.0"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@rhwp/core": "0.8.7"
+  }
 }
