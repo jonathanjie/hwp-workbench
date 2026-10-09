@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "case": "rpc-hwp-read",
+    "path": "/steps/capabilities/stdout/conversion/nativeBackend",
+    "reason": "The Rust engine links rhwp natively, so the backend is always present: 'native rhwp' replaces 'optional rhwp' (Node/WASM bridge).",
+    "approvedBy": "orchestrator (Claude), 2026-10-10"
+  },
+  {
+    "case": "rpc-hwpx-read",
+    "path": "/steps/capabilities/stdout/conversion/nativeBackend",
+    "reason": "The Rust engine links rhwp natively, so the backend is always present: 'native rhwp' replaces 'optional rhwp' (Node/WASM bridge).",
+    "approvedBy": "orchestrator (Claude), 2026-10-10"
+  },
+  {
+    "case": "rpc-hwp-apply-preview",
+    "path": "/steps/reread/stdout/parts/4/size",
+    "reason": "Compressed length of an edited HWP stream: Rust deflate (miniz_oxide) writes 138 bytes where Python zlib writes 136. The decompressed stream bytes are identical and are compared separately.",
+    "approvedBy": "orchestrator (Claude), 2026-10-10"
+  }
+]

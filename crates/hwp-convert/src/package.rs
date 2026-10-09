@@ -76,6 +76,26 @@ fn bad_zip(error: impl std::fmt::Display) -> WorkbenchError {
     WorkbenchError::new("BAD_ZIP", error.to_string())
 }
 pub fn write_package(parts: &Parts) -> Result<Vec<u8>> {
+    let names: Vec<String> = parts
+        .get_key_value("mimetype")
+        .into_iter()
+        .chain(parts.iter().filter(|(name, _)| name.as_str() != "mimetype"))
+        .map(|(name, _)| name.clone())
+        .collect();
+    write_package_ordered(parts, &names)
+}
+
+/// Write a complete package with an explicit member order and the same bounds.
+pub fn write_package_ordered(parts: &Parts, names: &[String]) -> Result<Vec<u8>> {
+    let unique: std::collections::HashSet<_> = names.iter().collect();
+    require(
+        names.len() == parts.len()
+            && unique.len() == parts.len()
+            && names.iter().all(|name| parts.contains_key(name)),
+        "BAD_ZIP",
+        "Invalid output ZIP member order.",
+    )?;
+
     require(
         parts.len() <= MAX_MEMBERS,
         "LIMIT",
@@ -93,11 +113,10 @@ pub fn write_package(parts: &Parts) -> Result<Vec<u8>> {
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
     // Fixed timestamps make output independent of clock and host timezone.
     let timestamp = DateTime::from_date_and_time(2026, 1, 1, 0, 0, 0).map_err(bad_zip)?;
-    let ordered = parts
-        .get_key_value("mimetype")
-        .into_iter()
-        .chain(parts.iter().filter(|(name, _)| name.as_str() != "mimetype"));
-    for (name, bytes) in ordered {
+    for name in names {
+        let bytes = parts
+            .get(name)
+            .ok_or_else(|| WorkbenchError::new("BAD_ZIP", "Invalid output ZIP member order."))?;
         let compression = if name == "mimetype" {
             CompressionMethod::Stored
         } else {

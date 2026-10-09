@@ -2248,6 +2248,7 @@ dependencies = [
  "hwp-core",
  "hwp-verify",
  "regex",
+ "rustix",
  "serde",
  "serde_json",
  "sha2 0.11.0",
