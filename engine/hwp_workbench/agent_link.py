@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import secrets
 
-from .document import Document, sha
+from .document import Document, sha, patch_input
 from .errors import WorkbenchError, require
 from .workspace import Workspace
 
@@ -29,9 +29,7 @@ def propose(workspace: Workspace, path: str, document: Document, args: dict) -> 
     require(isinstance(title, str) and bool(title.strip()), 'BAD_ARGUMENTS', 'Supply a nonempty proposal title.')
     require(isinstance(author, str) and bool(author.strip()), 'BAD_ARGUMENTS', 'Supply a nonempty proposal author.')
     require('notes' not in args or isinstance(notes, str), 'BAD_ARGUMENTS', 'Proposal notes must be text.')
-    patch = args.get('patch')
-    if isinstance(patch, dict) and 'schemaVersion' not in patch and 'patch' in patch:
-        patch = patch['patch']
+    patch = patch_input(args.get('patch'))
     document.patch(patch)
     # Resolve aliases now so the desktop always receives native IDs.
     native_patch = dict(patch)

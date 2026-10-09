@@ -7,7 +7,7 @@ from .errors import WorkbenchError, require, error_details
 from .service import invoke, CAPABILITIES
 from .mcp import serve
 from .workspace import Workspace
-from . import skill_install
+from . import skill_install, mcp_config, desktop_open
 
 
 class ArgumentParser(argparse.ArgumentParser):
@@ -41,7 +41,7 @@ def _parser() -> argparse.ArgumentParser:
         operation.add_argument('path', help='Source HWP/HWPX path inside the workspace.')
         operation.add_argument('--root', default='.', help='Allowed workspace (default: current directory).')
         if command in {'plan', 'apply', 'propose'}:
-            operation.add_argument('--patch', required=True, help='JSON patch file inside workspace.')
+            operation.add_argument('--patch', required=True, help='JSON patch or edit-preview file inside workspace.')
         if command in {'apply', 'replace', 'fill', 'set'}:
             operation.add_argument('-o', '--output', required=command == 'apply', help='New same-format output path; must not exist.')
             operation.add_argument('--acknowledge-risks', action='store_true', help='Acknowledge compatibility warnings before saving.')
@@ -79,6 +79,13 @@ def _parser() -> argparse.ArgumentParser:
             operation.add_argument('--text', required=True, help='New plain-text value for the node.')
     mcp = sub.add_parser('mcp', help='Run the local stdio MCP server.')
     mcp.add_argument('--root', required=True, help='Allowed document workspace.')
+    config = sub.add_parser('mcp-config', help='Print MCP client setup; does not run clients or edit configuration.')
+    config.add_argument('--client', required=True, choices=['claude-code', 'codex', 'claude-desktop', 'json'],
+                        help='Client setup format to print.')
+    config.add_argument('--root', required=True, help='Existing document folder; home and / are refused.')
+    review = sub.add_parser('open', help='Open a native document in the desktop app for visual review.')
+    review.add_argument('path', help='Existing regular .hwp/.hwpx file inside the workspace.')
+    review.add_argument('--root', default='.', help='Allowed workspace (default: current directory).')
     rpc = sub.add_parser('rpc', help='Run one desktop JSON request from stdin.')
     rpc.add_argument('--root', required=True, help='Allowed document workspace; desktop adapter only.')
     skill = sub.add_parser('skill', help='Install, inspect or remove the Claude Code and Codex skill.')
@@ -140,8 +147,13 @@ def main(argv=None):
             Workspace(args.root)
             serve(args.root)
             return 0
+        if args.command == 'mcp-config':
+            print(mcp_config.setup(args.client, args.root))
+            return 0
         if args.command == 'capabilities':
             result = CAPABILITIES
+        elif args.command == 'open':
+            result = desktop_open.open_document(args.root, args.path)
         elif args.command == 'skill':
             result = skill_install.run(args.skill_command, target=getattr(args, 'target', 'all'),
                                        dry_run=getattr(args, 'dry_run', False))

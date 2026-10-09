@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from . import agent_ops, agent_link
-from .document import Document, sha
+from .document import Document, sha, patch_input
 from .independent import check_output
 from .errors import require
 from .workspace import Workspace
@@ -94,7 +94,7 @@ def invoke(root, method: str, args: dict) -> dict:
         # Empty previews are useful; an empty patch cannot be applied as an edit.
         require(bool(patch['operations']), 'BAD_PATCH', 'No editable changes were selected; no output was written.')
         return _publish(ws, path, doc, args, result)
-    doc.patch(args.get('patch'))
+    doc.patch(patch_input(args.get('patch')))
     result = doc.diff()
     if method == 'plan':
         return result

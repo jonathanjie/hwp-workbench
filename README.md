@@ -77,7 +77,12 @@ A corresponding HWP example is in `examples/legacy.patch.json`:
 
 The bundled documents are self-authored, format-shaped parser fixtures. They contain deliberately opaque test data and are **not certified or intended as complete, submission-ready Hancom documents**. Successfully reopening them in this engine does not prove interoperability with Hancom.
 
-## Use with Claude Code or Codex
+## Use from Claude Code, Codex or Claude Desktop
+
+Keep working in your own agent client. HWP Workbench is the visual review surface;
+there is no chat inside the editor.
+
+**Skill (Claude Code and Codex).** Install the native-edit recipes:
 
 ```bash
 scripts/hwp-workbench skill install
@@ -85,7 +90,24 @@ scripts/hwp-workbench skill install
 
 This installs the marked skill for both agents. Use `--target claude` or `--target codex` to select one, and `--dry-run` to check destinations without writing. `skill status` shows installed versions and paths; `skill uninstall` removes only marked folders. Existing unmarked skills are preserved, and marked skills are backed up before replacement.
 
-The skill guides `read` → `search` → edit preview → diff review → `propose` for desktop review or `apply` to a new native file. `session` reports Agent link state and recorded decisions. Desktop session publishing and blue-pencil review require the separate desktop integration; this task supplies the engine file contract. Keep hashes, exact expected text and honest compatibility warnings. See `docs/AGENT-INTERFACE.md`.
+The skill guides `read` → `search` → saved preview → review → `apply --patch preview.json` to a new native file, or `propose` for desktop review. `open RESULT --root DIRECTORY` requests visual review. Desktop Agent link review and open handoff require the desktop integration. Keep source hashes, exact expected text and honest warnings.
+
+**MCP one-liner (Claude Code or Codex).** Print the setup, then run the printed command in your terminal:
+
+```bash
+./scripts/hwp-workbench mcp-config --client claude-code --root /absolute/path/to/document-folder
+./scripts/hwp-workbench mcp-config --client codex --root /absolute/path/to/document-folder
+```
+
+Setup uses absolute paths and shell quoting. It only prints; it never runs either client or edits configuration. The root must exist; `/` and the whole home folder are refused. `--client json` prints a `mcpServers` block.
+
+**Claude Desktop bundle (macOS, Python 3.11+).** Build the local stdio server bundle:
+
+```bash
+python3 scripts/build-mcpb.py
+```
+
+Double-click `dist/hwp-workbench.mcpb` and choose an approved document folder. The required setting has no default. The builder refuses existing outputs. The orchestrator must add `mcpb/icon.png` from the design icon before distribution. Bundle startup is tested; Claude Desktop installation is unverified. See [the agent interface](docs/AGENT-INTERFACE.md) for the contract and limits.
 
 ## Connect an agent through MCP
 

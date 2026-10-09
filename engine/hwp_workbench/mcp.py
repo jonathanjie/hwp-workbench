@@ -52,7 +52,7 @@ def _tools():
         if name == 'inspect':
             properties['compact'] = BOOL
         if name in {'plan', 'apply', 'propose'}:
-            properties['patch'] = PATCH_INPUT if name == 'propose' else PATCH
+            properties['patch'] = PATCH_INPUT
             required.append('patch')
         if name in {'apply', 'replace', 'fill', 'set'}:
             properties.update(output=STR, acknowledgeRisks=BOOL)
