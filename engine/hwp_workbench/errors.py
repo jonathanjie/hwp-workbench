@@ -2,6 +2,8 @@
 
 # retryable means retry after the stated correction, not repeat the same request.
 RECOVERY = {
+    'SOURCE_CHANGED': ('Read or inspect the document again and rebuild the patch for its current SHA-256 before saving.', True),
+    'READ_ONLY_DOCUMENT': ('Use a writable source or apply the patch to a new output file.', True),
     'STALE_DOCUMENT': ('Re-run read or inspect on the source and rebuild the patch with its current SHA-256.', True),
     'STALE_TEXT': ('Re-run read or inspect and rebuild the patch with the current expectedText.', True),
     'NODE_NOT_FOUND': ('Re-run read or search and use a full node ID from the current source.', True),

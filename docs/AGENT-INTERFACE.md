@@ -128,6 +128,16 @@ HWP and HWPX both allow length changes inside an existing plain-text run. An HWP
 
 `plan` validates a patch without writing. `plan`, `apply` and `propose` accept a native patch or a whole saved `replace`/`fill`/`set` preview envelope and use its `patch`. All existing patch checks still apply. `apply` saves a new same-format file, verifies it with this engine, then rechecks the source hash before publication. Keeping opaque payloads and passing these checks does not prove unchanged visual layout. Review in Hancom before official use.
 
+## Save in place
+
+`save {path, patch, acknowledgeRisks: true, backupDirectory?}` replaces the opened native file. It accepts the same patch or preview envelope as `apply`. It checks the complete patch, source hash, exact expected text, native format and self-reparse before writing. An independent-reader reopen failure or missing edited text returns `VERIFY_FAILED`. An unavailable reader is reported as unavailable; empty-text searches remain independently unverified. Neither case is proof of Hancom compatibility.
+
+Before replacement, the engine keeps the original bytes in `<document folder>/.hwp-workbench/backups/` by default. `backupDirectory` (CLI `--backup-dir`) can select another folder **inside the approved workspace**. A desktop caller can select its user-data backup folder only when that folder is within its approved engine workspace; this change does not grant access outside the workspace or wire desktop Save. New backup folders use mode `0700`; backups use mode `0600` and exclusive, non-overwriting creation. Names are `<stem>.<UTC yyyymmddThhmmssZ>-<6 hex>.<ext>`. The newest ten backups for the exact document name are kept; other names, symlinks and directories are left intact. A failed save can leave a previous-version backup, but does not publish unverified document bytes.
+
+The source hash is checked again before backup and before atomic replacement in the same folder. The file mode is retained, the folder is synced, and the returned hash is read from disk. Recovery bytes remain available until those checks succeed. The result is `{saved: true, path, previousSha256, sha256, backup, independentCheck, warnings}`. Read the saved revision before another edit. Hash checks refuse changes already present at the checks; they do not lock out another application writing concurrently.
+
+Refusal codes include `SOURCE_CHANGED` for a stale patch or changed disk source, `READ_ONLY_DOCUMENT` for a non-writable source, `UNSAFE_PATH` for unsafe parents or nonregular files, `READ_FAILED` when the initial no-follow document read fails (including a symlinked document), `OUTSIDE_WORKSPACE` for unapproved paths, `OUTPUT_FORMAT` for an extension that differs from the detected native format, `RISK_ACK_REQUIRED`, `BAD_PATCH`, `STALE_TEXT`, `SAVE_BLOCKED`, `VERIFY_FAILED`, and `WRITE_FAILED` for backup or replacement I/O errors. A backup-name collision returns `OUTPUT_EXISTS`. `apply` and conversions still require a new destination. Agents should keep using new files or proposals by default; `save` is not an MCP tool.
+
 ## CLI
 
 ```text
@@ -144,6 +154,7 @@ hwp-workbench validate PATH
 hwp-workbench convert PATH --to hwp|hwpx|docx [-o NEW_PATH --acknowledge-risks]
 hwp-workbench plan PATH --patch PATCH.json
 hwp-workbench apply PATH --patch PATCH.json -o NEW_PATH --acknowledge-risks
+hwp-workbench save PATH --patch PATCH_OR_PREVIEW.json --acknowledge-risks [--backup-dir DIR]
 hwp-workbench propose PATH --patch PATCH_OR_PREVIEW.json --title TITLE [--author agent] [--notes TEXT]
 hwp-workbench session PATH
 hwp-workbench skill install [--target claude|codex|all] [--dry-run]
@@ -154,7 +165,7 @@ hwp-workbench open PATH [--root DIRECTORY]
 hwp-workbench mcp --root DIRECTORY
 ```
 
-Each document subcommand accepts `--root DIRECTORY` (default: current directory). Source, patch, fields JSON and output paths must stay within it. Parent directories must exist, except that `propose` creates its link/proposal directories after validation. Symlink components and traversal are rejected. `--node-id` on replace can be repeated. `fill --field LABEL=VALUE` can be repeated; values can contain `=` and be empty. Duplicate labels and missing `=` are refused. Choose either `--field` or `--json`. Search accepts either a positional query or `--query`; supplying both is refused. `fill --json` reads a label/value object directly, such as `{"기관명":"새 기관","담당자":"Jane"}`.
+Each document subcommand accepts `--root DIRECTORY` (default: current directory). Source, patch, fields JSON and output paths must stay within it. Parent directories must exist, except that `propose` creates its link/proposal directories and `save` creates its backup directory after validation. Symlink components and traversal are rejected. `--node-id` on replace can be repeated. `fill --field LABEL=VALUE` can be repeated; values can contain `=` and be empty. Duplicate labels and missing `=` are refused. Choose either `--field` or `--json`. Search accepts either a positional query or `--query`; supplying both is refused. `fill --json` reads a label/value object directly, such as `{"기관명":"새 기관","담당자":"Jane"}`.
 
 Examples using the generated, self-authored fixtures:
 
@@ -269,6 +280,8 @@ CLI and RPC errors have this shape:
 | Code | Next action |
 |---|---|
 | `STALE_DOCUMENT`, `STALE_TEXT` | Read/inspect again; rebuild the patch with current hash and expected text |
+| `SOURCE_CHANGED` | Read/inspect again; rebuild the save patch for the current disk revision |
+| `READ_ONLY_DOCUMENT` | Use a writable source or apply to a new file |
 | `NODE_NOT_FOUND` | Get a full node ID or short reference from the current read/search result |
 | `SKILL_NOT_OWNED` | Keep the existing unmarked folder; choose an absent or application-marked install target |
 | `OUTPUT_EXISTS` | Choose a new filename |
