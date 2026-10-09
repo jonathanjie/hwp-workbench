@@ -2210,8 +2210,9 @@ dependencies = [
 name = "hwp-verify"
 version = "0.2.0-alpha.1"
 dependencies = [
- "hwp-core",
+ "base64 0.23.1",
  "rhwp",
+ "rustix",
  "serde",
  "serde_json",
  "tempfile",
