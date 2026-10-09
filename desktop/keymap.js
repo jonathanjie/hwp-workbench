@@ -9,7 +9,7 @@ export const KEYMAP = [
   {id: 'redo', mac: ['Meta+Shift+KeyZ'], windows: ['Ctrl+Shift+KeyZ']},
   {id: 'selectAll', mac: ['Meta+KeyA'], windows: ['Ctrl+KeyA']},
   {id: 'find', mac: ['Meta+KeyF'], windows: ['Ctrl+KeyF']},
-  {id: 'replace', mac: ['Meta+Alt+KeyF'], windows: ['Ctrl+KeyH', 'Meta+Alt+KeyF']},
+  {id: 'replace', mac: ['Meta+Alt+KeyF'], windows: ['Ctrl+KeyH', 'Ctrl+F2', 'Meta+Alt+KeyF']},
   {id: 'charFormat', mac: ['Alt+KeyL'], windows: ['Alt+KeyL']},
   {id: 'paraFormat', mac: ['Alt+KeyT'], windows: ['Alt+KeyT']},
   {id: 'pageFormat', mac: ['F7'], windows: ['F7']},
@@ -19,12 +19,14 @@ export const KEYMAP = [
   {id: 'cellSlip', mac: ['F5'], windows: ['F5']},
   {id: 'nextCell', mac: ['Tab'], windows: ['Tab']},
   {id: 'previousCell', mac: ['Shift+Tab'], windows: ['Shift+Tab']},
-  {id: 'palette', mac: ['Meta+KeyK'], windows: ['Ctrl+KeyK']},
+  // 한글 uses Ctrl+K as the first key of 26 commands (Ctrl+K B, Ctrl+K N, ...),
+  // so the Windows scheme keeps Control+K free and opens the palette with ⌘K only.
+  {id: 'palette', mac: ['Meta+KeyK'], windows: ['Meta+KeyK']},
   {id: 'shortcuts', mac: ['Meta+Slash'], windows: ['Ctrl+Slash']},
   {id: 'togglePanel', mac: ['Meta+Alt+KeyI'], windows: ['Meta+Alt+KeyI']},
   {id: 'zoomIn', mac: ['Meta+Equal', 'Meta+Shift+Equal'], windows: ['Ctrl+Equal', 'Ctrl+Shift+Equal']},
   {id: 'zoomOut', mac: ['Meta+Minus'], windows: ['Ctrl+Minus']},
-  {id: 'fitWidth', mac: ['Meta+Digit0'], windows: ['Ctrl+Digit0']}
+  {id: 'fitWidth', mac: ['Meta+Digit0'], windows: ['Ctrl+Digit0', 'Ctrl+KeyG KeyW']}
 ];
 
 const MODIFIERS = ['Ctrl', 'Meta', 'Alt', 'Shift'];

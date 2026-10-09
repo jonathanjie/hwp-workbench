@@ -1,8 +1,8 @@
 # Windows 한글 단축키 → Mac (HWP Workbench)
 
-HWP Workbench는 Windows 한글을 쓰던 분이 Mac에서 같은 손 습관으로 작업하도록 만듭니다. 아래 표는 Windows 한글 단축키를 기억에 의존해 정리한 **최선의 추정**입니다. 틀린 키는 `desktop/keymap.js`의 표 한 곳만 고치면 앱 전체(메뉴, 명령 팔레트, 단축키 표)에 반영됩니다. Claude Code나 Codex에게 "keymap.js에서 ○○ 키를 △△로 바꿔 줘"라고 요청하면 됩니다.
+HWP Workbench는 Windows 한글을 쓰던 분이 Mac에서 같은 손 습관으로 작업하도록 만듭니다. 아래 표는 한글 2022의 기본 단축키 표(Windows, 기본 모드)와 한 줄씩 대조해 확인했습니다(2026-10-10). 한컴의 코드나 자료는 복사하지 않았고, 어떤 키가 어떤 명령인지만 확인했습니다. 틀린 키는 `desktop/keymap.js`의 표 한 곳만 고치면 앱 전체(메뉴, 명령 팔레트, 단축키 표)에 반영됩니다. Claude Code나 Codex에게 "keymap.js에서 ○○ 키를 △△로 바꿔 줘"라고 요청하면 됩니다.
 
-*English: a best-effort map of Windows Hangul shortcuts. The single source of truth is the table in `desktop/keymap.js`; change a key there and the menus, palette and shortcut sheet follow.*
+*English: Windows Hangul shortcuts, checked key by key against the default shortcut map that ships with Hancom Office 2022 (only which key runs which command; no Hancom code or files are copied). The single source of truth is the table in `desktop/keymap.js`; change a key there and the menus, palette and shortcut sheet follow.*
 
 ## Mac에서의 원칙
 
@@ -33,7 +33,7 @@ HWP Workbench는 Windows 한글을 쓰던 분이 Mac에서 같은 손 습관으�
 | 다시 실행 | Ctrl+Shift+Z | ⇧⌘Z, ⇧⌃Z | 지금 (⇧⌘Z) · C4 |
 | 모두 선택 | Ctrl+A | ⌘A, ⌃A | 지금 (⌘A) · C4 |
 | 찾기 | Ctrl+F | ⌘F, ⌃F | 지금 (⌘F) · C4 |
-| 찾아 바꾸기 | Ctrl+H | ⌃H, ⌥⌘F | 지금 (⌥⌘F) · C4 |
+| 찾아 바꾸기 | Ctrl+H, Ctrl+F2 | ⌃H, ⌃F2, ⌥⌘F | 지금 |
 | 글자 모양 | Alt+L | ⌥L | C4 (보기만) · 엔진 (변경) |
 | 문단 모양 | Alt+T | ⌥T | C4 (보기만) · 엔진 (변경) |
 | 편집 용지 | F7 | F7 | C4 (보기만) |
@@ -42,22 +42,23 @@ HWP Workbench는 Windows 한글을 쓰던 분이 Mac에서 같은 손 습관으�
 | 조판 부호 보이기 | Ctrl+G, C | ⌃G 또는 ⌘G 다음 C | C4 |
 | 셀 블록 | F5 | F5 | C4 (셀 이동·편집) |
 | 다음 / 이전 셀 | Tab / Shift+Tab | Tab / ⇧Tab | C4 |
-| 명령 팔레트 | Ctrl+K | ⌃K, ⌘K | C4 |
-| 단축키 표 | Ctrl+/ | ⌃/, ⌘/ | C4 |
+| 명령 팔레트 | — (한글의 Ctrl+K는 Ctrl+K B 책갈피, Ctrl+K N 문단 번호 등 26개 명령의 첫 키) | ⌘K만 | 지금 |
+| 단축키 표 | — (한글 도움말: F1) | ⌃/, ⌘/ | 지금 |
 | 패널 | — | ⌥⌘I | 지금 |
-| 확대 / 축소 | Ctrl+= / Ctrl+- | ⌃ 또는 ⌘ + = / - | 지금 |
-| 너비 맞춤 | Ctrl+0 | ⌃0, ⌘0 | 지금 |
-| 한자 변환 | F9, 한자 키 | ⌥ Return (macOS) | 확인 예정 |
+| 확대 / 축소 | Shift+숫자패드 + / - | ⌃ 또는 ⌘ + = / - (Mac 노트북에는 숫자패드가 없음) | 지금 |
+| 폭 맞춤 | Ctrl+G, W | ⌃G 다음 W, ⌃0, ⌘0 | 지금 |
+| 쪽 맞춤 / 100% | Ctrl+G, P / Ctrl+G, Q | — | 나중 |
+| 한자 변환 | F9, 한자 키 | ⌥ Return (macOS 입력기) | 확인 예정 |
 | 표 만들기 | Ctrl+N, T | ⌃N 다음 T | 엔진 |
-| 쪽 나누기 | Ctrl+Enter | ⌃Return | 엔진 |
-| 진하게 / 기울임 / 밑줄 | Ctrl+B / I / U | ⌘B / I / U | 엔진 |
-| 정렬 (왼쪽/가운데/오른쪽/양쪽) | Ctrl+Shift+L / C / R / M (?) | ⇧⌃L / C / R / M | 엔진 |
-| 글자 크게 / 작게 | Alt+Shift+E / R (?) | ⇧⌥E / R | 엔진 |
-| 자간 좁게 / 넓게 | Alt+Shift+N / W (?) | ⇧⌥N / W | 엔진 |
-| 장평 좁게 / 넓게 | Alt+Shift+J / K (?) | ⇧⌥J / K | 엔진 |
+| 쪽 나누기 | Ctrl+Enter, Ctrl+J | ⌃Return | 엔진 |
+| 진하게 / 기울임 / 밑줄 | Ctrl+B / I / U, Alt+Shift+B / I / U | ⌘B / I / U | 엔진 |
+| 정렬 (왼쪽/가운데/오른쪽/양쪽/배분) | Ctrl+Shift+L / C / R / M / T | ⇧⌃L / C / R / M / T | 엔진 |
+| 글자 크게 / 작게 | Alt+Shift+E / R, Ctrl+] / [ | ⇧⌥E / R | 엔진 |
+| 자간 좁게 / 넓게 | Alt+Shift+N / W | ⇧⌥N / W | 엔진 |
+| 장평 좁게 / 넓게 | Alt+Shift+J / K | ⇧⌥J / K | 엔진 |
 | 모양 복사 | Alt+C | ⌥C | 엔진 |
 
-(?) 표시는 특히 확실하지 않은 키입니다.
+한글과 다르게 둔 키: Ctrl+O(한글: 끼워 넣기)와 Ctrl+Shift+S(한글: 블록 합계)는 이 앱에 해당 기능이 없어 불러오기와 다른 이름으로 저장에 씁니다. Ctrl+-(한글: 글자 스타일 해제)는 축소에 씁니다.
 
 ## 고치는 방법
 
