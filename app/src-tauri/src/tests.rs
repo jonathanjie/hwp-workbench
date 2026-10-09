@@ -252,3 +252,20 @@ fn native_message_mapping_keeps_cancel_as_default() {
         2
     );
 }
+
+#[test]
+fn unbundled_binary_uses_the_source_checkout_for_the_engine() {
+    let checkout = engine_source_root(None).unwrap();
+    assert!(checkout.join("engine/hwp_workbench").is_dir());
+    let empty = tempfile::tempdir().unwrap();
+    assert_eq!(
+        engine_source_root(Some(empty.path().to_path_buf())).unwrap(),
+        checkout
+    );
+    let bundle = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(bundle.path().join("app/engine/hwp_workbench")).unwrap();
+    assert_eq!(
+        engine_source_root(Some(bundle.path().to_path_buf())).unwrap(),
+        bundle.path().join("app")
+    );
+}

@@ -381,6 +381,20 @@ fn request_close<R: Runtime>(app: &tauri::AppHandle<R>) {
         }
     });
 }
+/// Folder that holds the engine sources: the bundle's `app` resource folder,
+/// or the source checkout. An unbundled development binary has no resource
+/// folder (`resource_dir()` fails), so `resource_dir` is `None` there.
+fn engine_source_root(resource_dir: Option<PathBuf>) -> std::io::Result<PathBuf> {
+    let bundled = resource_dir
+        .map(|directory| directory.join("app"))
+        .filter(|directory| directory.join("engine/hwp_workbench").is_dir());
+    match bundled {
+        Some(directory) => Ok(directory),
+        None => PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize(),
+    }
+}
 fn window_color(theme: tauri::Theme) -> tauri::window::Color {
     if theme == tauri::Theme::Dark {
         tauri::window::Color(15, 15, 14, 255)
@@ -450,14 +464,7 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
             }
         })
         .setup(|app| {
-            let resource_source = app.path().resource_dir()?.join("app");
-            let source_root = if resource_source.join("engine/hwp_workbench").is_dir() {
-                resource_source
-            } else {
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("../..")
-                    .canonicalize()?
-            };
+            let source_root = engine_source_root(app.path().resource_dir().ok())?;
             let profile = app.path().app_data_dir()?;
             let host = Arc::new(NativeHost {
                 app: app.handle().clone(),
