@@ -170,3 +170,15 @@
 - **Trigger:** `scan()` returned at once while a watcher-started scan ran. Switching Agent link on then returned an empty inbox, and the older scan's rows were dropped as a previous generation. The desktop suite failed or hung in about half of the runs.
 - **Rule:** A scan requested during a running scan waits for it and then one more pass. Close watchers in test teardown even when an assertion fails.
 - **Why:** Callers treat `await scan()` as "up to date"; a skipped request breaks that silently.
+
+### Find the element that overflows before changing fit math
+- **Date:** 2026-10-10
+- **Trigger:** After the panel-fit fix, a 6-page public report still scrolled sideways. The zoom was correct; one rhwp text-box click target was 567 px wide and extended past the page.
+- **Rule:** When a container scrolls, list the descendants whose right edge passes its client width before you change layout constants. Clip per-page click targets to the page.
+- **Why:** rhwp can report text boxes wider than the page; a fit formula cannot compensate for content outside the page.
+
+### Check disk space before fetching large dependencies
+- **Date:** 2026-10-10
+- **Trigger:** A shallow clone of rhwp (about 9 GB with samples and fonts), Cargo's git checkout and `cargo vendor` filled the disk; tool output files could not be written.
+- **Rule:** Check free space and the upstream repository size first. Vendor only the library files the build needs, delete inspection copies when done, and share one Cargo target folder across worktrees.
+- **Why:** Git dependencies vendor the whole package folder, and each worktree's debug build of rhwp and Tauri takes gigabytes.
