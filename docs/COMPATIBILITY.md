@@ -18,7 +18,7 @@ This does not imply visual fidelity. Cached preview text, images and line positi
 
 ## Protected, active and unknown content
 
-Protected/DRM/password HWP is refused. Detected script or signature metadata blocks edits. HWP documents containing script storage are currently read-only even when that storage may be benign. Signed documents are not silently invalidated or stripped. The app does not execute macros, scripts, OLE or external references.
+Protected/DRM/password HWP is refused. Detected script or signature metadata blocks edits. The one exception is Hancom's default script stub (`Scripts/DefaultJScript` with an empty `OnDocument_New` and `Scripts/JScriptVersion`): when both decompressed payloads match the recorded SHA-256 hashes exactly, the document stays editable, the streams are kept byte-identical and never executed, and an `info` warning `DEFAULT_SCRIPT_STUB` is reported. Any other script content keeps the document read-only. Signed documents are not silently invalidated or stripped. The app does not execute macros, scripts, OLE or external references.
 
 Known feature warnings cover tables, images, equations, charts, OLE, headers/footers, fields, footnotes and selected shapes. Unknown payloads are retained where possible. Detection of every unsupported feature is not implemented, so the general uncertified-layout warning is never removed. A missing feature-specific warning is not a claim of support.
 

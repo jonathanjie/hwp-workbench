@@ -1,11 +1,13 @@
 {
   "suite": "public corpus: native save/reopen and independent rhwp render",
-  "generatedAt": "2026-10-09T13:35:10.524854+00:00",
+  "generatedAt": "2026-10-09T13:44:59.477941+00:00",
   "host": "MacBook-Air-3.local",
   "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
   "machine": "arm64",
   "python": "3.14.6",
   "success": false,
+  "failures": 0,
+  "skipped": 2,
   "results": [
     {
       "name": "pyhwp-aligns.hwp",
@@ -62,7 +64,7 @@
         },
         "edit": {
           "status": "skipped",
-          "reason": "No safely editable printable body text exists."
+          "reason": "No printable body text."
         },
         "rhwpEdit": {
           "status": "skipped",
