@@ -1,6 +1,6 @@
 import io,json,tempfile,unittest,subprocess,os,sys
 from pathlib import Path
-from fixtures import make_hwpx
+from fixtures import make_hwpx, make_hwp
 from hwp_workbench.mcp import serve
 from hwp_workbench.document import Document
 from test_engine import patch
@@ -14,7 +14,10 @@ class MCPTests(unittest.TestCase):
         if initialize:msgs=[{'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-11-25','capabilities':{},'clientInfo':{'name':'test','version':'1'}}},{'jsonrpc':'2.0','method':'notifications/initialized'}]
         msgs+=more;out=io.StringIO();serve(self.root,io.StringIO('\n'.join(json.dumps(x) for x in msgs)+'\n'),out);return [json.loads(x) for x in out.getvalue().splitlines()]
     def test_initialize_tools(self):
-        r=self.run_messages([{'jsonrpc':'2.0','id':2,'method':'tools/list'}]);self.assertEqual(r[0]['result']['protocolVersion'],'2025-11-25');self.assertEqual(len(r[1]['result']['tools']),5)
+        replies = self.run_messages([{'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list'}])
+        self.assertEqual(replies[0]['result']['protocolVersion'], '2025-11-25')
+        self.assertEqual(len(replies[1]['result']['tools']), 10)
+
     def test_inspect(self):
         r=self.run_messages([{'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':'hwp_inspect','arguments':{'path':'form.hwpx'}}}]);self.assertFalse(r[-1]['result']['isError']);self.assertEqual(r[-1]['result']['structuredContent']['format'],'hwpx')
     def test_root_escape(self):
@@ -48,3 +51,98 @@ class MCPTests(unittest.TestCase):
         messages=[{'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-11-25'}},{'jsonrpc':'2.0','method':'notifications/initialized'},{'jsonrpc':'2.0','id':2,'method':'tools/list'}]
         r=subprocess.run([sys.executable,'-m','hwp_workbench','mcp','--root',str(self.root)],input='\n'.join(map(json.dumps,messages))+'\n',capture_output=True,text=True,env=env,timeout=10)
         self.assertEqual(r.returncode,0,r.stderr);self.assertEqual(len(r.stdout.splitlines()),2);self.assertEqual(r.stderr,'')
+
+    def test_new_tools_cli_mcp_service_parity(self):
+        from hwp_workbench.service import invoke
+
+        project = Path(__file__).resolve().parents[1]
+        env = {**os.environ, 'PYTHONPATH': str(project / 'engine')}
+        (self.root / 'legacy.hwp').write_bytes(make_hwp())
+        fields = {'기관명': '새 기관'}
+        (self.root / 'fields.json').write_text(json.dumps(fields))
+        for path in ['form.hwpx', 'legacy.hwp']:
+            doc = Document((self.root / path).read_bytes())
+            cases = [
+                ('read', {'offset': 0, 'limit': 1}, ['--offset', '0', '--limit', '1']),
+                ('search', {'query': '검토'}, ['--query', '검토']),
+                ('replace', {'find': '검토', 'replaceWith': '확정'}, ['--find', '검토', '--replace-with', '확정']),
+                ('fill', {'fields': fields}, ['--json', 'fields.json']),
+                ('set', {'nodeId': doc.nodes[0].id, 'text': doc.nodes[0].text.replace('검토', '확정')},
+                 ['--node-id', doc.nodes[0].id, '--text', doc.nodes[0].text.replace('검토', '확정')]),
+                ('inspect', {'compact': True}, ['--compact']),
+            ]
+            for method, options, flags in cases:
+                with self.subTest(path=path, method=method):
+                    args = {'path': path, **options}
+                    expected = invoke(self.root, method, args)
+                    replies = self.run_messages([{'jsonrpc': '2.0', 'id': 2, 'method': 'tools/call',
+                                                 'params': {'name': 'hwp_' + method, 'arguments': args}}])
+                    self.assertFalse(replies[-1]['result']['isError'])
+                    self.assertEqual(replies[-1]['result']['structuredContent'], expected)
+                    process = subprocess.run([sys.executable, '-m', 'hwp_workbench', method, path,
+                                              '--root', str(self.root), *flags],
+                                             capture_output=True, text=True, env=env, timeout=10)
+                    self.assertEqual(process.returncode, 0, process.stderr)
+                    self.assertEqual(json.loads(process.stdout), expected)
+
+    def test_new_tool_schemas_reject_wrong_nested_types(self):
+        cases = [
+            ('hwp_read', {'limit': True}),
+            ('hwp_search', {'query': 'x', 'regex': 'yes'}),
+            ('hwp_replace', {'find': 'x', 'replaceWith': 'y', 'nodeIds': [4]}),
+            ('hwp_fill', {'fields': {'기관명': 4}}),
+            ('hwp_set', {'nodeId': 4, 'text': 'x'}),
+        ]
+        for name, options in cases:
+            with self.subTest(tool=name):
+                replies = self.run_messages([{'jsonrpc': '2.0', 'id': 2, 'method': 'tools/call',
+                                             'params': {'name': name, 'arguments': {'path': 'form.hwpx', **options}}}])
+                self.assertEqual(replies[-1]['error']['code'], -32602)
+
+    def test_new_edit_tool_annotations_and_apply(self):
+        replies = self.run_messages([{'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list'}])
+        tools = {tool['name']: tool for tool in replies[-1]['result']['tools']}
+        for name in ['replace', 'fill', 'set']:
+            self.assertFalse(tools['hwp_' + name]['annotations']['readOnlyHint'])
+            self.assertFalse(tools['hwp_' + name]['annotations']['destructiveHint'])
+        args = {'path': 'form.hwpx', 'find': '검토', 'replaceWith': '확정',
+                'output': 'replaced.hwpx', 'acknowledgeRisks': True}
+        replies = self.run_messages([{'jsonrpc': '2.0', 'id': 2, 'method': 'tools/call',
+                                     'params': {'name': 'hwp_replace', 'arguments': args}}])
+        self.assertTrue(replies[-1]['result']['structuredContent']['reopenedAndVerified'])
+
+    def test_engine_and_protocol_errors_include_recovery(self):
+        replies = self.run_messages([{'jsonrpc': '2.0', 'id': 2, 'method': 'tools/call',
+                                     'params': {'name': 'hwp_read', 'arguments': {'path': '../outside.hwpx'}}}])
+        error = json.loads(replies[-1]['result']['content'][0]['text'])
+        self.assertEqual(error['code'], 'OUTSIDE_WORKSPACE')
+        self.assertTrue(error['hint'])
+        self.assertIsInstance(error['retryable'], bool)
+        self.assertEqual(replies[-1]['result']['structuredContent']['error'], error)
+        replies = self.run_messages([{'jsonrpc': '2.0', 'id': 2, 'method': 'tools/call',
+                                     'params': {'name': 'hwp_read', 'arguments': {'path': 'form.hwpx', 'limit': 'x'}}}])
+        self.assertEqual(replies[-1]['error']['code'], -32602)
+        self.assertTrue(replies[-1]['error']['data']['hint'])
+        self.assertTrue(replies[-1]['error']['data']['retryable'])
+
+    def test_cli_rpc_and_parser_errors_include_recovery(self):
+        project = Path(__file__).resolve().parents[1]
+        env = {**os.environ, 'PYTHONPATH': str(project / 'engine')}
+        cases = [
+            (['read', 'missing.hwpx', '--root', str(self.root)], None, 'READ_FAILED'),
+            (['search', 'form.hwpx', '--root', str(self.root)], None, 'BAD_ARGUMENTS'),
+            (['fill', 'form.hwpx', '--json', 'bad.json', '--root', str(self.root)], None, 'REQUEST_FAILED'),
+            (['rpc', '--root', str(self.root)], json.dumps({'method': 'read', 'args': {'path': 'missing.hwpx'}}), 'READ_FAILED'),
+            (['rpc', '--root', str(self.root)], '{bad', 'REQUEST_FAILED'),
+        ]
+        (self.root / 'bad.json').write_text('{bad')
+        for arguments, request, code in cases:
+            with self.subTest(arguments=arguments, request=request):
+                process = subprocess.run([sys.executable, '-m', 'hwp_workbench', *arguments],
+                                         input=request, capture_output=True, text=True, env=env, timeout=10)
+                self.assertEqual(process.returncode, 2)
+                error = json.loads(process.stderr)['error']
+                self.assertEqual(error['code'], code)
+                self.assertTrue(error['hint'])
+                self.assertIsInstance(error['retryable'], bool)
+                self.assertEqual(process.stdout, '')
