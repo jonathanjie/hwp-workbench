@@ -356,7 +356,7 @@ class SkillRecipesTests(AgentLinkCase):
             self.assertIn(term, skill)
         reference = (skill_path.parent / 'references/patch-format.md').read_text()
         for term in ['schemaVersion', 'baseSha256', 'set_text', 'nodeId', 'expectedText',
-                     'STALE_DOCUMENT', 'STALE_TEXT', 'HWP_LENGTH_CHANGE_BLOCKED', 'OUTPUT_EXISTS']:
+                     'STALE_DOCUMENT', 'STALE_TEXT', 'UNSUPPORTED_ELEMENT', 'OUTPUT_EXISTS']:
             self.assertIn(term, reference)
         read = self.cli('read', 'form.hwpx', '--root', str(self.root))
         self.assertEqual(read.returncode, 0, read.stderr)
