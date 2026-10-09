@@ -64,6 +64,10 @@ Each task runs in its own git worktree and branch under `../hwp-workbench-worktr
 - C2 command palette, find and replace, changes panel, review sheet, toasts, checks panel, shortcuts, i18n and accessibility.
 - C3 (after A2 and B2) live preview of staged edits, Agent link panel with proposal inbox and session sharing, and an Agents card that shows and installs the skill and MCP setup for Claude Code, Codex and Claude Desktop.
 
+- C4 (after C3) Windows 한글 familiarity on the Mac: a "Windows 한글" keymap (Ctrl → ⌃ and ⌘, Alt → ⌥, chords), 한글 vocabulary in the Korean UI and palette, read-only 글자 모양/문단 모양/편집 용지 cards, 문자표, Tab between table cells, a 조판 부호 overlay and a missing-font list with Mac substitutes. Key table for the user to confirm: `docs/design/hangul-keymap.md`.
+
+Decision (user, 9 October): the first end user works daily in Windows 한글 and will use HWP Workbench on a Mac. Familiar keys and words come first; the visual design stays modern.
+
 Decision (user, 9 October): no chat panel inside the editor. People keep working in their own Claude Code, Codex or Claude app; the editor is the live visual and review surface for what those agents propose.
 
 **B3 — Reach agents where people already work** (after B2)
