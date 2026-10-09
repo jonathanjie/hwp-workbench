@@ -1,0 +1,17 @@
+{
+  "suite": "unit + integration (synthetic fixtures)",
+  "python": "3.14.6",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "testsRun": 68,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "success": true,
+  "elapsedSeconds": 0.393,
+  "notTested": [
+    "macOS Electron runtime",
+    "Hancom interoperability",
+    "public binary fixture corpus",
+    "native page fidelity"
+  ]
+}

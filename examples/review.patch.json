@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "baseSha256": "daf3cfef9cb034def0b464ce46c0823c15e4e7047173ddabf8c6e36d8db9bbff",
+  "operations": [
+    {
+      "op": "set_text",
+      "nodeId": "Contents/section0.xml#text:0",
+      "expectedText": "내부 업무 검토서",
+      "text": "내부 업무 검토서 — 최종"
+    }
+  ]
+}

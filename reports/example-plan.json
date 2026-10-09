@@ -1,0 +1,39 @@
+{
+  "baseSha256": "daf3cfef9cb034def0b464ce46c0823c15e4e7047173ddabf8c6e36d8db9bbff",
+  "changes": [
+    {
+      "nodeId": "Contents/section0.xml#text:0",
+      "before": "내부 업무 검토서",
+      "after": "내부 업무 검토서 — 최종",
+      "part": "Contents/section0.xml"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "FONT_METRICS_UNVERIFIED",
+      "severity": "warning",
+      "message": "Requested fonts are listed, but installed font identity and text metrics are not verified. No fonts are bundled."
+    },
+    {
+      "code": "TABLE_LAYOUT",
+      "severity": "warning",
+      "message": "tbl content is retained in the package; its full layout/behavior is not editable or certified in this alpha."
+    },
+    {
+      "code": "IMAGES",
+      "severity": "warning",
+      "message": "pic content is retained in the package; its full layout/behavior is not editable or certified in this alpha."
+    },
+    {
+      "code": "PREVIEW_CACHE_RETAINED",
+      "severity": "info",
+      "message": "Embedded preview images/text and line-layout caches are retained unchanged. They may be stale after edits; reopen in Hancom to refresh."
+    },
+    {
+      "code": "LAYOUT_UNVERIFIED",
+      "severity": "warning",
+      "message": "The workspace preview is approximate. Hancom layout, pagination and font fidelity have not been certified."
+    }
+  ],
+  "layoutCertified": false
+}

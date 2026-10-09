@@ -1,0 +1,20 @@
+[
+  {
+    "name": "pyhwp-aligns.hwp",
+    "hancomCertified": false,
+    "status": "not-run",
+    "reason": "Fixture not downloaded."
+  },
+  {
+    "name": "pyhwp-borderfill.hwp",
+    "hancomCertified": false,
+    "status": "not-run",
+    "reason": "Fixture not downloaded."
+  },
+  {
+    "name": "hwp-cli-report-tables.hwpx",
+    "hancomCertified": false,
+    "status": "not-run",
+    "reason": "Fixture not downloaded."
+  }
+]

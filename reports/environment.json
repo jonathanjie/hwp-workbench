@@ -1,0 +1,17 @@
+{
+  "sourceVersion": "0.1.0-alpha.1",
+  "host": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "python": "3.13.5",
+  "node": "v22.16.0",
+  "electronInstalled": false,
+  "macOSBuildExecuted": false,
+  "publicFixtureTestsExecuted": false,
+  "githubRepositoryCreated": false,
+  "rendererExecution": "Linux Chromium; source injected in memory; real engine; test-only IPC bridge",
+  "limitations": [
+    "Python worker not OS-sandboxed",
+    "No Hancom interoperability or visual validation",
+    "No dependency lockfile: resolution failed",
+    "No native application binary in this source handoff"
+  ]
+}

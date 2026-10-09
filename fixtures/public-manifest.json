@@ -1,0 +1,9 @@
+{
+  "schemaVersion":1,
+  "policy":"Download-only, internal compatibility testing. Public fixture files are gitignored and not redistributed. Verify fixture-specific rights separately before redistribution.",
+  "fixtures":[
+    {"name":"pyhwp-aligns.hwp","repository":"mete0r/pyhwp","path":"tests/hwp5_tests/fixtures/aligns.hwp","blobSha1":"b2e4dc02c093059d8774f62058fce9a410da4c14","bytes":16384,"source":"https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/aligns.hwp","focus":"Paragraph alignments; legacy CFB, controls and scripts. Expected read-only if script storage is present."},
+    {"name":"pyhwp-borderfill.hwp","repository":"mete0r/pyhwp","path":"tests/hwp5_tests/fixtures/borderfill.hwp","blobSha1":"afbaa406784d52f7ab05318a289151c1b644e26c","bytes":25600,"source":"https://github.com/mete0r/pyhwp/blob/83239f0d3bdf438b2c9f7dcff455a6e841154a39/tests/hwp5_tests/fixtures/borderfill.hwp","focus":"Border/fill preservation and native controls."},
+    {"name":"hwp-cli-report-tables.hwpx","repository":"STAIxBWLB/hwp-cli","path":"fixtures/samples/report-tables.hwpx","blobSha1":"6475b45d72f0c69f895693aafa26c6eb73805dec","bytes":191242,"source":"https://github.com/STAIxBWLB/hwp-cli/blob/main/fixtures/samples/report-tables.hwpx","focus":"Real-world HWPX report tables, images and section structure. Download is blob-pinned even though source browsing link tracks main."}
+  ]
+}

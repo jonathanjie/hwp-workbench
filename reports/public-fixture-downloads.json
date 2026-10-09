@@ -1,0 +1,17 @@
+[
+  {
+    "name": "pyhwp-aligns.hwp",
+    "status": "download-failed",
+    "error": "<urlopen error [Errno -3] Temporary failure in name resolution>"
+  },
+  {
+    "name": "pyhwp-borderfill.hwp",
+    "status": "download-failed",
+    "error": "<urlopen error [Errno -3] Temporary failure in name resolution>"
+  },
+  {
+    "name": "hwp-cli-report-tables.hwpx",
+    "status": "download-failed",
+    "error": "<urlopen error [Errno -3] Temporary failure in name resolution>"
+  }
+]

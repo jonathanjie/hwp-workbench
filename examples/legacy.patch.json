@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "baseSha256": "b5378f69056cc5e2ddde4b0573e155c5caddf8a8425c9e9297d17efa24931cd3",
+  "operations": [
+    {
+      "op": "set_text",
+      "nodeId": "BodyText/Section0#record:1:text:0",
+      "expectedText": "마리나체인 검토 중",
+      "text": "마리나체인 검토 완"
+    }
+  ]
+}

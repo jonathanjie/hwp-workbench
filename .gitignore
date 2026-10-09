@@ -1,0 +1,25 @@
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
+.DS_Store
+.env*
+*.pem
+*.p12
+*.mobileprovision
+user-documents/
+drafts/
+fixtures/public/*
+!fixtures/public/README.md
+!fixtures/public/.gitkeep
+*.hwp
+*.hwpx
+!fixtures/generated/*.hwp
+!fixtures/generated/*.hwpx
+reports/ui-test-workspace/
+
+reports/cli-smoke-workspace/
+
+# Local agent and scratch state
+work/
+.claude/settings.local.json

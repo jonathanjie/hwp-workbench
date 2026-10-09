@@ -1,0 +1,21 @@
+{
+  "name": "hwp-workbench",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "Internal HWP/HWPX editing workbench \u2014 preservation-first development alpha",
+  "main": "desktop/main.cjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "python3 scripts/run-tests.py",
+    "fixtures": "python3 scripts/generate-fixtures.py",
+    "check": "node --check desktop/main.cjs && node --check desktop/preload.cjs && node --check desktop/renderer.js",
+    "package:mac": "node scripts/package-mac.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.5.1"
+  },
+  "license": "UNLICENSED"
+}

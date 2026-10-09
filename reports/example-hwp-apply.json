@@ -1,0 +1,38 @@
+{
+  "baseSha256": "b5378f69056cc5e2ddde4b0573e155c5caddf8a8425c9e9297d17efa24931cd3",
+  "changes": [
+    {
+      "nodeId": "BodyText/Section0#record:1:text:0",
+      "before": "마리나체인 검토 중",
+      "after": "마리나체인 검토 완",
+      "part": "BodyText/Section0"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "HWP_EQUAL_LENGTH_ONLY",
+      "severity": "warning",
+      "message": "HWP alpha editing requires the same UTF-16 code-unit length per text run. Length-changing and structural edits are blocked to retain character/line offsets."
+    },
+    {
+      "code": "HWP_LAYOUT_NOT_RENDERED",
+      "severity": "warning",
+      "message": "HWP is shown as structured text, not a page-faithful rendering. Table/control/style streams are retained but not visually reconstructed."
+    },
+    {
+      "code": "PREVIEW_CACHE_RETAINED",
+      "severity": "info",
+      "message": "Stored preview content remains unchanged and may be stale after editing."
+    },
+    {
+      "code": "LAYOUT_UNVERIFIED",
+      "severity": "warning",
+      "message": "The workspace preview is approximate. Hancom layout, pagination and font fidelity have not been certified."
+    }
+  ],
+  "layoutCertified": false,
+  "output": "reports/cli-smoke-workspace/edited.hwp",
+  "outputSha256": "6c74803a1f158df7b32a775a93a4a5655e008cc92a0bfef84f4e35118c97dab0",
+  "reopenedAndVerified": true,
+  "sourceUntouched": true
+}
