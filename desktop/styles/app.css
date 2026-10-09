@@ -198,6 +198,8 @@ body.outline-mode .canvas { left: 238px; }
 .page { flex: none; min-height: 0; }
 .page-image { pointer-events: none; }
 .hit-layer, .mark-layer { position: absolute; inset: 0; }
+/* rhwp can report text boxes wider than the page; keep click targets on the page. */
+.hit-layer { overflow: hidden; }
 .mark-layer { pointer-events: none; }
 .text-hit { position: absolute; padding: 0; background: transparent; border-radius: 3px; }
 .mark-line { right: auto; }
@@ -269,9 +271,14 @@ body .capsule { left: calc(var(--rail-space) + (100vw - var(--rail-space) - var(
 .palette .seal img { width: 18px; }
 .palette .q { flex: 1; min-width: 0; font-size: 15px; border: 0; padding: 4px; background: transparent; color: var(--island-ink); }
 .palette .q::placeholder { color: var(--island-ink-2); }
-.palette .scope { display: flex; gap: 4px; }
-.palette .scope button { font: 500 11px var(--font-mono); padding: 5px 7px; border-radius: 6px; color: var(--island-ink-2); border: .5px solid var(--island-hairline); }
+.palette .scope, .segmented { display: flex; gap: 4px; }
+.palette .scope button, .segmented button { font: 500 11px var(--font-mono); padding: 5px 7px; border-radius: 6px; }
+.palette .scope button { color: var(--island-ink-2); border: .5px solid var(--island-hairline); }
 .palette .scope .on { color: var(--island-ink); background: var(--island-3); border-color: transparent; }
+.segmented { margin: 12px 0; }
+.segmented button { color: var(--ink-2); border: .5px solid var(--hairline-strong); }
+.segmented button:hover { color: var(--ink); }
+.segmented .on { color: var(--ink); background: var(--surface-sunk); border-color: transparent; }
 .palette .results { max-height: min(530px, calc(100vh - 170px)); overflow: auto; }
 .palette .grp { padding: 10px 8px 4px; }
 .palette .lbl { font: 600 10px var(--font-mono); letter-spacing: .09em; color: var(--island-ink-2); padding: 4px 10px 8px; }
@@ -351,6 +358,7 @@ dialog.sheet { position: fixed; inset: 58px auto auto 50%; transform: translateX
 .review-sheet > header { position: static; flex: none; margin: 0; padding: 0 0 10px; }
 .review-summary { margin-top: 5px; font-size: 11px; color: var(--ink-2); }
 #reviewChanges { min-height: 0; overflow: auto; }
+#reviewChanges:focus-visible { outline-offset: -2px; }
 .review-group:first-child .section-label { padding-top: 4px; }
 .review-bottom { flex: none; padding-top: 10px; border-top: .5px solid var(--hairline); }
 .review-bottom summary { font-size: 12px; cursor: pointer; }
@@ -397,11 +405,16 @@ kbd { font-family: var(--font-ui); font-variant-numeric: slashed-zero; }
 .agent-link input[role="switch"]:checked { background: var(--pencil); }
 .agent-link input[role="switch"]:checked::before { transform: translateX(12px); }
 
-.format-card { width: 360px; }
+dialog.sheet.format-card { inset: auto; transform: none; width: min(360px, calc(100vw - 24px)); }
+dialog.format-card::backdrop { background: transparent; backdrop-filter: none; }
 .format-row { display: flex; justify-content: space-between; gap: 20px; padding: 7px 0; font-size: 12px; }
+.format-row .mono { overflow-wrap: anywhere; text-align: right; min-width: 0; }
 
 .symbol-picker { width: 430px; }
 .symbol-query { width: 100%; margin: 12px 0; padding: 8px; background: var(--surface-sunk); border-radius: 6px; }
+.sheet input[type="search"] { border: 0; color: var(--ink); }
+.sheet input[type="search"]:focus,
+.sheet input[type="search"]:focus-visible { outline: none; box-shadow: none; caret-color: var(--ink); }
 .symbol-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
 .symbol-choice { font-size: 20px; padding: 8px; border-radius: 6px; }
 .symbol-choice:hover { background: var(--surface-sunk); }

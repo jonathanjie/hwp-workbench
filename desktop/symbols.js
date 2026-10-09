@@ -52,6 +52,7 @@ export class SymbolPicker {
     close.onclick = () => this.dialog.close();
     header.append(close);
     this.query = element('input', 'symbol-query');
+    this.query.type = 'search';
     this.query.id = 'symbolQuery';
     this.query.setAttribute('aria-label', t('symbolSearch'));
     this.query.placeholder = t('symbolSearch');

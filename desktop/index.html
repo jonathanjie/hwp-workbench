@@ -78,7 +78,7 @@
   <div id="status" class="status" role="status" aria-live="polite"></div>
   <dialog id="reviewDialog" class="sheet review-sheet" data-aria="reviewAll">
     <header><div><strong data-label="reviewAll"></strong><div id="reviewSummary" class="review-summary"></div></div><button id="closeReview" class="btn ghost" data-title="close">×</button></header>
-    <div id="reviewChanges"></div>
+    <div id="reviewChanges" tabindex="0" autofocus data-aria="changes"></div>
     <div class="review-bottom"><details><summary data-label="warningDetails"></summary><div id="reviewWarnings"></div></details>
     <label class="ack"><input id="acknowledge" type="checkbox"><span data-label="ack"></span></label>
     <footer><button id="cancelReview" class="btn ghost" data-label="cancel"></button><button id="confirmSave" class="btn seal" data-label="saveCopy" disabled></button></footer></div>
@@ -89,7 +89,12 @@
     <div id="paletteResults" class="results" role="listbox"></div>
     <div class="foot"><span><kbd>↑↓</kbd><span data-label="navigate"></span></span><span><kbd>↵</kbd><span data-label="run"></span></span><span><kbd>tab</kbd><span data-label="scope"></span></span><span class="palette-note" data-label="preview"></span></div>
   </dialog>
-  <dialog id="shortcutsDialog" class="sheet" data-aria="shortcuts"><header><strong data-label="shortcuts"></strong><button id="closeShortcuts" class="btn ghost" data-title="close">×</button></header><select id="keyScheme" data-title="keyScheme"><option value="windows">Windows 한글</option><option value="mac">Mac</option></select><div id="shortcutItems"></div></dialog>
+  <dialog id="shortcutsDialog" class="sheet" data-aria="shortcuts"><header><strong data-label="shortcuts"></strong><button id="closeShortcuts" class="btn ghost" data-title="close">×</button></header>
+    <div id="keyScheme" class="segmented" role="radiogroup" data-aria="keyScheme">
+      <button type="button" role="radio" data-scheme="windows" aria-checked="true" tabindex="0" data-label="schemeWindowsChoice"></button>
+      <button type="button" role="radio" data-scheme="mac" aria-checked="false" tabindex="-1" data-label="schemeMacChoice"></button>
+    </div>
+    <div id="shortcutItems"></div></dialog>
   <dialog id="symbolDialog" class="sheet symbol-picker"></dialog>
   <dialog id="formatDialog" class="sheet format-card"></dialog>
   <script type="module" src="renderer.js"></script>
