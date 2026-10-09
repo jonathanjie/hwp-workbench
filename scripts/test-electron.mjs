@@ -144,6 +144,43 @@ try {
   await window.keyboard.press('Escape');
   checks.push('Palette command and text selection, scopes, focus return and panel recentering');
 
+  // Replays the key sequence that a real macOS 2-Set Korean run produced:
+  // Enter commits a syllable (isComposing) and then arrives again as a plain
+  // Enter; ⌘↵ during composition arrives once, with isComposing set.
+  await window.locator('.text-hit[data-node-id]:not([data-node-id=""]), .text-node').first().click();
+  await window.waitForSelector('.slip');
+  const imeKeys = await window.evaluate(async () => {
+    const editor = document.getElementById('textEdit');
+    const press = (key, init = {}) => {
+      const event = new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true, ...init});
+      editor.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    const composingEnterPassedToInput = !press('Enter', {isComposing: true});
+    const plainEnterBlocked = press('Enter');
+    press('Escape', {isComposing: true});
+    const openAfterComposingEscape = !!document.querySelector('.slip');
+    editor.value += ' 한글';
+    editor.dispatchEvent(new Event('input'));
+    press('Enter', {metaKey: true, isComposing: true});
+    const stagedBeforeCommit = document.querySelectorAll('#changes .change').length;
+    editor.dispatchEvent(new CompositionEvent('compositionend', {data: '글'}));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    return {
+      composingEnterPassedToInput, plainEnterBlocked, openAfterComposingEscape, stagedBeforeCommit,
+      staged: document.querySelectorAll('#changes .change').length,
+      inserted: document.querySelector('#changes ins')?.textContent,
+      slipOpen: !!document.querySelector('.slip')
+    };
+  });
+  assert.deepEqual(imeKeys, {
+    composingEnterPassedToInput: true, plainEnterBlocked: true, openAfterComposingEscape: true,
+    stagedBeforeCommit: 0, staged: 1, inserted: ' 한글', slipOpen: false
+  });
+  await shortcut('z');
+  await window.waitForFunction(() => document.querySelectorAll('#changes .change').length === 0);
+  checks.push('Korean IME keys: Enter adds no line break, ⌘↵ during composition stages once after commit');
+
   for (const theme of ['Dark', 'Light']) {
     await command(`Theme ${theme}`);
     assert.equal(await window.evaluate(() => document.documentElement.dataset.theme), theme.toLowerCase());
@@ -291,7 +328,7 @@ try {
   assert.notEqual(await window.evaluate(async () => (await fetch('app://workbench/unknown.xyz')).status), 200);
   assert.deepEqual(errors, []);
   checks.push('Protocol rejects traversal and unknown types; no renderer errors');
-  console.log(JSON.stringify({host: `${process.platform}/${process.arch}`, checks, skipped, notTested: ['Hancom reopen/layout', 'Real Korean IME', 'Signing/packaging']}, null, 2));
+  console.log(JSON.stringify({host: `${process.platform}/${process.arch}`, checks, skipped, notTested: ['Hancom reopen/layout', 'Real Korean IME (manual: scripts/qa/real-ime.mjs)', 'Signing/packaging']}, null, 2));
 } finally {
   if (application) {
     await application.evaluate(({app, dialog}) => {

@@ -145,7 +145,7 @@ At handoff, **68 core/CLI/MCP tests passed** on Linux/Python 3.13.5. **15 render
 
 Public fixture metadata was located online for two legacy HWP examples and one HWPX report. Downloads failed here because the execution environment could not resolve external hosts. Consequently **no public binary corpus tests ran**. The manifest pins repository blobs and expected sizes, and the downloader records SHA-256 after verification. Missing samples never count as passing tests. Public document binaries are not redistributed or committed.
 
-Reports and screenshots are under `reports/`. Mac Electron execution, native dialogs, real Korean IME composition, Apple Silicon packaging/signing, and Hancom reopen/layout comparisons have **not** been tested. The CI workflow is provided but has not run on GitHub.
+Reports and screenshots are under `reports/`. On macOS arm64, the native Electron suite (`npm run test:electron`, 8 workflows) passes, and real 2-Set Korean IME typing was tested with OS key events (`reports/ime-macos.md`). GitHub Actions runs the Python and desktop checks on Ubuntu and macOS. Apple Silicon packaging/signing and Hancom reopen/layout comparisons have **not** been tested.
 
 ## Private GitHub repository
 

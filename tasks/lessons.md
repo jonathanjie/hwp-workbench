@@ -67,3 +67,9 @@
 - **Trigger:** Deleting one run can change the segment IDs of later runs when the saved paragraph is parsed again; empty runs also made corpus anchor checks pass without nonempty text evidence.
 - **Rule:** Keep source revision IDs stable for patches. Verify complete edited native sections on reopen, including controls and metadata. Emit an existing empty paragraph run for insertion, but exclude empty text from corpus body-anchor evidence. Preserve pre-existing duplicate shape starts; drop only starts that newly collapse during an edit.
 - **Why:** Printable-run IDs describe a source revision, and an empty substring alone does not test a reader's text-position agreement.
+
+### Test Korean input with real OS key events
+- **Date:** 2026-10-09
+- **Trigger:** Simulated composition passed, but real 2-Set Korean typing on macOS showed two defects: Enter arrives twice (composing, then plain) and added a line break; ⌘↵ arrives once with `isComposing` set, so the slip ignored it.
+- **Rule:** Qualify text entry with `scripts/qa/real-ime.mjs` (real HID key events, a bare control textarea, nobody typing). Record the event sequence and replay it in `scripts/test-electron.mjs`. A request made during composition (such as ⌘↵) runs after `compositionend`.
+- **Why:** Synthetic events copy what we expect; the input method decides the real order.

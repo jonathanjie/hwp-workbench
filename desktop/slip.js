@@ -62,19 +62,40 @@ export class ProofSlip {
     this.slip.append(header, original, this.editor, this.error, footer);
     this.host.append(this.slip);
     this.editor.oninput = () => this.update();
-    this.slip.onkeydown = event => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        this.close();
-      } else if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !event.isComposing) {
-        event.preventDefault();
-        this.stage();
+    this.stageAfterComposition = false;
+    // A Korean IME sends ⌘↵ with isComposing set and no second key, so stage
+    // once the composition has committed its syllable.
+    this.editor.addEventListener('compositionend', () => {
+      if (this.stageAfterComposition) {
+        this.stageAfterComposition = false;
+        setTimeout(() => {
+          this.update();
+          this.stage();
+        });
       }
-    };
+    });
+    this.slip.onkeydown = event => this.keydown(event);
     this.relabel();
     this.position();
     this.editor.focus({preventScroll: true});
+  }
+
+  keydown(event) {
+    const command = event.metaKey || event.ctrlKey;
+    if (event.key === 'Escape' && !event.isComposing) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.close();
+    } else if (event.key === 'Enter' && command && event.isComposing) {
+      this.stageAfterComposition = true;
+    } else if (event.key === 'Enter' && command) {
+      event.preventDefault();
+      this.stage();
+    } else if (event.key === 'Enter' && !event.isComposing) {
+      // Paragraph text has no line breaks. macOS Korean input also sends a
+      // plain Enter after the Enter that commits a syllable.
+      event.preventDefault();
+    }
   }
 
   position() {
