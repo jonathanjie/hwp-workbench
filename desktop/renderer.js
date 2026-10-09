@@ -19,6 +19,7 @@ import {SymbolPicker, insertSymbol} from './symbols.js';
 import {readRhwpFormat, mergeFormats, showFormat} from './format-card.js';
 import {KEYMAP, Keymap, keyLabel, shortcutFor} from './keymap.js';
 import {PanelZoom} from './panel-zoom.js';
+import {KeySchemeSelector} from './key-scheme.js';
 import {renderStructure} from './structure-view.js';
 
 const $ = id => document.getElementById(id);
@@ -597,6 +598,7 @@ async function review(mode = 'save') {
     $('acknowledge').checked = false;
     reviewFocus = document.activeElement;
     $('reviewDialog').showModal();
+    $('reviewChanges').focus({preventScroll: true});
   } catch (error) {
     status('failed', {reason: errorReason(error)}, true);
   } finally {
@@ -828,14 +830,9 @@ function setTheme(theme) {
   localStorage.setItem('hwp-theme', theme);
 }
 
-function shortcuts() {
-  if ($('shortcutsDialog').open) {
-    return;
-  }
-  $('keyScheme').value = keys.scheme;
-  const heading = element('div', 'shortcut');
-  heading.append(element('span', '', t('keyScheme')), element('span', '', keys.scheme === 'windows' ? 'Windows 한글 · Mac' : 'Mac'));
-  $('shortcutItems').replaceChildren(heading, ...KEYMAP.map(command => {
+function renderShortcuts() {
+  schemeSelector.setScheme(keys.scheme);
+  $('shortcutItems').replaceChildren(...KEYMAP.map(command => {
     const row = element('div', 'shortcut');
     row.append(element('span', '', t(command.id)));
     if (keys.scheme === 'windows') {
@@ -844,6 +841,13 @@ function shortcuts() {
     row.append(element('kbd', '', shortcutFor(command.id, keys.scheme)));
     return row;
   }));
+}
+
+function shortcuts() {
+  if ($('shortcutsDialog').open) {
+    return;
+  }
+  renderShortcuts();
   shortcutFocus = document.activeElement;
   $('shortcutsDialog').showModal();
 }
@@ -859,7 +863,7 @@ async function formatCard(kind) {
     const previewNode = pageView.nodes?.find(item => item.id === node?.id) || node;
     const native = readRhwpFormat(pageView.document, previewNode, [...(slip.editor?.value.slice(0, slip.editor.selectionStart) || '')].length);
     const fallback = await call('format', node?.id || null);
-    showFormat($('formatDialog'), kind, mergeFormats(native, fallback));
+    showFormat($('formatDialog'), kind, mergeFormats(native, fallback), slip.slip);
   } catch (error) {
     status('failed', {reason: errorReason(error)}, true);
   }
@@ -910,11 +914,11 @@ function setKeyScheme(scheme) {
   localStorage.setItem('hwp-key-scheme', scheme);
   call('keyScheme', scheme).catch(error => status('failed', {reason: errorReason(error)}, true));
   if ($('shortcutsDialog').open) {
-    $('shortcutsDialog').close();
-    shortcuts();
+    renderShortcuts();
   }
 }
-$('keyScheme').onchange = event => setKeyScheme(event.target.value);
+const schemeSelector = new KeySchemeSelector($('keyScheme'), setKeyScheme);
+schemeSelector.setScheme(keys.scheme);
 call('keyScheme', keys.scheme).catch(() => {});
 const palette = new CommandPalette($('palette'), commandList, paletteTextResults, match => locateNode(match.node));
 $('paletteButton').onclick = () => palette.open();

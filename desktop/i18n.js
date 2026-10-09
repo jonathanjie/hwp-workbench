@@ -1,11 +1,11 @@
 const strings = {
   en: {
-    keyScheme: 'Keyboard scheme', schemeWindows: 'Keyboard · Windows Hangul', schemeMac: 'Keyboard · Mac', selectAll: 'Select all', nextCell: 'Next cell', previousCell: 'Previous cell', cellSlip: 'Cell text', palette: 'Commands',
+    keyScheme: 'Keyboard scheme', schemeWindowsChoice: 'Windows Hangul', schemeMacChoice: 'Mac', schemeWindows: 'Keyboard · Windows Hangul', schemeMac: 'Keyboard · Mac', selectAll: 'Select all', nextCell: 'Next cell', previousCell: 'Previous cell', cellSlip: 'Cell block', palette: 'Commands',
     charFormat: 'Character shape', paraFormat: 'Paragraph shape', pageFormat: 'Page setup', styleFormat: 'Style', symbols: 'Character map', controlMarks: 'Control marks',
-    readOnly: 'Read only', font: 'Font', size: 'Size', widthRatio: 'Width ratio (%)', letterSpacing: 'Letter spacing (%)', bold: 'Bold', italic: 'Italic', underline: 'Underline', colour: 'Colour', alignment: 'Alignment', indent: 'Indent (pt)', before: 'Before (pt)', after: 'After (pt)', lineSpacing: 'Line spacing', width: 'Width', height: 'Height', orientation: 'Orientation', left: 'Left', right: 'Right', top: 'Top', bottom: 'Bottom', header: 'Header', footer: 'Footer', gutter: 'Gutter', name: 'Name', on: 'On', portrait: 'Portrait', landscape: 'Landscape',
+    readOnly: 'Read only', font: 'Font', size: 'Size', widthRatio: 'Width ratio (%)', letterSpacing: 'Letter spacing (%)', bold: 'Bold', italic: 'Italic', underline: 'Underline', colour: 'Colour', alignment: 'Alignment', indent: 'Indent (pt)', before: 'Before (pt)', after: 'After (pt)', lineSpacing: 'Line spacing', width: 'Width', height: 'Height', orientation: 'Orientation', left: 'Left', right: 'Right', top: 'Top', bottom: 'Bottom', header: 'Header', footer: 'Footer', gutter: 'Gutter', name: 'Name', on: 'On', formatOff: 'Off', portrait: 'Portrait', landscape: 'Landscape',
     symbolSearch: 'Search symbols',
     cellsSkipped: 'Skipped cells · {n} · {reason}',
-    fontInstall: 'Free Hamchorom fonts bring pages closer to Hangul layout.',
+    fontInstall: 'Hamchorom fonts',
     center: 'Centre', justify: 'Justify',
     save: 'Save', savedInPlace: 'Saved',
     warningDetails: 'Warnings', fonts: 'Fonts', tables: 'Tables', images: 'Images', previewCache: 'Preview cache', sameLengthFeature: 'Same length', scriptStub: 'Default script', textEdits: 'Text edits', formatting: 'Formatting', structureEdits: 'Structure edits', ok: 'OK', partial: 'Partial', off: 'Off', noHeadings: 'No headings', recentFailed: 'Recent files unavailable', thumbnailFailed: 'Thumbnail unavailable',
@@ -78,12 +78,12 @@ const strings = {
     bookmarks: 'Bookmarks', defaultScript: 'Default script stub retained · not executed', unknownRisk: 'Native payload retained · compatibility unverified'
   },
   ko: {
-    keyScheme: '단축키 방식', schemeWindows: '단축키 · Windows 한글', schemeMac: '단축키 · Mac', selectAll: '모두 선택', nextCell: '다음 셀', previousCell: '이전 셀', cellSlip: '셀 글자', palette: '명령',
+    keyScheme: '단축키 방식', schemeWindowsChoice: 'Windows 한글', schemeMacChoice: 'Mac', schemeWindows: '단축키 · Windows 한글', schemeMac: '단축키 · Mac', selectAll: '모두 선택', nextCell: '다음 셀', previousCell: '이전 셀', cellSlip: '셀 블록', palette: '명령',
     charFormat: '글자 모양', paraFormat: '문단 모양', pageFormat: '편집 용지', styleFormat: '스타일', symbols: '문자표', controlMarks: '조판 부호',
-    readOnly: '보기만', font: '글꼴', size: '크기', widthRatio: '장평 (%)', letterSpacing: '자간 (%)', bold: '진하게', italic: '기울임', underline: '밑줄', colour: '글자 색', alignment: '정렬', indent: '첫 줄 (pt)', before: '문단 위 (pt)', after: '문단 아래 (pt)', lineSpacing: '줄 간격', width: '폭', height: '높이', orientation: '용지 방향', left: '왼쪽', right: '오른쪽', top: '위쪽', bottom: '아래쪽', header: '머리말', footer: '꼬리말', gutter: '제본', name: '이름', on: '켜짐', portrait: '세로', landscape: '가로',
+    readOnly: '읽기 전용', font: '글꼴', size: '크기', widthRatio: '장평 (%)', letterSpacing: '자간 (%)', bold: '진하게', italic: '기울임', underline: '밑줄', colour: '글자 색', alignment: '정렬', indent: '첫 줄 (pt)', before: '문단 위 (pt)', after: '문단 아래 (pt)', lineSpacing: '줄 간격', width: '폭', height: '길이', orientation: '용지 방향', left: '왼쪽', right: '오른쪽', top: '위쪽', bottom: '아래쪽', header: '머리말', footer: '꼬리말', gutter: '제본 여백', name: '이름', on: '켜짐', formatOff: '꺼짐', portrait: '세로', landscape: '가로',
     symbolSearch: '문자 검색',
     cellsSkipped: '건너뛴 셀 · {n} · {reason}',
-    fontInstall: '무료 함초롬 글꼴을 설치하면 한글의 쪽 배치에 더 가까워집니다.',
+    fontInstall: '함초롬 글꼴',
     center: '가운데', justify: '양쪽',
     save: '저장', savedInPlace: '저장됨',
     warningDetails: '경고', fonts: '글꼴', tables: '표', images: '이미지', previewCache: '미리보기 캐시', sameLengthFeature: '길이 유지', scriptStub: '기본 스크립트', textEdits: '본문 수정', formatting: '서식', structureEdits: '구조 수정', ok: '가능', partial: '부분', off: '미지원', noHeadings: '제목 없음', recentFailed: '최근 문서 사용 불가', thumbnailFailed: '쪽 미리보기 사용 불가',

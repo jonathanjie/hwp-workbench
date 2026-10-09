@@ -160,6 +160,8 @@ try {
     shell.showItemInFolder = file => { globalThis.testRevealedOutput = file; };
   });
   window = await application.firstWindow();
+  // The window exists only after firstWindow() resolves.
+  await application.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows()[0].setSize(1440, 900));
   const errors = [];
   window.on('pageerror', error => errors.push(error.message));
   // A dialog can close before the handler runs (for example on a document switch).
@@ -224,15 +226,39 @@ try {
   assert.match(await window.locator('#formatDialog').innerText(), /Character shape/);
   assert.match(await window.locator('#formatDialog').innerText(), /Apple SD Gothic Neo/);
   assert.match(await window.locator('#formatDialog').innerText(), /22 pt/);
+  assert.equal(await window.locator('#formatDialog').evaluate(dialog => dialog.getBoundingClientRect().width), 360);
+  await window.waitForFunction(() => {
+    const card = document.getElementById('formatDialog').getBoundingClientRect();
+    const slip = document.querySelector('.slip').getBoundingClientRect();
+    return card.left >= slip.right + 11 || card.right <= slip.left - 11 ||
+      card.top >= slip.bottom + 11 || card.bottom <= slip.top - 11;
+  });
   await window.keyboard.press('Escape');
+  assert.equal(await window.evaluate(() => document.activeElement.id), 'textEdit');
   const symbolOriginal = await window.locator('#textEdit').inputValue();
   await window.locator('#textEdit').evaluate(editor => editor.setSelectionRange(0, 0));
   await window.keyboard.press('Control+F10');
   await window.waitForSelector('#symbolDialog[open]');
+  assert.equal(await window.evaluate(() => document.activeElement.id), 'symbolQuery');
+  const symbolFocus = await window.locator('#symbolQuery').evaluate(input => {
+    const style = getComputedStyle(input);
+    return {outline: style.outlineStyle, shadow: style.boxShadow, caret: style.caretColor, ink: style.color};
+  });
+  assert.equal(symbolFocus.outline, 'none');
+  assert.equal(symbolFocus.shadow, 'none');
+  assert.equal(symbolFocus.caret, symbolFocus.ink);
   await window.locator('#symbolQuery').fill('reference');
   await window.locator('.symbol-choice').first().click();
   assert.equal(await window.locator('#textEdit').inputValue(), '※' + symbolOriginal);
   await window.locator('#textEdit').fill(symbolOriginal);
+  await window.keyboard.press('Escape');
+  await window.keyboard.press('Alt+l');
+  await window.waitForSelector('#formatDialog[open]');
+  await window.waitForFunction(() => {
+    const card = document.getElementById('formatDialog').getBoundingClientRect();
+    return Math.abs(card.left - (innerWidth - card.width) / 2) < 1 &&
+      Math.abs(card.top - (innerHeight - card.height) / 2) < 1;
+  });
   await window.keyboard.press('Escape');
   const cellDocument = engineRequest(root, 'inspect', {path: 'fixtures/generated/review-form.hwpx'});
   const cellNodes = cellDocument.nodes.filter(node => node.role === 'table-cell' && node.editable);
@@ -244,6 +270,10 @@ try {
   await window.waitForFunction(text => document.getElementById('textEdit')?.value === text, cellNodes[1].text);
   await window.keyboard.press('Shift+Tab');
   await window.waitForFunction(text => document.getElementById('textEdit')?.value === text, cellNodes[0].text + ' C4');
+  await window.waitForFunction(() => {
+    const canvas = document.getElementById('canvas');
+    return canvas.scrollWidth <= canvas.clientWidth + 1;
+  });
   const canvasFit = await window.locator('#canvas').evaluate(canvas => canvas.scrollWidth <= canvas.clientWidth + 1);
   assert.equal(canvasFit, true);
   const railFit = await window.locator('#thumbnails .sheet').first().evaluate(sheet => {
@@ -346,6 +376,20 @@ try {
   }
   await shortcut('/');
   assert.ok(await window.locator('#shortcutItems .shortcut').count() >= 15);
+  assert.equal(await window.locator('#keyScheme').getAttribute('role'), 'radiogroup');
+  assert.equal(await window.locator('#keyScheme select').count(), 0);
+  const windowsScheme = window.locator('#keyScheme [data-scheme="windows"]');
+  const macScheme = window.locator('#keyScheme [data-scheme="mac"]');
+  await windowsScheme.focus();
+  await window.keyboard.press('ArrowRight');
+  assert.equal(await macScheme.getAttribute('aria-checked'), 'true');
+  assert.equal(await macScheme.getAttribute('tabindex'), '0');
+  assert.equal(await window.evaluate(() => document.activeElement.dataset.scheme), 'mac');
+  assert.equal(await window.evaluate(() => localStorage.getItem('hwp-key-scheme')), 'mac');
+  await window.keyboard.press('ArrowRight');
+  assert.equal(await windowsScheme.getAttribute('aria-checked'), 'true');
+  assert.equal(await window.evaluate(() => document.activeElement.dataset.scheme), 'windows');
+  assert.equal(await window.locator('#shortcutsDialog').evaluate(dialog => dialog.open), true);
   await window.keyboard.press('Escape');
   await window.emulateMedia({reducedMotion: 'reduce'});
   assert.equal(await window.locator('#dropSheet').evaluate(element => getComputedStyle(element).transitionDuration), '0s');
@@ -368,6 +412,11 @@ try {
   await window.locator('#replaceAll').click();
   assert.match(await window.locator('#dirty').innerText(), /1/);
   assert.equal(await window.locator('#changes .change').count(), 1);
+  assert.equal(await window.locator('#panel').isVisible(), true);
+  await window.waitForFunction(() => {
+    const canvas = document.getElementById('canvas');
+    return canvas.scrollWidth <= canvas.clientWidth + 1;
+  });
   assert.match(await window.locator('#skippedPopover').innerText(), /Locked/);
   await window.keyboard.press('Escape'); // skip popover
   await window.locator('#findClose').click();
@@ -377,6 +426,11 @@ try {
   assert.equal(await window.locator('#changes .change').count(), 1);
   await window.locator('#save').click();
   await window.waitForSelector('#reviewDialog[open]');
+  assert.equal(await window.evaluate(() => document.activeElement.id), 'reviewChanges');
+  await window.keyboard.press('Shift+Tab');
+  assert.equal(await window.evaluate(() => document.activeElement.id), 'closeReview');
+  await window.keyboard.press('Tab');
+  assert.equal(await window.evaluate(() => document.activeElement.id), 'reviewChanges');
   assert.equal(await window.locator('#confirmSave').isDisabled(), true);
   await window.locator('#acknowledge').check();
   await window.locator('#reviewChanges .acts button').click();

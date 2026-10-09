@@ -3,6 +3,7 @@ import {changedRanges} from './preview.js';
 import {matchBounds} from './search-layout.js';
 import {createFontMapper} from './fonts.js';
 import {mapTextRuns, paragraphBounds} from './hit-map.js';
+import {fitZoom} from './panel-zoom.js';
 
 const VENDOR = 'app://workbench/vendor/rhwp/';
 const ZOOM_STEPS = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200];
@@ -246,7 +247,12 @@ export class PageView {
       };
       entry.hits.append(hit);
     }
-    this.sizePage(entry);
+    if (this.fit) {
+      // Lazy rendering can reveal a wider page than the initial estimate.
+      this.setZoom('fit');
+    } else {
+      this.sizePage(entry);
+    }
     this.drawMarks(entry);
   }
 
@@ -350,8 +356,7 @@ export class PageView {
 
   setZoom(value) {
     this.fit = value === 'fit';
-    const width = this.entries[0]?.width || 794;
-    this.zoom = this.fit ? Math.max(10, Math.min(200, (this.canvas.clientWidth - 216) / width * 100)) : value;
+    this.zoom = this.fit ? fitZoom(this.canvas.clientWidth, this.entries) : value;
     this.entries.forEach(entry => this.sizePage(entry));
     const percent = Math.round(this.zoom);
     this.onZoom(percent);

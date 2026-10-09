@@ -55,6 +55,10 @@ export function commitPagePreview(previous, next, {pages, thumbnails, onMount, o
     thumbnails.replaceChildren(...thumbnailNodes);
     view.pages = pages;
     view.thumbnails = thumbnails;
+    // Panel fitting or manual zoom can change while the preview renders.
+    // Rollback also keeps the zoom from the view that was just active.
+    const current = view === next ? previous : next;
+    view.setZoom(current.fit ? 'fit' : current.zoom);
     onMount(view);
     view.activate();
   }

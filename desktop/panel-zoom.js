@@ -1,15 +1,23 @@
 // Reserve canvas padding plus 54 px on each side for proof marks.
 const CANVAS_MARGIN = 216;
 
+export function fitZoom(canvasWidth, entries) {
+  const width = Math.max(0, ...entries.map(entry => entry.width)) || 794;
+  return Math.max(10, Math.min(200, (canvasWidth - CANVAS_MARGIN) / width * 100));
+}
+
 export class PanelZoom {
-  constructor(view) {
+  constructor(view, nextFrame = callback => requestAnimationFrame(callback)) {
     this.view = view;
+    this.nextFrame = nextFrame;
+    this.revision = 0;
     this.visible = false;
     this.previous = null;
   }
 
   changed() {
     this.previous = null;
+    this.revision += 1;
   }
 
   update(visible) {
@@ -17,15 +25,23 @@ export class PanelZoom {
       return;
     }
     this.visible = visible;
-    const view = this.view;
+    const revision = ++this.revision;
     if (visible) {
-      const width = view.entries[0]?.width || 794;
-      if (!view.fit && width * view.zoom / 100 > view.canvas.clientWidth - CANVAS_MARGIN) {
-        this.previous = view.zoom;
-        view.setZoom('fit');
-      }
+      // Measure after the panel layout and any preview swap have completed.
+      this.nextFrame(() => {
+        if (revision !== this.revision) {
+          return;
+        }
+        const view = this.view;
+        if (view.fit) {
+          view.setZoom('fit');
+        } else if (view.zoom > fitZoom(view.canvas.clientWidth, view.entries)) {
+          this.previous = view.zoom;
+          view.setZoom('fit');
+        }
+      });
     } else if (this.previous !== null) {
-      view.setZoom(this.previous);
+      this.view.setZoom(this.previous);
       this.previous = null;
     }
   }
