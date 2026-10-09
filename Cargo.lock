@@ -2214,6 +2214,7 @@ dependencies = [
  "getrandom 0.4.3",
  "hex",
  "quick-xml 0.42.0",
+ "rhwp",
  "rustix",
  "serde",
  "serde_json",
