@@ -24,9 +24,13 @@ PATCH = schema({'schemaVersion': {'const': 1}, 'baseSha256': STR,
                 'operations': {'type': 'array', 'items': OP, 'minItems': 1, 'maxItems': 1000}},
                ['schemaVersion', 'baseSha256', 'operations'])
 
+PATCH_INPUT = {'anyOf': [PATCH, {'type': 'object', 'properties': {'patch': PATCH}, 'required': ['patch']}]}
+
 
 def _tools():
     descriptions = {
+        'session': 'Read the desktop Agent link session and up to 200 bounded proposals and their outcomes. Does not write files.',
+        'propose': 'Validate a patch or edit preview and write a new Agent link proposal for desktop review. This does not edit the document.',
         'inspect': 'Return text nodes, full node IDs and compatibility warnings. Use compact to omit the view and package parts.',
         'extract': 'Return all document text without node references. Use read or search when you need IDs for editing.',
         'validate': 'Check bounded container and parse integrity. This does not certify Hancom layout or interoperability.',
@@ -36,16 +40,19 @@ def _tools():
         'search': 'Return matching full node IDs, character offsets, context and editability. Regex accepts fixed-width syntax only; repetitions, groups and branches are refused.',
         'replace': 'Return a hash-bound find/replace patch, diff and skipped targets; replacement text is literal. Supplying output and acknowledgeRisks saves a verified new file.',
         'fill': 'Return a patch and resolved/unresolved HWPX form labels, choosing value cells to the right or below. Supplying output and acknowledgeRisks saves a new file; HWP cell mapping is unavailable.',
-        'set': 'Return a one-node text patch and diff using a full node ID. Supplying output and acknowledgeRisks saves a verified new file.',
+        'set': 'Return a one-node text patch and diff using a full node ID or short reference. Supplying output and acknowledgeRisks saves a verified new file.',
     }
     tools = []
     for name, description in descriptions.items():
         properties = {'path': STR}
         required = ['path']
+        if name == 'propose':
+            properties.update(title=STR, author=STR, notes=STR)
+            required.append('title')
         if name == 'inspect':
             properties['compact'] = BOOL
-        if name in {'plan', 'apply'}:
-            properties['patch'] = PATCH
+        if name in {'plan', 'apply', 'propose'}:
+            properties['patch'] = PATCH_INPUT if name == 'propose' else PATCH
             required.append('patch')
         if name in {'apply', 'replace', 'fill', 'set'}:
             properties.update(output=STR, acknowledgeRisks=BOOL)
@@ -73,7 +80,7 @@ def _tools():
         if name == 'set':
             properties.update(nodeId=STR, text={'type': 'string', 'maxLength': 200000})
             required.extend(['nodeId', 'text'])
-        writes = name in {'apply', 'replace', 'fill', 'set'}
+        writes = name in {'apply', 'replace', 'fill', 'set', 'propose'}
         tools.append({'name': 'hwp_' + name, 'description': description,
                       'inputSchema': schema(properties, required),
                       'annotations': {'readOnlyHint': not writes, 'destructiveHint': False,
@@ -86,6 +93,8 @@ TOOLS = _tools()
 
 def _valid(value, definition):
     """Validate the small JSON Schema subset used by this server's tool inputs."""
+    if 'anyOf' in definition:
+        return any(_valid(value, option) for option in definition['anyOf'])
     if 'const' in definition:
         constant = definition['const']
         if type(value) is not type(constant) or value != constant:
