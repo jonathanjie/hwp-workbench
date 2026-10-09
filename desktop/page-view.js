@@ -5,7 +5,7 @@ import {createFontMapper} from './fonts.js';
 import {mapTextRuns, paragraphBounds} from './hit-map.js';
 import {fitZoom} from './panel-zoom.js';
 
-const VENDOR = 'app://workbench/vendor/rhwp/';
+const VENDOR = new URL('vendor/rhwp/', globalThis.document?.baseURI ?? import.meta.url).href;
 const ZOOM_STEPS = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200];
 let runtime;
 

@@ -14,7 +14,8 @@
     "check": "node desktop/check.cjs && node --check scripts/package-mac.cjs && bash -n scripts/hwp-workbench",
     "package:mac": "node scripts/package-mac.cjs",
     "test:electron": "node scripts/test-electron.mjs",
-    "test:desktop": "node --test desktop/tests/*.test.*"
+    "test:desktop": "node --test desktop/tests/*.test.*",
+    "build:frontend": "node scripts/build-frontend.mjs"
   },
   "devDependencies": {
     "electron": "44.5.1",
