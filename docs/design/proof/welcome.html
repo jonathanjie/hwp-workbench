@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>HWP Workbench — welcome concept</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="concept.css">
+<style>
+.stage { position: fixed; inset: 0; display: grid; place-items: center; }
+.center { display: flex; flex-direction: column; align-items: center; gap: 22px; margin-top: -10px; }
+.drop {
+  width: 300px; height: 424px; border-radius: 3px;
+  background: color-mix(in oklab, var(--paper) 55%, transparent);
+  border: 1px dashed var(--hairline-strong);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  position: relative;
+  transition: transform var(--base) var(--ease), box-shadow var(--base) var(--ease), border-color var(--base);
+}
+.drop.over { transform: translateY(-6px) rotate(-0.6deg); border: 1px solid var(--seal); background: var(--paper); box-shadow: var(--paper-shadow); }
+.drop .watermark { width: 92px; opacity: .9; }
+.drop .formats { display: flex; gap: 6px; }
+.drop .formats span { font: 600 10px/1 var(--font-mono); letter-spacing: .08em; color: var(--ink-2); border: 0.5px solid var(--hairline-strong); border-radius: 5px; padding: 5px 7px; }
+.drop .corner { position: absolute; top: 0; right: 0; width: 34px; height: 34px; background: linear-gradient(225deg, var(--desk) 50%, rgba(20,20,20,.07) 50%); }
+.ghost-lines { position: absolute; left: 34px; right: 34px; bottom: 40px; display: flex; flex-direction: column; gap: 9px; }
+.ghost-lines i { height: 5px; border-radius: 3px; background: var(--surface-sunk); }
+.ghost-lines i:nth-child(2) { width: 82%; } .ghost-lines i:nth-child(3) { width: 64%; }
+.ctas { display: flex; gap: 8px; }
+.btn.lg { height: 36px; padding: 0 14px; border-radius: 10px; font-size: 13.5px; }
+.btn.lg kbd { margin-left: 2px; }
+.btn.ink kbd { background: rgba(255,255,255,.14); border: 0; color: rgba(255,255,255,.8); }
+.recent { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.recent .lbl { font: 600 10px/1 var(--font-mono); letter-spacing: .09em; color: var(--ink-3); }
+.recent .row { display: flex; gap: 10px; }
+.doc-card { width: 196px; display: flex; gap: 10px; align-items: center; padding: 8px 10px 8px 8px; border-radius: 12px; background: var(--surface); backdrop-filter: var(--surface-blur); box-shadow: var(--surface-shadow); }
+.doc-card .mini { width: 30px; height: 42px; border-radius: 2px; background: #fff; box-shadow: 0 0 0 0.5px rgba(0,0,0,.14); overflow: hidden; flex: none; }
+.doc-card .mini img { width: 100%; height: 100%; }
+.doc-card .meta { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.doc-card .name { font-weight: 560; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; }
+.doc-card .sub { font: 500 10.5px/1 var(--font-mono); color: var(--ink-3); display: flex; gap: 6px; }
+.agents { position: fixed; right: 16px; bottom: 16px; width: 248px; padding: 12px; border-radius: var(--radius-l); background: var(--surface); backdrop-filter: var(--surface-blur); box-shadow: var(--surface-shadow); }
+.agents .lbl { font: 600 10px/1 var(--font-mono); letter-spacing: .09em; color: var(--ink-3); display: flex; justify-content: space-between; }
+.agent-row { display: flex; align-items: center; gap: 9px; margin-top: 10px; font-weight: 550; }
+.agent-row .av { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font: 700 11px/1 var(--font-mono); color: #fff; }
+.agent-row .st { margin-left: auto; font: 500 10.5px/1 var(--font-mono); display: flex; gap: 5px; align-items: center; color: var(--moss); }
+.agent-row .st.off { color: var(--ink-3); }
+.agent-row .st i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.agent-row .st.off i { background: transparent; box-shadow: inset 0 0 0 1px currentColor; }
+.cmdline { margin-top: 12px; display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 10px; border-radius: 9px; background: var(--surface-sunk); font: 500 11px/1 var(--font-mono); color: var(--ink-2); }
+.cmdline span { color: var(--ink-3); }
+.cmdline b { font-weight: 500; color: var(--ink); }
+.cmdline .copy { margin-left: auto; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; color: var(--ink-2); box-shadow: inset 0 0 0 0.5px var(--hairline-strong); }
+.island.min .doc { color: var(--island-ink); }
+</style>
+</head>
+<body>
+<div class="lights"><i></i><i></i><i></i></div>
+<div class="island min">
+  <span class="seal"><img src="logo.svg" alt=""></span>
+  <span class="doc">HWP Workbench</span>
+  <span class="cmd"><span>⌘</span><span>K</span></span>
+</div>
+
+<div class="stage">
+  <div class="center">
+    <div class="drop over">
+      <span class="corner"></span>
+      <img class="watermark" src="logo.svg" alt="">
+      <div class="formats"><span>HWP</span><span>HWPX</span></div>
+      <div class="ghost-lines"><i></i><i></i><i></i></div>
+    </div>
+    <div class="ctas">
+      <button class="btn ink lg">문서 열기 <kbd>⌘O</kbd></button>
+      <button class="btn line lg">샘플</button>
+    </div>
+  </div>
+</div>
+
+<div class="recent">
+  <span class="lbl">RECENT</span>
+  <div class="row">
+    <div class="doc-card"><div class="mini"><img src="page-0.svg" alt=""></div><div class="meta"><span class="name">사업계획서_최종.hwpx</span><span class="sub"><span>HWPX</span><span>·</span><span>2분 전</span></span></div></div>
+    <div class="doc-card"><div class="mini"><img src="page-2.svg" alt=""></div><div class="meta"><span class="name">2026 예산 신청서.hwp</span><span class="sub"><span>HWP</span><span>·</span><span>어제</span></span></div></div>
+    <div class="doc-card"><div class="mini"><img src="page-1.svg" alt=""></div><div class="meta"><span class="name">협약서_검토본.hwpx</span><span class="sub"><span>HWPX</span><span>·</span><span>10월 2일</span></span></div></div>
+  </div>
+</div>
+
+<aside class="agents">
+  <div class="lbl"><span>AGENTS</span><span>LOCAL</span></div>
+  <div class="agent-row"><span class="av" style="background:#D97757">C</span>Claude Code<span class="st"><i></i>skill</span></div>
+  <div class="agent-row"><span class="av" style="background:#111">X</span>Codex<span class="st off"><i></i>off</span></div>
+  <div class="cmdline"><span>$</span><b>hwp-workbench skill install</b><span class="copy"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><path d="M8.5 3.5V2.5a1 1 0 0 0-1-1h-5a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h1"/></svg></span></div>
+</aside>
+</body>
+</html>
