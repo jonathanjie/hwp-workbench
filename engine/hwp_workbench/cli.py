@@ -16,6 +16,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
 
 COMMAND_HELP = {
+    'convert': 'Report an explicit, lossy format export; optionally save a new file.',
     'session': 'Read Agent link state and proposal outcomes without writing.',
     'propose': 'Write a validated patch for desktop review without changing the document.',
     'inspect': 'Inspect native text nodes and compatibility warnings.',
@@ -45,6 +46,10 @@ def _parser() -> argparse.ArgumentParser:
         if command in {'apply', 'replace', 'fill', 'set'}:
             operation.add_argument('-o', '--output', required=command == 'apply', help='New same-format output path; must not exist.')
             operation.add_argument('--acknowledge-risks', action='store_true', help='Acknowledge compatibility warnings before saving.')
+        if command == 'convert':
+            operation.add_argument('--to', choices=['hwp', 'hwpx', 'docx'], required=True, help='Requested export format.')
+            operation.add_argument('-o', '--output', help='New output path with the target extension; must not exist.')
+            operation.add_argument('--acknowledge-risks', action='store_true', help='Acknowledge conversion losses before writing.')
         if command == 'propose':
             operation.add_argument('--title', required=True, help='Title shown to the person reviewing the proposal.')
             operation.add_argument('--author', default='agent', help='Proposal author (default: agent).')
@@ -108,6 +113,11 @@ def _payload(args) -> dict:
         payload['patch'] = json.loads(Workspace(args.root).read(args.patch))
     if args.command in {'apply', 'replace', 'fill', 'set'} and args.output is not None:
         payload.update(output=args.output, acknowledgeRisks=args.acknowledge_risks)
+    if args.command == 'convert':
+        payload['to'] = args.to
+        payload['acknowledgeRisks'] = args.acknowledge_risks
+        if args.output is not None:
+            payload['output'] = args.output
     if args.command == 'propose':
         payload.update(title=args.title, author=args.author)
         if args.notes is not None:

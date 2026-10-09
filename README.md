@@ -12,6 +12,7 @@ The product requirement remains full HWP/HWPX editing with close official-docume
 |---|---|
 | HWPX | Open, inspect, extract, edit existing plain text (including table-cell text), save a new HWPX copy. Text length may change. |
 | HWP | Open supported HWP 5.x containers, inspect/extract text, make length-changing text edits in existing plain text runs, save a new HWP copy. Hancom reflow is unverified. |
+| Conversion | Explicit, reported HWP/HWPX/DOCX export through HWPX. Direct Python DOCX mapping; native format export uses optional rhwp. DOC/ODT/RTF import requires optional LibreOffice. Lossy and unqualified for Hancom layout. |
 | Desktop | English/Korean UI; outline/search; selectable structured preview; text inspector; staged undo/redo; change review; local staged-patch recovery; native open/save-dialog wiring. |
 | Preservation | Original file never overwritten; untouched payloads retained; changes bound to the source hash and expected text; output reopened by this engine before publication. |
 | Agents | Shared native read/search/edit/plan/apply operations, bounded proposals and session reports, plus an installable Claude Code/Codex skill. CLI and MCP use the same engine as the desktop. |
@@ -65,6 +66,16 @@ Run from the project directory. Paths are constrained to the current directory u
   --acknowledge-risks
 ```
 
+Explicit conversion is separate from save. First inspect a dry-run report:
+
+```bash
+./scripts/hwp-workbench convert input.docx --to hwpx --root /approved/workspace
+./scripts/hwp-workbench convert input.hwpx --to docx --root /approved/workspace \
+  -o exported.docx --acknowledge-risks
+```
+
+Without **both** output and risk acknowledgement, conversion returns a report and writes no file. Existing outputs are refused. The report lists the route, engine loss reports, unsupported feature counts, and a comparison of readable paragraph text. A zero-loss rhwp report does not cover Python import losses or prove matching layout. Review the complete report and compare the new file in Hancom before official use. See `docs/COMPATIBILITY.md`.
+
 JSON is the default output. Errors are JSON on stderr with exit code 2. `validate` checks bounded parsing and container structure; it is **not** a full HWPX schema or Hancom-rendering validation. Re-running the final command with an existing output fails instead of replacing the file.
 
 A corresponding HWP example is in `examples/legacy.patch.json`:
@@ -104,7 +115,7 @@ Example client configuration, replacing both absolute paths:
 }
 ```
 
-Tools are `hwp_read`, `hwp_search`, `hwp_replace`, `hwp_fill`, `hwp_set`, `hwp_inspect`, `hwp_extract`, `hwp_validate`, `hwp_plan`, `hwp_apply`, `hwp_propose`, and `hwp_session`. Start with inspect, use the returned source hash and node IDs to construct a patch, review plan output, then apply to a new filename. A node ID is scoped to its source revision; re-inspect after changing the file.
+Tools are `hwp_read`, `hwp_search`, `hwp_replace`, `hwp_fill`, `hwp_set`, `hwp_inspect`, `hwp_extract`, `hwp_validate`, `hwp_plan`, `hwp_apply`, `hwp_propose`, `hwp_session`, and `hwp_convert`. Start with inspect, use the returned source hash and node IDs to construct a patch, review plan output, then apply to a new filename. A node ID is scoped to its source revision; re-inspect after changing the file.
 
 Grant the smallest practical workspace. An agent host can transmit extracted content to its model provider even though this application does not upload documents. The `acknowledgeRisks` flag acknowledges a policy; it is not cryptographic evidence of human approval. See `docs/AGENT-INTERFACE.md` and `docs/SECURITY.md`.
 
@@ -114,12 +125,20 @@ Grant the smallest practical workspace. An agent host can transmit extracted con
 python3 scripts/run-tests.py
 npm run check
 
+# Optional external checks; use a host where LibreOffice can run.
+HWP_WORKBENCH_LIBREOFFICE_TESTS=1 PYTHONPATH=engine:tests \
+  python3 -m unittest \
+  test_convert.ReverseMapperTests.test_libreoffice_independently_opens_output_docx \
+  test_convert.LibreOfficeSafetyTests.test_real_rtf_import_when_runtime_can_execute -v
+
 # Requires internet access; only downloads, never uploads document bytes.
 python3 scripts/fetch-public-fixtures.py
 python3 scripts/test-public-corpus.py
 ```
 
 At handoff, **68 core/CLI/MCP tests passed** on Linux/Python 3.13.5. **15 renderer workflow checks passed** in Chromium with the real Python engine and a test-only IPC adapter. The optional renderer harness needs Playwright and Chromium: `python3 scripts/test-ui.py`.
+
+Real LibreOffice tests are opt-in. The normal suite skips them with a reason and runs mocked isolation/timeout tests. On this restricted macOS worker, LibreOffice aborted during application registration before document import; no PDF or legacy import success is claimed. Run the opt-in checks outside this worker.
 
 Public fixture metadata was located online for two legacy HWP examples and one HWPX report. Downloads failed here because the execution environment could not resolve external hosts. Consequently **no public binary corpus tests ran**. The manifest pins repository blobs and expected sizes, and the downloader records SHA-256 after verification. Missing samples never count as passing tests. Public document binaries are not redistributed or committed.
 

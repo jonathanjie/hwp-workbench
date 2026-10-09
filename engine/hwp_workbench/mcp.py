@@ -29,6 +29,7 @@ PATCH_INPUT = {'anyOf': [PATCH, {'type': 'object', 'properties': {'patch': PATCH
 
 def _tools():
     descriptions = {
+        'convert': 'Report lossy HWP/HWPX/DOCX export through HWPX. DOC/ODT/RTF require LibreOffice. Writes a new file only with output plus acknowledgeRisks: true.',
         'session': 'Read the desktop Agent link session and up to 200 bounded proposals and their outcomes. Does not write files.',
         'propose': 'Validate a patch or edit preview and write a new Agent link proposal for desktop review. This does not edit the document.',
         'inspect': 'Return text nodes, full node IDs and compatibility warnings. Use compact to omit the view and package parts.',
@@ -46,6 +47,9 @@ def _tools():
     for name, description in descriptions.items():
         properties = {'path': STR}
         required = ['path']
+        if name == 'convert':
+            properties.update(to={'type': 'string', 'enum': ['hwp', 'hwpx', 'docx']}, output=STR, acknowledgeRisks=BOOL)
+            required.append('to')
         if name == 'propose':
             properties.update(title=STR, author=STR, notes=STR)
             required.append('title')
@@ -80,7 +84,7 @@ def _tools():
         if name == 'set':
             properties.update(nodeId=STR, text={'type': 'string', 'maxLength': 200000})
             required.extend(['nodeId', 'text'])
-        writes = name in {'apply', 'replace', 'fill', 'set', 'propose'}
+        writes = name in {'apply', 'replace', 'fill', 'set', 'propose', 'convert'}
         tools.append({'name': 'hwp_' + name, 'description': description,
                       'inputSchema': schema(properties, required),
                       'annotations': {'readOnlyHint': not writes, 'destructiveHint': False,
@@ -99,6 +103,8 @@ def _valid(value, definition):
         constant = definition['const']
         if type(value) is not type(constant) or value != constant:
             return False
+    if 'enum' in definition and value not in definition['enum']:
+        return False
     kind = definition.get('type')
     if kind == 'object':
         if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):

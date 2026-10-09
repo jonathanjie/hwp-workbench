@@ -8,7 +8,7 @@ RECOVERY = {
     'HWP_LENGTH_CHANGE_BLOCKED': ('Use replacement text with the same UTF-16 code-unit length as the original node.', True),
     'SKILL_NOT_OWNED': ('Keep the existing skill folder; install only into an absent or application-marked folder.', True),
     'OUTPUT_EXISTS': ('Choose a new output filename; existing files cannot be replaced.', True),
-    'OUTPUT_FORMAT': ('Use an output filename with the same native extension as the source format.', True),
+    'OUTPUT_FORMAT': ('Use the required extension: the source format for native save, or the requested target for conversion.', True),
     'RISK_ACK_REQUIRED': ('Review the patch and compatibility warnings, then pass acknowledgeRisks: true to save.', True),
     'BAD_PATCH': ('Rebuild a schemaVersion-1 patch with the current hash, expectedText and 1–1000 unique targets.', True),
     'BAD_ARGUMENTS': ('Correct the arguments using CLI help or the MCP tools/list input schema.', True),
@@ -32,7 +32,7 @@ RECOVERY = {
 
 MALFORMED_DOCUMENT_CODES = {
     'BAD_CFB', 'BAD_HWP_COMPRESSION', 'BAD_HWP_RECORD', 'BAD_HWP_TEXT',
-    'BAD_XML', 'BAD_ZIP', 'NOT_HWP', 'NOT_HWPX', 'UNSAFE_XML', 'UNSAFE_ZIP', 'XML_ENCODING',
+    'BAD_XML', 'BAD_ZIP', 'NOT_HWP', 'NOT_HWPX', 'NOT_DOCX', 'UNSAFE_XML', 'UNSAFE_ZIP', 'XML_ENCODING',
 }
 UNSUPPORTED_DOCUMENT_CODES = {'ENCRYPTED', 'PROTECTED_HWP', 'UNSUPPORTED_FORMAT'}
 

@@ -18,7 +18,7 @@
 ### Keep tests independent of local-only folders
 - **Date:** 2026-10-09
 - **Trigger:** A corpus test created its temp folder under the gitignored `work/` folder. It passed locally and failed in every clean GitHub Actions checkout; fail-fast then cancelled the macOS jobs.
-- **Rule:** Tests use the system temp folder or create what they need. Before merging, run the suite once with local-only folders (`work/`, `fixtures/public/`, `node_modules/`) absent or moved aside, and check that missing optional tools produce skips with reasons.
+- **Rule:** Tests use the system temp folder or create what they need, including independent-parser service checks. Before merging, run the suite once with local-only folders (`work/`, `fixtures/public/`, `node_modules/`) absent or moved aside, and check that missing optional tools produce skips with reasons.
 - **Why:** CI runs a clean checkout; local scratch state hides missing setup.
 
 ### Resolve agent references before validation
@@ -56,3 +56,21 @@
 - **Trigger:** Deleting one run can change the segment IDs of later runs when the saved paragraph is parsed again; empty runs also made corpus anchor checks pass without nonempty text evidence.
 - **Rule:** Keep source revision IDs stable for patches. Verify complete edited native sections on reopen, including controls and metadata. Emit an existing empty paragraph run for insertion, but exclude empty text from corpus body-anchor evidence. Preserve pre-existing duplicate shape starts; drop only starts that newly collapse during an edit.
 - **Why:** Printable-run IDs describe a source revision, and an empty substring alone does not test a reader's text-position agreement.
+
+### Keep real LibreOffice checks opt-in
+- **Date:** 2026-10-09
+- **Trigger:** Headless LibreOffice launches in the restricted macOS worker crashed during application registration and showed crash dialogs to the user.
+- **Rule:** Test and validation scripts must not start real LibreOffice unless `HWP_WORKBENCH_LIBREOFFICE_TESTS=1`. Normal suites skip those checks with the exact opt-in reason; mocked subprocess tests remain active. Run external qualification outside the restricted worker and record failures separately. Do not retry an installed GUI runtime after an environment-level crash.
+- **Why:** Headless flags do not remove macOS application-registration requirements or user-visible crash dialogs.
+
+### Check conversion semantics beyond paragraph text
+- **Date:** 2026-10-09
+- **Trigger:** Review found ignored default DOCX styles, restored list numbering after an explicit disable, and omitted HWPX image modifiers without loss counts.
+- **Rule:** Test default and inherited formatting, explicit removal of inherited properties, and unsupported image modifiers. Apply supported semantics or add named loss counts; matching paragraph text alone cannot establish conversion fidelity.
+- **Why:** Simple direct-format fixtures do not exercise inheritance or unsupported modifiers.
+
+### Check generated packages with a second reader
+- **Date:** 2026-10-09
+- **Trigger:** The DOCX writer passed every self-read test, but LibreOffice refused all its output ("source file could not be loaded") because ElementTree wrote `ns0:Types` and `ns0:Relationships`. LibreOffice also exits 0 in that case.
+- **Rule:** For every new writer, open its output in an independent reader (LibreOffice for DOCX, rhwp for HWPX) and assert the output file exists, not only the exit code. Write OPC package parts with an unprefixed namespace.
+- **Why:** Our own reader accepts what our writer emits; namespace-prefix tolerance differs between readers.
