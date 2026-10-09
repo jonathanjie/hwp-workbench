@@ -1,30 +1,33 @@
-# Engine foundations (R1)
+# Native document core (R1 + R2)
 
-This crate supplies native container and workspace primitives. It does not yet
-supply a document model, patch service, converter, CLI, MCP server or desktop.
-Authored fixtures test preservation and bounds. They do not qualify Hancom
-layout or public document compatibility.
+This crate reads native HWP 5 and HWPX, stages complete hash-bound text patches,
+and serializes same-format edits while retaining opaque payloads. CLI, MCP,
+service orchestration and desktop integration belong to later packages.
 
 | Module | Caller contract |
 | --- | --- |
-| `errors` | Use `Result<T>`, `WorkbenchError`, `require` and the shared limits. `as_json()` returns the error detail; CLI adds its `error` envelope. Optional `details` is internal context and is not added to the Python JSON contract. |
-| `xml_io` | `xml_tree` owns namespace names, ordered attributes, text, tails and children. Namespace declarations are separate from ElementTree attributes. `Element::get` accepts expanded names. `TokenReader` validates the same policy and returns original byte ranges, resolved names, preorder indexes and empty-tag form. Empty tags produce a single Start token. Callers supply native text-node selection and edit logic. |
-| `package_io` | `ZipPackage` keeps the source, central-directory order and original Python member names. `read_member` takes the prior actual expansion plus part and total budgets; callers increment the prior expansion by the returned length. It checks CRC, length and complete deflate data in 64 KiB chunks. `rewrite` retains untouched local records verbatim and changes only required size, CRC and offset fields elsewhere. It retains opaque extra fields, comments, descriptors and ZIP64 structures. Native package inventory and XML-part dispatch belong to R2/R6. |
-| `workspace` | Construct an approved canonical `Workspace`. Path methods use no-follow descriptor walks. `read` uses the standard limit; `read_with_options` permits a narrower budget and absent-file handling. `list_files` takes a full-name predicate and a limit; a caller can supply its own anchored regex without an added core dependency. `write_new` never replaces a destination. `backup_existing` keeps ten versions per canonical source. `replace_existing` checks hash, mode and inode, syncs files and directories, reads back output and retains recovery on conflicts. |
-| `cfb` | `CompoundFile` keeps original bytes, raw directory entries and every stream. Use `ordered_streams()` to retain Python traversal order; its public maps provide lookup. `rewrite` accepts existing stream names only, returns original bytes for a no-op and reparses to verify every opaque payload. Integer field helpers return bounded `Result` values. |
+| `document` | `Document::new(bytes, name)` detects native format from bytes. `inspect` and `diff` retain Python JSON key and array order. `patch(&Value)` validates the full batch before mutation, resolves source-scoped short references, and checks source hash and expected text. `serialize(acknowledge_risks)` returns exact original bytes for a no-op; edited output requires acknowledgement, native reopen and payload verification. `node`, `part` and `current_text` provide read access. `patch_input` unwraps the preview envelope. |
+| `hwp_records` | Parse bounded native records, preserve exact untouched record bytes, validate paragraph/control ranges, and update only edited text and dependent UTF-16 metadata. At collapsed shape boundaries, preserve duplicate groups and the last original start for surviving content. |
+| `format_readout` | `read_format(&Document, node_id)` reports native header properties; absent/unreadable values stay unknown. It does not change document bytes. |
+| `errors` | Shared `Result<T>`, `WorkbenchError`, `require` and parsing limits. `as_json` emits the Python error contract. Optional `details` is internal context. |
+| `xml_io` | UTF-8 restricted XML trees and lexical tokens retain namespace names, ordered attributes, text/tails, original byte offsets and self-closing form. All XML, HPF and relationship package parts are checked, including unsupported parts. |
+| `package_io` | `ZipPackage` validates actual bounded inflation, CRC, completion, lengths and paths. Its writer copies untouched local entry records raw, retaining order, extras, descriptors and comments. |
+| `cfb` | `CompoundFile` retains original bytes, directory records and streams. `ordered_streams` supplies Python traversal order; rewrite accepts existing stream names and verifies untouched payloads. |
+| `workspace` | Approved canonical root, no-follow descriptor walks, bounded regular-file reads, exclusive new writes, and per-source previous-version retention. Save replacement checks hash, mode and inode, syncs and reads back output, and keeps recovery on conflicts. The service must still verify the complete native patch and keep a previous-version backup before replacement. |
 
-The workspace failure hook and deterministic name/clock controls exist only in
-unit-test builds. Production callers cannot select or pay for those hooks.
+Atomic exchange remains the preferred publication and rollback operation. If a
+volume returns `ENOTSUP` or `EINVAL`, replacement uses a plain rename after the
+same source hash/inode or output ownership checks. That fallback cannot capture
+an external revision written between the final check and rename. Recovery
+copies remain valid after rollback sync failures. Open-descriptor writes are
+not frozen by either rename form; this is not a cross-process locking protocol.
+The fault seams exist only in test builds.
 
-R1 makes two safety changes to Python. Publication and rollback use atomic
-exchange on macOS/Linux, so a pathname race retains the exact displaced file.
-Unsupported exchange fails closed; there is no overwrite-rename fallback.
-Rollback and recovery failures keep original bytes and report a recovery path.
-Atomic exchange cannot freeze bytes held by another writer's open descriptor.
-Captured revisions are retained when a race is detected; this is not a
-cross-process locking protocol. R7 must still create the previous-version
-backup and verify complete native patches before calling replacement.
+Tests include exported authored fixtures, all-part XML policy, native rhwp
+anchor/range and render checks, and the public files when present. Missing,
+malformed, protected and unsupported cases are reported separately from
+successful edits. No test here qualifies Hancom layout or font fidelity.
 
-Integration test targets are `errors`, `xml_io`, `package_io` and `cfb`.
-Workspace tests are `hwp_core::workspace::tests`. The R1 result maps each Python
-case, including inherited save tests, to a target or its R2/R7 deferral.
+The required build wrapper supplies offline vendored dependencies. The only
+R2 dependency addition is native rhwp as a development dependency, used by
+independent reader tests rather than the preservation writer.

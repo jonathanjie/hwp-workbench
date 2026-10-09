@@ -25,3 +25,4 @@ getrandom.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+rhwp = { workspace = true }

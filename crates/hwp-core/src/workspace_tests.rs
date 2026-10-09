@@ -605,3 +605,158 @@ fn external_revision_between_rollback_check_and_exchange_is_kept() {
     assert_eq!(f.replace().unwrap_err().code, "SOURCE_CHANGED");
     assert_eq!(fs::read(f.path()).unwrap(), b"external raced rollback");
 }
+
+#[test]
+fn unsupported_exchange_publication_uses_checked_rename() {
+    for code in ["ENOTSUP", "EINVAL"] {
+        let f = Fixture::new();
+        fail_once("publish", code);
+        assert_eq!(f.replace().unwrap(), sha256(b"edited bytes"));
+        assert_eq!(fs::read(f.path()).unwrap(), b"edited bytes");
+        assert_eq!(fs::metadata(f.path()).unwrap().mode() & 0o777, 0o640);
+        f.no_temporary();
+    }
+}
+
+#[test]
+fn unsupported_exchange_rollback_uses_checked_rename() {
+    for publication_fallback in [false, true] {
+        let f = Fixture::new();
+        hook(move |step| match step {
+            "publish" if publication_fallback => {
+                Err(WorkbenchError::new("ENOTSUP", "unsupported swap"))
+            }
+            "publication_sync" => Err(write_error("injected sync failure")),
+            "rollback_exchange" => Err(WorkbenchError::new("ENOTSUP", "unsupported swap")),
+            _ => Ok(()),
+        });
+        assert_eq!(f.replace().unwrap_err().code, "WRITE_FAILED");
+        f.original();
+    }
+}
+
+#[test]
+fn fallback_rechecks_source_and_rollback_ownership() {
+    for point in ["publish", "rollback_exchange"] {
+        let f = Fixture::new();
+        let path = f.path();
+        hook(move |step| {
+            if step == "publication_sync" && point == "rollback_exchange" {
+                return Err(write_error("injected sync failure"));
+            }
+            if step == point {
+                fs::write(&path, b"external revision").unwrap();
+                return Err(WorkbenchError::new("ENOTSUP", "unsupported swap"));
+            }
+            Ok(())
+        });
+        assert_eq!(f.replace().unwrap_err().code, "SOURCE_CHANGED");
+        assert_eq!(fs::read(f.path()).unwrap(), b"external revision");
+        f.no_temporary();
+    }
+}
+
+#[test]
+fn unsupported_exchange_restores_raced_rollback_revision() {
+    let f = Fixture::new();
+    let path = f.path();
+    hook(move |step| {
+        if step == "publication_sync" {
+            return Err(write_error("injected sync failure"));
+        }
+        if step == "rollback_exchange" {
+            fs::write(&path, b"external raced rollback").unwrap();
+        }
+        if step == "rollback_restore_exchange" {
+            return Err(WorkbenchError::new("ENOTSUP", "unsupported swap"));
+        }
+        Ok(())
+    });
+    assert_eq!(f.replace().unwrap_err().code, "SOURCE_CHANGED");
+    assert_eq!(fs::read(f.path()).unwrap(), b"external raced rollback");
+    f.no_temporary();
+}
+
+#[test]
+fn fallback_rollback_sync_failure_reports_existing_recovery() {
+    let f = Fixture::new();
+    hook(move |step| match step {
+        "publish" | "rollback_exchange" => Err(WorkbenchError::new("ENOTSUP", "unsupported swap")),
+        "publication_sync" | "fallback_rollback_sync" => Err(write_error("injected sync failure")),
+        _ => Ok(()),
+    });
+    let error = f.replace().unwrap_err();
+    assert_eq!(error.code, "WRITE_FAILED");
+    assert_eq!(fs::read(f.path()).unwrap(), b"original document bytes");
+    let location = error.message.split("recovery kept at ").last().unwrap();
+    assert_eq!(
+        fs::read(f.directory.path().join(location)).unwrap(),
+        b"original document bytes"
+    );
+}
+
+#[test]
+fn fallback_restore_sync_failure_reports_existing_recovery() {
+    let f = Fixture::new();
+    let path = f.path();
+    hook(move |step| {
+        if step == "publication_sync" || step == "fallback_restore_sync" {
+            return Err(write_error("injected sync failure"));
+        }
+        if step == "rollback_exchange" {
+            fs::write(&path, b"external raced rollback").unwrap();
+        }
+        if step == "rollback_restore_exchange" {
+            return Err(WorkbenchError::new("ENOTSUP", "unsupported swap"));
+        }
+        Ok(())
+    });
+    let error = f.replace().unwrap_err();
+    assert_eq!(error.code, "WRITE_FAILED");
+    assert_eq!(fs::read(f.path()).unwrap(), b"external raced rollback");
+    let location = error.message.split("recovery kept at ").last().unwrap();
+    assert_eq!(
+        fs::read(f.directory.path().join(location)).unwrap(),
+        b"external raced rollback"
+    );
+}
+
+#[test]
+fn rollback_refuses_nonregular_displaced_source_without_blocking() {
+    for kind in ["directory", "fifo"] {
+        let f = Fixture::new();
+        let original_inode = fs::metadata(f.path()).unwrap().ino();
+        let directory = f.directory.path().to_owned();
+        hook(move |step| {
+            if step == "publication_sync" {
+                return Err(write_error("injected sync failure"));
+            }
+            if step == "rollback" {
+                let captured = fs::read_dir(&directory)
+                    .unwrap()
+                    .map(|entry| entry.unwrap().path())
+                    .find(|path| fs::metadata(path).unwrap().ino() == original_inode)
+                    .unwrap();
+                fs::remove_file(&captured).unwrap();
+                if kind == "fifo" {
+                    assert!(std::process::Command::new("mkfifo")
+                        .arg(&captured)
+                        .status()
+                        .unwrap()
+                        .success());
+                } else {
+                    fs::create_dir(&captured).unwrap();
+                }
+            }
+            Ok(())
+        });
+        let error = f.replace().unwrap_err();
+        assert_eq!(error.code, "WRITE_FAILED");
+        assert!(error.message.starts_with("Only regular files are allowed."));
+        let location = error.message.split("recovery kept at ").last().unwrap();
+        assert_eq!(
+            fs::read(f.directory.path().join(location)).unwrap(),
+            b"original document bytes"
+        );
+    }
+}

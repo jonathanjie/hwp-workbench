@@ -21,13 +21,37 @@ thread_local! {
     static TEST_TIMESTAMP: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
 }
 macro_rules! step {
-    ($name:literal) => {{
+    ($name:expr) => {{
         #[cfg(test)]
         TEST_HOOK.with(|hook| match hook.borrow_mut().as_mut() {
             Some(hook) => hook($name),
             None => Ok(()),
         })?;
     }};
+}
+
+/// Report whether an exchange happened; unsupported volumes use checked rename.
+fn exchange(parent: &OwnedFd, first: &str, second: &str, seam: &str) -> Result<bool> {
+    #[cfg(not(test))]
+    let _ = seam;
+    let injected = exchange_fault(seam);
+    match injected {
+        Err(error) if matches!(error.code.as_str(), "ENOTSUP" | "EINVAL") => return Ok(false),
+        Err(error) => return Err(error),
+        Ok(()) => {}
+    }
+    match fs::renameat_with(parent, first, parent, second, fs::RenameFlags::EXCHANGE) {
+        Ok(()) => Ok(true),
+        Err(Errno::OPNOTSUPP | Errno::INVAL) => Ok(false),
+        Err(error) => Err(write_error(error)),
+    }
+}
+
+fn exchange_fault(seam: &str) -> Result<()> {
+    step!(seam);
+    #[cfg(not(test))]
+    let _ = seam;
+    Ok(())
 }
 
 fn write_error(error: impl std::fmt::Display) -> WorkbenchError {
@@ -483,25 +507,101 @@ impl Workspace {
         displaced: &str,
         hash: &str,
         published: &Metadata,
-    ) -> Result<bool> {
+    ) -> Result<(bool, bool)> {
         step!("rollback");
         if !self.owns_output(parent, name, hash, published) {
-            return Ok(false);
+            return Ok((false, false));
         }
-        step!("rollback_exchange");
-        // Exchange captures the exact revision present at the syscall, closing
-        // the destructive check-then-rename gap in the Python implementation.
-        fs::renameat_with(parent, displaced, parent, name, fs::RenameFlags::EXCHANGE)
-            .map_err(write_error)?;
+        let descriptor = fs::openat(
+            parent,
+            displaced,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(write_error)?;
+        let mut source = File::from(descriptor);
+        let original_info = source.metadata().map_err(write_error)?;
+        require(
+            original_info.is_file(),
+            "UNSAFE_PATH",
+            "Only regular files are allowed.",
+        )?;
+        let original_hash = sha256(&bounded_read(&mut source, MAX_FILE).map_err(write_error)?);
+        if !exchange(parent, displaced, name, "rollback_exchange")? {
+            // This mirrors Python's check-then-rename on volumes without swap.
+            // A writer can still race the final check and rename syscall.
+            let restored = self.checked_recovery_rename(
+                parent,
+                displaced,
+                name,
+                hash,
+                published,
+                "fallback_rollback_sync",
+            )?;
+            return Ok((restored, restored));
+        }
         if !self.owns_output(parent, displaced, hash, published) {
-            // A writer raced the first exchange. Restore that captured revision;
-            // retain whatever the second exchange displaces for explicit recovery.
-            fs::renameat_with(parent, displaced, parent, name, fs::RenameFlags::EXCHANGE)
-                .map_err(write_error)?;
+            if !exchange(parent, displaced, name, "rollback_restore_exchange")? {
+                let consumed = self.checked_recovery_rename(
+                    parent,
+                    displaced,
+                    name,
+                    &original_hash,
+                    &original_info,
+                    "fallback_restore_sync",
+                )?;
+                return Ok((false, consumed));
+            }
             fs::fsync(parent).map_err(write_error)?;
-            return Ok(false);
+            return Ok((false, false));
         }
         fs::fsync(parent).map_err(write_error)?;
+        Ok((true, false))
+    }
+
+    fn checked_recovery_rename(
+        &self,
+        parent: &OwnedFd,
+        captured: &str,
+        destination: &str,
+        destination_hash: &str,
+        destination_info: &Metadata,
+        sync_seam: &str,
+    ) -> Result<bool> {
+        let descriptor = fs::openat(
+            parent,
+            captured,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(write_error)?;
+        let mut source = File::from(descriptor);
+        require(
+            source.metadata().map_err(write_error)?.is_file(),
+            "UNSAFE_PATH",
+            "Only regular files are allowed.",
+        )?;
+        let bytes = bounded_read(&mut source, MAX_FILE).map_err(write_error)?;
+        require(bytes.len() <= MAX_FILE, "LIMIT", "Document exceeds 64 MiB.")?;
+        // Plain rename consumes its source. A private copy keeps recovery valid
+        // if directory sync fails afterwards, even on volumes without hard links.
+        let snapshot = self.private_file(parent, &bytes, 0o600)?;
+        if !self.owns_output(parent, destination, destination_hash, destination_info) {
+            fs::unlinkat(parent, snapshot.as_str(), AtFlags::empty()).map_err(write_error)?;
+            return Ok(false);
+        }
+        let result = (|| {
+            fs::renameat(parent, captured, parent, destination).map_err(write_error)?;
+            step!(sync_seam);
+            #[cfg(not(test))]
+            let _ = sync_seam;
+            fs::fsync(parent).map_err(write_error)?;
+            fs::unlinkat(parent, snapshot.as_str(), AtFlags::empty()).map_err(write_error)
+        })();
+        result.map_err(|mut error: WorkbenchError| {
+            error.details = Some(serde_json::json!({"recoveryName":snapshot}));
+            error
+        })?;
         Ok(true)
     }
 
@@ -568,29 +668,35 @@ impl Workspace {
             )
             .map_err(write_error)?;
             let published_info = File::from(descriptor).metadata().map_err(write_error)?;
-            step!("publish");
-            fs::renameat_with(
-                &parent,
-                temporary_name.as_str(),
-                &parent,
-                name.as_str(),
-                fs::RenameFlags::EXCHANGE,
-            )
-            .map_err(write_error)?;
+            let swapped = exchange(&parent, &temporary_name, &name, "publish")?;
+            if !swapped {
+                let (_, current_info) = self.replacement_source(&parent, &name, expected_sha256)?;
+                require(
+                    same_inode(&current_info, &original_info),
+                    "SOURCE_CHANGED",
+                    "Document was replaced during saving.",
+                )?;
+                fs::renameat(&parent, temporary_name.as_str(), &parent, name.as_str())
+                    .map_err(write_error)?;
+            }
             temporary = None;
-            displaced = Some(temporary_name.clone());
+            if swapped {
+                displaced = Some(temporary_name.clone());
+            }
             published = Some(published_info.clone());
             step!("after_publish");
-            // Verify the source that was actually displaced by publication.
-            let source_check = self.replacement_source(&parent, &temporary_name, expected_sha256);
-            source_conflict = !source_check
-                .as_ref()
-                .is_ok_and(|(_, info)| same_inode(info, &original_info));
-            require(
-                !source_conflict,
-                "SOURCE_CHANGED",
-                "Document was replaced during saving.",
-            )?;
+            if swapped {
+                let source_check =
+                    self.replacement_source(&parent, &temporary_name, expected_sha256);
+                source_conflict = !source_check
+                    .as_ref()
+                    .is_ok_and(|(_, info)| same_inode(info, &original_info));
+                require(
+                    !source_conflict,
+                    "SOURCE_CHANGED",
+                    "Document was replaced during saving.",
+                )?;
+            }
             step!("publication_sync");
             fs::fsync(&parent).map_err(write_error)?;
             step!("readback");
@@ -606,10 +712,11 @@ impl Workspace {
                 .ok_or_else(|| write_error("Missing recovery file."))?;
             fs::unlinkat(&parent, recovery_name, AtFlags::empty()).map_err(write_error)?;
             recovery = None;
-            step!("displaced_cleanup");
-            fs::unlinkat(&parent, temporary_name.as_str(), AtFlags::empty())
-                .map_err(write_error)?;
-            displaced = None;
+            if let Some(displaced_name) = displaced.as_deref() {
+                step!("displaced_cleanup");
+                fs::unlinkat(&parent, displaced_name, AtFlags::empty()).map_err(write_error)?;
+                displaced = None;
+            }
             Ok(sha256(&saved))
         })();
         let result = match result {
@@ -619,8 +726,9 @@ impl Workspace {
                     .ok_or_else(|| write_error("Missing publication identity."))?;
                 let captured = displaced
                     .as_deref()
-                    .ok_or_else(|| write_error("Missing displaced source."))?;
-                let restored = match self.rollback_exchange(
+                    .or(recovery.as_deref())
+                    .ok_or_else(|| write_error("Missing recovery source."))?;
+                let (restored, consumed) = match self.rollback_exchange(
                     &parent,
                     &name,
                     captured,
@@ -636,11 +744,24 @@ impl Workspace {
                             recovery_relative_path(
                                 self,
                                 path,
-                                recovery.as_deref().unwrap_or(captured)
+                                rollback_error
+                                    .details
+                                    .as_ref()
+                                    .and_then(|details| details.get("recoveryName"))
+                                    .and_then(serde_json::Value::as_str)
+                                    .or(recovery.as_deref())
+                                    .unwrap_or(captured)
                             )?
                         )));
                     }
                 };
+                if consumed {
+                    if displaced.is_some() {
+                        displaced = None;
+                    } else {
+                        recovery = None;
+                    }
+                }
                 if !restored || source_conflict {
                     let mut backups = vec![];
                     if let Some(retained) = recovery.take() {
