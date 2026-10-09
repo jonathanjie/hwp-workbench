@@ -174,6 +174,25 @@ class Workspace:
             raise
         return name
 
+    def _retain_recovery(self, path, parent, recovery_name):
+        """Move owned recovery bytes into the private backup folder without pruning."""
+        document = Path(self.relative_path(path))
+        directory = str(document.parent / '.hwp-workbench' / 'backups')
+        self.ensure_directory(directory)
+        backup_parent = self._directory(self._parts(directory))
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+        name = f'{document.name}.recovery-{timestamp}-{secrets.token_hex(6)}'
+        try:
+            os.chmod(recovery_name, 0o600, dir_fd=parent, follow_symlinks=False)
+            os.link(recovery_name, name, src_dir_fd=parent,
+                    dst_dir_fd=backup_parent, follow_symlinks=False)
+            os.fsync(backup_parent)
+            os.unlink(recovery_name, dir_fd=parent)
+            os.fsync(parent)
+        finally:
+            os.close(backup_parent)
+        return str(Path(directory) / name)
+
     def replace_existing(self, path, data, expected_sha256):
         """Replace a hash-bound source atomically and return its disk-read SHA-256."""
         require(len(data) <= MAX_FILE, 'LIMIT', 'Output exceeds 64 MiB.')
@@ -186,17 +205,21 @@ class Workspace:
             mode = stat.S_IMODE(info.st_mode)
             temporary_name = self._private_file(parent, data, mode)
             # Retain recovery bytes until post-rename sync and disk verification
-            # succeed. A failure after publication must restore the old version.
+            # succeed. Rollback is allowed only while this output is still there.
             recovery_name = self._private_file(parent, original, mode)
             _, current_info = self._replacement_source(parent, name, expected_sha256)
             require((current_info.st_dev, current_info.st_ino) == (info.st_dev, info.st_ino),
                     'SOURCE_CHANGED', 'Document was replaced during saving.')
+            published_info = os.stat(temporary_name, dir_fd=parent, follow_symlinks=False)
+            expected_output = hashlib.sha256(data).hexdigest()
             os.replace(temporary_name, name, src_dir_fd=parent, dst_dir_fd=parent)
             temporary_name = None
             replaced = True
             os.fsync(parent)
-            expected_output = hashlib.sha256(data).hexdigest()
-            saved, _ = self._replacement_source(parent, name, expected_output)
+            saved, saved_info = self._replacement_source(parent, name, expected_output)
+            require((saved_info.st_dev, saved_info.st_ino) ==
+                    (published_info.st_dev, published_info.st_ino),
+                    'SOURCE_CHANGED', 'Document was replaced after saving.')
             # Cleanup is part of the guarded operation: an unlink failure must
             # restore the source instead of reporting a failed save after changing it.
             os.unlink(recovery_name, dir_fd=parent)
@@ -204,6 +227,20 @@ class Workspace:
             return hashlib.sha256(saved).hexdigest()
         except BaseException as error:
             if replaced:
+                try:
+                    _, current_info = self._replacement_source(parent, name, expected_output)
+                    owns_output = ((current_info.st_dev, current_info.st_ino) ==
+                                   (published_info.st_dev, published_info.st_ino))
+                except (OSError, WorkbenchError):
+                    owns_output = False
+                if not owns_output:
+                    # Keep an external revision, even if it has identical bytes.
+                    # Do not let final cleanup discard recovery on backup failure.
+                    retained_name = recovery_name
+                    recovery_name = None
+                    backup = self._retain_recovery(path, parent, retained_name)
+                    raise WorkbenchError('SOURCE_CHANGED',
+                                         'Document changed after publication; recovery kept at ' + backup) from error
                 os.replace(recovery_name, name, src_dir_fd=parent, dst_dir_fd=parent)
                 recovery_name = None
                 os.fsync(parent)
@@ -223,12 +260,13 @@ class Workspace:
         if directory is None:
             directory = str(document.parent / '.hwp-workbench' / 'backups')
         self.ensure_directory(directory)
+        source_identity = hashlib.sha256(os.fsencode(self.root / document)).hexdigest()[:8]
         timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-        name = f'{document.stem}.{timestamp}-{secrets.token_hex(3)}{document.suffix}'
+        name = f'{document.stem}.{source_identity}.{timestamp}-{secrets.token_hex(3)}{document.suffix}'
         backup = str(Path(directory) / name)
         self.write_new(backup, data)
         require(self.read(backup) == data, 'VERIFY_FAILED', 'Previous-version backup differs from the source.')
-        pattern = re.compile(re.escape(document.stem) +
+        pattern = re.compile(re.escape(document.stem + '.' + source_identity) +
                              r'\.[0-9]{8}T[0-9]{6}Z-[0-9a-f]{6}' + re.escape(document.suffix))
         self._prune_backups(directory, pattern, name)
         return backup

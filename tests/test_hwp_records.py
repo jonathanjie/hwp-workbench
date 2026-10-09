@@ -81,13 +81,13 @@ class VariableLengthTests(unittest.TestCase):
         self.assertIn('HWP_REFLOW_UNVERIFIED', [warning['code'] for warning in saved.warnings])
         self.assertNotIn('HWP_EQUAL_LENGTH_ONLY', [warning['code'] for warning in saved.warnings])
 
-    def test_shrink_keeps_first_shape_at_collapsed_boundary(self):
+    def test_shrink_keeps_shape_of_surviving_terminator(self):
         from hwp_workbench.hwp_records import parse_section
         document = Document(paragraph_fixture())
         set_text(document, document.nodes[0], 'XY')
         saved = Document(document.serialize(True))
         records = parse_section(saved.sections['BodyText/Section0']).records
-        self.assertEqual(struct.unpack('<4I', records[2].data), (0, 10, 2, 20))
+        self.assertEqual(struct.unpack('<4I', records[2].data), (0, 10, 2, 40))
         self.assertEqual(struct.unpack_from('<H', records[0].data, 12)[0], 2)
         self.assertEqual(struct.unpack('<III', records[4].data), (2, 2, 0xfeedbeef))
         self.assertEqual(records[0].data[4:12], document.hwp_sections['BodyText/Section0'].records[0].data[4:12])
@@ -102,6 +102,31 @@ class VariableLengthTests(unittest.TestCase):
 
 
 class EdgeCaseTests(unittest.TestCase):
+    def test_deletion_keeps_surviving_control_and_suffix_shapes(self):
+        cases = [
+            ('ab\ncd', ((0, 10), (2, 20)), 0, ((0, 20),)),
+            ('xy\nab\ncd', ((0, 10), (3, 20), (5, 30)), 1,
+             ((0, 10), (3, 30))),
+            ('xy\nab', ((0, 10), (3, 20), (5, 30)), 1,
+             ((0, 10), (3, 30))),
+            ('ab\ncd', ((0, 10), (2, 20), (2, 30)), 0,
+             ((0, 20), (0, 30))),
+            ('ab\ncd', ((0, 10), (0, 11), (2, 20)), 0,
+             ((0, 10), (0, 11), (0, 20))),
+        ]
+        for text, shapes, deleted_run, expected in cases:
+            with self.subTest(text=text, shapes=shapes):
+                document = Document(paragraph_fixture(text, shapes))
+                set_text(document, document.nodes[deleted_run], '')
+                saved = Document(document.serialize(True))
+                records = saved.hwp_sections['BodyText/Section0'].records
+                actual = tuple(struct.iter_unpack('<II', records[2].data))
+                self.assertEqual(actual, expected)
+                self.assertEqual(records[1].data,
+                                 (text[:document.nodes[deleted_run].textStart]
+                                  + text[document.nodes[deleted_run].textEnd:]
+                                  + '\r').encode('utf-16le'))
+
     def test_empty_text_node_accepts_insertion(self):
         document = Document(paragraph_fixture('', shapes=((0, 10),)))
         self.assertEqual(len(document.nodes), 1)

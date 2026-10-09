@@ -15,7 +15,7 @@ class AgentInbox {
     this.decisions = new Map();
     this.validated = new Map();
     this.generation = 0;
-    this.running = false;
+    this.scanning = null;
   }
 
   stop() {
@@ -147,11 +147,30 @@ class AgentInbox {
     this.poll.unref();
   }
 
-  async scan() {
-    if (!this.enabled || this.running) {
-      return;
+  // A request during a running scan waits for it and one more pass, so
+  // `await scan()` always reflects files written before the call.
+  scan() {
+    if (!this.enabled) {
+      return Promise.resolve();
     }
-    this.running = true;
+    if (this.scanning) {
+      this.rescan = true;
+      return this.scanning;
+    }
+    this.scanning = this.scanUntilCurrent().finally(() => {
+      this.scanning = null;
+    });
+    return this.scanning;
+  }
+
+  async scanUntilCurrent() {
+    do {
+      this.rescan = false;
+      await this.scanOnce();
+    } while (this.rescan && this.enabled);
+  }
+
+  async scanOnce() {
     const generation = this.generation;
     const document = this.document;
     try {
@@ -183,8 +202,6 @@ class AgentInbox {
         this.error = error.message;
         this.emit();
       }
-    } finally {
-      this.running = false;
     }
   }
 

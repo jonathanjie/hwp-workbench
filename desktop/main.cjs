@@ -9,6 +9,8 @@ const {RecentStore, validateDroppedFile} = require('./recent-store.cjs');
 const {OutputReveal} = require('./output-reveal.cjs');
 const {OpenHandoff, openArgument, requestedOpen} = require('./open-handoff.cjs');
 const {AgentTools} = require('./agent-tools.cjs');
+const pythonProcess = require('./python-process.cjs');
+const {pythonExecutable, engineSpawnOptions} = pythonProcess;
 const {AgentInbox} = require('./agent-inbox.cjs');
 const {readDocumentBytes} = require('./document-bytes.cjs');
 
@@ -17,6 +19,7 @@ const {LatestPreview} = require('./preview-lane.cjs');
 const previews = new LatestPreview();
 
 const ROOT = path.resolve(__dirname, '..');
+pythonProcess.useElectron(require('electron'));
 const INDEX = 'app://workbench/index.html';
 // Honor Chromium's explicit profile-directory option for isolated app runs.
 const profileDirectory = app.commandLine.getSwitchValue('user-data-dir');
@@ -69,14 +72,7 @@ function callEngine(root, method, args, signal) {
     return Promise.reject(Error('Request too large'));
   }
   return new Promise((resolve, reject) => {
-    const python = process.env.HWP_WORKBENCH_PYTHON ||
-      ['/opt/homebrew/bin/python3', '/usr/local/bin/python3', '/usr/bin/python3'].find(file => fsSync.existsSync(file)) || 'python3';
-    const child = spawn(python, ['-m', 'hwp_workbench', 'rpc', '--root', root], {
-      cwd: ROOT,
-      shell: false,
-      env: {...process.env, PYTHONPATH: path.join(ROOT, 'engine'), PYTHONUTF8: '1'},
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    const child = spawn(pythonExecutable(), ['-m', 'hwp_workbench', 'rpc', '--root', root], engineSpawnOptions());
     let output = '';
     let errorOutput = '';
     let size = 0;

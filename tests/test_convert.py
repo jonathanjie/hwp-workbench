@@ -6,6 +6,31 @@ from convert_fixtures import docx, png
 
 
 class ForwardMapperTests(unittest.TestCase):
+    def test_image_only_merge_continuation_is_kept_and_reported(self):
+        import io
+        import zipfile
+        from convert_fixtures import package
+        from hwp_workbench.convert.docx_read import read_docx
+        from hwp_workbench.convert.hwpx_write import write_hwpx
+        from hwp_workbench.convert.model import paragraphs
+        from hwp_workbench.document import Document
+        with zipfile.ZipFile(io.BytesIO(docx())) as archive:
+            parts = {name: archive.read(name) for name in archive.namelist()}
+        text = parts['word/document.xml'].decode('utf-8')
+        drawing = text[text.index('<w:drawing>'):text.index('</w:drawing>') + len('</w:drawing>')]
+        text = text.replace('<w:tcPr><w:vMerge/></w:tcPr><w:p/>',
+                            '<w:tcPr><w:vMerge/></w:tcPr><w:p><w:r>'
+                            + drawing + '</w:r></w:p>')
+        parts['word/document.xml'] = text.encode('utf-8')
+        rich = read_docx(package(parts))
+        owner = rich.sections[0].blocks[4].rows[1][0]
+        images = [run.image for p in paragraphs(owner.blocks) for run in p.runs if run.image]
+        self.assertEqual([image.data for image in images], [png()])
+        self.assertEqual(rich.unsupported.get('nonemptyMergeContinuation'), 1)
+        native = Document(write_hwpx(rich))
+        self.assertIn(png(), native.parts.values())
+        self.assertEqual(native.parts['Contents/section0.xml'].count(b'<hp:pic '), 2)
+
     def test_docx_reader_preserves_rich_properties(self):
         from hwp_workbench.convert.docx_read import read_docx
         from hwp_workbench.convert.model import Table
@@ -508,3 +533,42 @@ class ReviewRegressionTests(unittest.TestCase):
         self.assertEqual(report['imageTransforms'], 1)
         self.assertEqual(report['imageCropping'], 1)
         self.assertEqual(report['imageEffects'], 1)
+
+
+class StyleScalingTests(unittest.TestCase):
+    def test_24000_distinct_single_character_runs_convert_in_seconds(self):
+        import tempfile
+        import time
+        from pathlib import Path
+        from convert_fixtures import W
+        from hwp_workbench.service import invoke
+        runs = ''.join(f'<w:r><w:rPr><w:color w:val="{index:06X}"/></w:rPr><w:t>x</w:t></w:r>'
+                       for index in range(24000))
+        document_xml = f'<w:document xmlns:w="{W}"><w:body><w:p>{runs}</w:p></w:body></w:document>'
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'runs.docx').write_bytes(docx(extra_parts={'word/document.xml': document_xml}))
+            # Measure CPU work so host scheduling does not make this budget flaky.
+            started = time.process_time()
+            result = invoke(root, 'convert', {'path': 'runs.docx', 'to': 'hwpx'})
+            elapsed = time.process_time() - started
+        self.assertTrue(result['available'])
+        self.assertTrue(result['textCheck']['matches'])
+        self.assertEqual(result['unsupported'], {})
+        self.assertLess(elapsed, 8, f'24000 distinct runs used {elapsed:.3f} CPU seconds')
+
+    def test_docx_distinct_numbering_converts_in_seconds(self):
+        import time
+        from hwp_workbench.convert.model import Paragraph, RichDocument, Run, Section
+        from hwp_workbench.convert.docx_write import write_docx
+        from hwp_workbench.convert.docx_read import read_docx
+        blocks = [Paragraph([Run('x')], numbering=dict(kind='decimal', level=0,
+                  start=index + 1, text='%1.', style={'left': index})) for index in range(24000)]
+        rich = RichDocument([Section(blocks)])
+        started = time.process_time()
+        payload = write_docx(rich)
+        elapsed = time.process_time() - started
+        self.assertLess(elapsed, 8, f'24000 numbering styles used {elapsed:.3f} CPU seconds')
+        reopened = read_docx(payload)
+        self.assertEqual(len(reopened.sections[0].blocks), 24000)
+        self.assertEqual(reopened.sections[0].blocks[-1].numbering['start'], 24000)

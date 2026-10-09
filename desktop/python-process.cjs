@@ -1,21 +1,35 @@
 const {spawn} = require('node:child_process');
-const fs = require('node:fs');
-const path = require('node:path');
-const ROOT = path.resolve(__dirname, '..');
+const runtime = require('./runtime.cjs');
 
+// Main passes Electron at startup. Unit tests run without Electron, as a
+// source checkout would.
+let host = {app: {isPackaged: false}};
+let python;
+
+function useElectron(electron) {
+  host = electron;
+  python = undefined;
+}
+
+// The installed app carries its own Python; a source checkout needs 3.11+.
 function pythonExecutable() {
-  return process.env.HWP_WORKBENCH_PYTHON ||
-    ['/opt/homebrew/bin/python3', '/usr/local/bin/python3', '/usr/bin/python3'].find(file => fs.existsSync(file)) || 'python3';
+  if (python === undefined) {
+    python = runtime.pythonCommand(host);
+  }
+  if (!python) {
+    throw Error('HWP Workbench needs Python 3.11 or newer / Python 3.11 이상이 필요합니다');
+  }
+  return python;
+}
+
+function engineSpawnOptions() {
+  return {cwd: runtime.appRoot(host), shell: false, env: runtime.engineEnvironment(host), stdio: ['pipe', 'pipe', 'pipe']};
 }
 
 // Main supplies fixed actions and argument lists. This is never exposed over IPC.
 function runPython(arguments_, input = '', maxBytes = 32 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
-    const child = spawn(pythonExecutable(), arguments_, {
-      cwd: ROOT, shell: false,
-      env: {...process.env, PYTHONPATH: path.join(ROOT, 'engine'), PYTHONUTF8: '1'},
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    const child = spawn(pythonExecutable(), arguments_, engineSpawnOptions());
     let output = '';
     let errors = '';
     let size = 0;
@@ -65,4 +79,4 @@ function runPython(arguments_, input = '', maxBytes = 32 * 1024 * 1024) {
   });
 }
 
-module.exports = {runPython};
+module.exports = {runPython, useElectron, pythonExecutable, engineSpawnOptions};

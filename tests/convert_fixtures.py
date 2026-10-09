@@ -15,11 +15,18 @@ def png():
             + chunk(b'IDAT', zlib.compress(b'\0\x20\x80\xc0')) + chunk(b'IEND', b''))
 
 
+# A fixed member time keeps fixtures byte-identical between calls; tests
+# compare a written source with a fresh fixture across clock seconds.
+FIXED_ZIP_TIME = (2026, 1, 1, 0, 0, 0)
+
+
 def package(parts):
     output = io.BytesIO()
     with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
         for name, data in parts.items():
-            archive.writestr(name, data)
+            member = zipfile.ZipInfo(name, date_time=FIXED_ZIP_TIME)
+            member.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(member, data)
     return output.getvalue()
 
 

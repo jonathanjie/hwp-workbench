@@ -59,7 +59,7 @@ def read_proposals(workspace, name, hash_):
         summary = agent_link._proposal_summary(workspace, file, document)
         summary['file'] = filename
         if summary['status'] in ('pending', 'stale'):
-            proposal, readable = agent_link._read_json(workspace, file)
+            proposal, readable, _ = agent_link._read_json(workspace, file)
             if readable and agent_link._valid_proposal(proposal, document):
                 summary['patch'] = proposal['patch']
         rows.append(summary)
@@ -69,7 +69,7 @@ def read_proposals(workspace, name, hash_):
 def publish_outcome(workspace, name, args):
     filename = args.get('file')
     require(isinstance(filename, str) and proposal_pattern(name).fullmatch(filename), 'BAD_ARGUMENTS', 'Invalid proposal file.')
-    proposal, readable = agent_link._read_json(workspace, '.hwp-workbench/proposals/' + filename)
+    proposal, readable, proposal_sha256 = agent_link._read_json(workspace, '.hwp-workbench/proposals/' + filename)
     require(readable and agent_link._valid_proposal(proposal, SimpleNamespace(name=name)), 'BAD_ARGUMENTS', 'Invalid proposal.')
     if 'expectedPatch' in args:
         require(proposal['patch'] == args['expectedPatch'], 'STALE_DOCUMENT', 'Proposal changed before the outcome write.')
@@ -80,7 +80,10 @@ def publish_outcome(workspace, name, args):
     expected = [operation['nodeId'] for operation in proposal['patch']['operations']]
     require(len(set(expected)) == len(expected) and len(set(accepted + declined)) == len(accepted + declined)
             and set(accepted + declined) == set(expected), 'BAD_ARGUMENTS', 'Outcome must contain the complete proposal once.')
+    # Bind the decision to the exact proposal bytes that were reviewed, so a
+    # replaced proposal with the same name is not reported as decided.
     outcome = {'schemaVersion': 1, 'status': 'partial' if accepted and declined else 'accepted' if accepted else 'declined',
+               'proposalSha256': proposal_sha256,
                'acceptedNodeIds': accepted, 'declinedNodeIds': declined,
                'decidedAt': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}
     workspace.write_new('.hwp-workbench/proposals/' + filename.removesuffix('.json') + '.outcome.json',

@@ -46,7 +46,8 @@ test('bounded reader distinguishes stale and unreadable proposals; outcomes are 
     await fs.writeFile(path.join(folder, second), JSON.stringify(proposal()));
     const unsafeOutcome = path.join(folder, second.replace(/\.json$/, '.outcome.json'));
     await fs.symlink(path.join(root, 'target.json'), unsafeOutcome);
-    assert.equal((await files.read('a'.repeat(64))).find(row => row.file === second).status, 'unreadable');
+    // A readable proposal whose outcome cannot be trusted needs a fresh review.
+    assert.equal((await files.read('a'.repeat(64))).find(row => row.file === second).status, 'needsReview');
     await assert.rejects(files.outcome(second, nodeIds, []), /exist|symlink/i);
     assert.deepEqual(JSON.parse(await fs.readFile(path.join(root, 'target.json'))), proposal());
     await fs.rm(path.join(root, '.hwp-workbench'), {recursive: true});
