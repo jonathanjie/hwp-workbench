@@ -13,9 +13,17 @@ MINIMUM_VERSION = (3, 11)
 BUNDLE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 ENGINE_DIRECTORY = os.path.join(BUNDLE_DIRECTORY, "engine")
 
+# The installed HWP Workbench app carries its own Python and Electron.
+APP_BUNDLES = [
+    "/Applications/HWP Workbench.app",
+    os.path.expanduser("~/Applications/HWP Workbench.app"),
+]
+APP_PYTHONS = [os.path.join(bundle, "Contents/Resources/python/bin/python3") for bundle in APP_BUNDLES]
+
 # Common install locations on macOS, newest conventions first.
 CANDIDATE_INTERPRETERS = [
     os.environ.get("HWP_WORKBENCH_PYTHON", ""),
+] + APP_PYTHONS + [
     "/opt/homebrew/bin/python3",
     "/usr/local/bin/python3",
     os.path.expanduser("~/.local/bin/python3"),
@@ -54,6 +62,18 @@ def supported_interpreter():
     return None
 
 
+def add_app_node(environment):
+    """Let the rhwp check use the installed app's Electron as Node."""
+    if environment.get("HWP_WORKBENCH_NODE"):
+        return
+    for bundle in APP_BUNDLES:
+        electron = os.path.join(bundle, "Contents/MacOS/HWP Workbench")
+        if os.path.isfile(electron) and os.access(electron, os.X_OK):
+            environment["HWP_WORKBENCH_NODE"] = electron
+            environment["ELECTRON_RUN_AS_NODE"] = "1"
+            return
+
+
 def main():
     interpreter = supported_interpreter()
     if interpreter is None:
@@ -64,6 +84,7 @@ def main():
         return 1
     environment = dict(os.environ)
     environment["PYTHONPATH"] = ENGINE_DIRECTORY
+    add_app_node(environment)
     arguments = [interpreter, "-m", "hwp_workbench"] + sys.argv[1:]
     # Replace this process so stdio stays connected to the MCP client.
     os.execve(interpreter, arguments, environment)
