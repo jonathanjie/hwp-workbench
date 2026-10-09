@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="400" height="400">
+  <!-- Seal mark (朱文印): seal-script 한 in vermillion. Strokes join the frame, as in a carved seal. -->
+  <g fill="#E2412B">
+    <path fill-rule="evenodd" d="M12 3H88A9 9 0 0 1 97 12V88A9 9 0 0 1 88 97H12A9 9 0 0 1 3 88V12A9 9 0 0 1 12 3Z M17 11A6 6 0 0 0 11 17V83A6 6 0 0 0 17 89H83A6 6 0 0 0 89 83V17A6 6 0 0 0 83 11Z"/>
+    <!-- ㅎ -->
+    <rect x="26" y="18" width="17" height="7"/>
+    <rect x="11" y="30" width="42" height="7"/>
+    <path fill-rule="evenodd" d="M18 43H47V65H18Z M25 50V58H40V50Z"/>
+    <!-- ㅏ -->
+    <rect x="59" y="11" width="7.5" height="57"/>
+    <rect x="66" y="35" width="23" height="7"/>
+    <!-- ㄴ -->
+    <rect x="18" y="71" width="7.5" height="18"/>
+    <rect x="18" y="78" width="64" height="7"/>
+  </g>
+</svg>

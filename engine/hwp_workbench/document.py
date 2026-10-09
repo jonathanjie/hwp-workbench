@@ -16,6 +16,15 @@ HP = 'http://www.hancom.co.kr/hwpml/2011/paragraph'
 HC = 'http://www.hancom.co.kr/hwpml/2011/core'
 HH = 'http://www.hancom.co.kr/hwpml/2011/head'
 
+# Observed in pyhwp-aligns.hwp and pyhwp-borderfill.hwp (public manifest).
+# DefaultJScript contains length-prefixed UTF-16LE document bindings and an
+# empty OnDocument_New callback with a //todo comment, plus native padding.
+# JScriptVersion is the eight bytes 01 00 00 00 00 00 00 00.
+DEFAULT_SCRIPT_HASHES = {
+    'Scripts/DefaultJScript': 'e1f35ff38336598f79448c84b41bcb508d53a552808454a76ee12691cb2c97e4',
+    'Scripts/JScriptVersion': '7c9fa136d4413fa6173637e883b6998d32e1d675f88cddff9dcbcf331820f4b8',
+}
+
 def sha(data: bytes) -> str: return hashlib.sha256(data).hexdigest()
 def local(tag: str) -> str: return tag.rsplit('}',1)[-1]
 def esc(s: str) -> str: return s.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
@@ -143,22 +152,44 @@ class Document:
                     self.nodes.append(node); self.positions[node.id]=t
                 for c in e: scan(c,ancestors+(tag,),style)
             scan(root)
-            def visual(e,depth=0):
-                if depth>32: return []
-                tag=local(e.tag)
-                if tag=='t' and id(e) in token_by_element: return [{'type':'text','node':token_by_element[id(e)]['id']}]
-                if tag in {'pic','ole','chart','equation','rect','line','ellipse','polygon','curve'}:
-                    return [{'type':'opaque','label':tag}]
-                children=[]
-                for c in e: children.extend(visual(c,depth+1))
-                if tag=='tbl': return [{'type':'table','children':children}]
-                if tag=='tr': return [{'type':'row','children':children}]
-                if tag=='tc':
-                    span=next((c for c in e if local(c.tag)=='cellSpan'),None)
-                    try: cs=int(span.attrib.get('colSpan','1')) if span is not None else 1; rs=int(span.attrib.get('rowSpan','1')) if span is not None else 1
-                    except ValueError: cs=rs=1
-                    return [{'type':'cell','colspan':max(1,min(100,cs)),'rowspan':max(1,min(100,rs)),'children':children}]
-                if tag=='p': return [{'type':'paragraph','children':children}]
+            def visual(e, depth=0):
+                if depth > 32:
+                    return []
+                tag = local(e.tag)
+                if tag == 't' and id(e) in token_by_element:
+                    return [{'type': 'text', 'node': token_by_element[id(e)]['id']}]
+                if tag in {'pic', 'ole', 'chart', 'equation', 'rect', 'line', 'ellipse', 'polygon', 'curve'}:
+                    return [{'type': 'opaque', 'label': tag}]
+                children = []
+                for child in e:
+                    children.extend(visual(child, depth + 1))
+                if tag == 'tbl':
+                    return [{'type': 'table', 'children': children}]
+                if tag == 'tr':
+                    return [{'type': 'row', 'children': children}]
+                if tag == 'tc':
+                    span = next((child for child in e if local(child.tag) == 'cellSpan'), None)
+                    try:
+                        columns = int(span.attrib.get('colSpan', '1')) if span is not None else 1
+                        rows = int(span.attrib.get('rowSpan', '1')) if span is not None else 1
+                    except ValueError:
+                        columns = 1
+                        rows = 1
+                    native_span = None if span is None else {
+                        'rows': span.attrib.get('rowSpan', '1'),
+                        'columns': span.attrib.get('colSpan', '1'),
+                    }
+                    address = next((child for child in e if local(child.tag) == 'cellAddr'), None)
+                    # Retain raw addresses so agent operations can refuse malformed positions.
+                    position = None if address is None else {
+                        'row': address.attrib.get('rowAddr'),
+                        'column': address.attrib.get('colAddr'),
+                    }
+                    return [{'type': 'cell', 'colspan': max(1, min(100, columns)),
+                             'rowspan': max(1, min(100, rows)), 'address': position,
+                             'nativeSpan': native_span, 'children': children}]
+                if tag == 'p':
+                    return [{'type': 'paragraph', 'children': children}]
                 return children
             self.view.append({'type':'section','label':section,'children':visual(root)})
         self.warn('PREVIEW_CACHE_RETAINED','info','Embedded preview images/text and line-layout caches are retained unchanged. They may be stale after edits; reopen in Hancom to refresh.')
@@ -198,67 +229,125 @@ class Document:
         except expat.ExpatError as e: raise WorkbenchError('BAD_XML',str(e))
         return tokens
 
+    def _hwp_stream(self, name):
+        payload = self.parts[name]
+        self.stream_trailers[name] = False
+        if not self.compressed:
+            require(len(payload) <= MAX_PART, 'LIMIT', 'HWP stream exceeds limit.')
+            return payload
+        try:
+            decompressor = zlib.decompressobj(-15)
+            raw = decompressor.decompress(payload, MAX_PART + 1)
+        except zlib.error as error:
+            raise WorkbenchError('BAD_HWP_COMPRESSION', str(error))
+        message = 'Invalid or oversized compressed HWP stream.'
+        require(
+            len(raw) <= MAX_PART and not decompressor.unconsumed_tail and decompressor.eof,
+            'LIMIT', message,
+        )
+        trailer = decompressor.unused_data
+        if trailer:
+            # Some Hancom raw-deflate streams end with CRC32 and expanded size,
+            # both unsigned 32-bit little-endian. No other suffix is accepted.
+            require(len(trailer) == 8, 'LIMIT', message)
+            checksum, size = struct.unpack('<II', trailer)
+            require(checksum == zlib.crc32(raw) and size == len(raw), 'LIMIT', message)
+            self.stream_trailers[name] = True
+        return raw
+
     def _read_hwp(self):
-        self.cfb=CompoundFile(self.original);self.parts=self.cfb.streams
-        head=self.parts.get('FileHeader',b'')
-        require(len(head)>=40 and head[:17]==b'HWP Document File','NOT_HWP','Missing HWP FileHeader.')
-        require(head[35]==5,'UNSUPPORTED_FORMAT','Only HWP 5.x is supported.')
-        self.flags=u32(head,36)
-        require(not self.flags&((1<<1)|(1<<2)|(1<<4)|(1<<8)|(1<<9)),'PROTECTED_HWP','Password, distribution or DRM protected HWP cannot be opened by this alpha.')
-        self.compressed=bool(self.flags&1)
-        if self.flags&((1<<3)|(1<<6)|(1<<7)) or any('script' in k.lower() for k in self.parts):
-            self.block_save=True
-            self.warn('PROTECTED_OR_ACTIVE_CONTENT','error','Script or digital-signature metadata detected; editing is blocked.')
-        self.sections={};self.fonts=[];expanded_total=0
-        section_names=sorted((name for name in self.parts if re.fullmatch(r'BodyText/Section\d+',name)),key=lambda name:int(name.rsplit('Section',1)[1]))
+        self.cfb = CompoundFile(self.original)
+        self.parts = self.cfb.streams
+        head = self.parts.get('FileHeader', b'')
+        require(len(head) >= 40 and head[:17] == b'HWP Document File', 'NOT_HWP', 'Missing HWP FileHeader.')
+        require(head[35] == 5, 'UNSUPPORTED_FORMAT', 'Only HWP 5.x is supported.')
+        self.flags = u32(head, 36)
+        protected_flags = (1 << 1) | (1 << 2) | (1 << 4) | (1 << 8) | (1 << 9)
+        require(not self.flags & protected_flags, 'PROTECTED_HWP', 'Password, distribution or DRM protected HWP cannot be opened by this alpha.')
+        self.compressed = bool(self.flags & 1)
+        self.stream_trailers = {}
+        self._classify_hwp_scripts()
+        self.sections = {}
+        self.fonts = []
+        expanded_total = 0
+        section_names = sorted(
+            (name for name in self.parts if re.fullmatch(r'BodyText/Section\d+', name)),
+            key=lambda name: int(name.rsplit('Section', 1)[1]),
+        )
         for name in section_names:
-            raw=self.parts[name]
-            if self.compressed:
-                try:
-                    decomp=zlib.decompressobj(-15)
-                    raw=decomp.decompress(raw,MAX_PART+1)
-                    require(len(raw)<=MAX_PART and not decomp.unconsumed_tail and decomp.eof and not decomp.unused_data,'LIMIT','Invalid or oversized compressed HWP stream.')
-                except zlib.error as e: raise WorkbenchError('BAD_HWP_COMPRESSION',str(e))
-            require(len(raw)<=MAX_PART,'LIMIT','HWP section exceeds limit.')
-            expanded_total+=len(raw)
-            require(expanded_total<=MAX_EXPANDED,'LIMIT','Expanded HWP sections exceed limit.')
-            self.sections[name]=raw
-            at=0;record=0;para=0;children=[]
-            while at<len(raw):
-                require(at+4<=len(raw),'BAD_HWP_RECORD','Truncated record header.')
-                bits=u32(raw,at);tag=bits&1023;size=bits>>20;hdr=4
-                if size==4095:
-                    require(at+8<=len(raw),'BAD_HWP_RECORD','Truncated extended record header.')
-                    size=u32(raw,at+4);hdr=8
-                start=at+hdr;end=start+size
-                require(end<=len(raw),'BAD_HWP_RECORD','Record payload exceeds stream bounds.')
-                if tag==66: para+=1
-                if tag==67:
-                    require(size%2==0,'BAD_HWP_TEXT','Misaligned UTF-16 text record.')
-                    # Edit only contiguous printable text; native control records stay opaque.
-                    off=start;seg=0
-                    while off<end:
-                        code=struct.unpack_from('<H',raw,off)[0]
-                        if code<32:
-                            width=16 if (1<=code<=9 or 11<=code<=12 or 14<=code<=23) else 2
-                            require(off+width<=end,'BAD_HWP_TEXT','Truncated HWP control sequence.')
-                            off+=width;continue
-                        begin=off
-                        while off<end and struct.unpack_from('<H',raw,off)[0]>=32: off+=2
-                        try: text=raw[begin:off].decode('utf-16le')
-                        except UnicodeError: raise WorkbenchError('BAD_HWP_TEXT','Invalid UTF-16 in paragraph text.')
-                        nid=f'{name}#record:{record}:text:{seg}'
-                        self.nodes.append(TextNode(nid,text,name,'text-run',True,para,{}))
-                        self.positions[nid]={'start':begin,'end':off,'part':name}
-                        children.append({'type':'paragraph','children':[{'type':'text','node':nid}]})
-                        seg+=1
-                at=end;record+=1
-                require(record<=MAX_NODES,'LIMIT','Too many HWP records.')
-            self.view.append({'type':'section','label':name,'children':children})
-        require(bool(self.sections),'NOT_HWP','No HWP body sections found.')
-        self.warn('HWP_EQUAL_LENGTH_ONLY','warning','HWP alpha editing requires the same UTF-16 code-unit length per text run. Length-changing and structural edits are blocked to retain character/line offsets.')
-        self.warn('HWP_LAYOUT_NOT_RENDERED','warning','HWP is shown as structured text, not a page-faithful rendering. Table/control/style streams are retained but not visually reconstructed.')
-        self.warn('PREVIEW_CACHE_RETAINED','info','Stored preview content remains unchanged and may be stale after editing.')
+            raw = self._hwp_stream(name)
+            expanded_total += len(raw)
+            require(expanded_total <= MAX_EXPANDED, 'LIMIT', 'Expanded HWP sections exceed limit.')
+            self.sections[name] = raw
+            self._read_hwp_section(name, raw)
+        require(bool(self.sections), 'NOT_HWP', 'No HWP body sections found.')
+        self.warn('HWP_EQUAL_LENGTH_ONLY', 'warning', 'HWP alpha editing requires the same UTF-16 code-unit length per text run. Length-changing and structural edits are blocked to retain character/line offsets.')
+        self.warn('HWP_LAYOUT_NOT_RENDERED', 'warning', 'HWP is shown as structured text, not a page-faithful rendering. Table/control/style streams are retained but not visually reconstructed.')
+        self.warn('PREVIEW_CACHE_RETAINED', 'info', 'Stored preview content remains unchanged and may be stale after editing.')
+
+    def _classify_hwp_scripts(self):
+        script_names = {name for name in self.parts if 'script' in name.lower()}
+        known_stub = False
+        if script_names == set(DEFAULT_SCRIPT_HASHES):
+            # Hash native bytes only. Never decode, interpret or execute scripts.
+            payloads = {name: self._hwp_stream(name) for name in sorted(script_names)}
+            known_stub = all(sha(payloads[name]) == digest for name, digest in DEFAULT_SCRIPT_HASHES.items())
+        if known_stub:
+            self.warn('DEFAULT_SCRIPT_STUB', 'info', 'Exact known Hancom default script stub retained byte-identically; never executed.')
+        has_scripts = bool(script_names) or bool(self.flags & (1 << 3))
+        has_signature = bool(self.flags & ((1 << 6) | (1 << 7)))
+        if has_signature or (has_scripts and not known_stub):
+            self.block_save = True
+            self.warn('PROTECTED_OR_ACTIVE_CONTENT', 'error', 'Script or digital-signature metadata detected; editing is blocked.')
+
+    def _read_hwp_section(self, name, raw):
+        at = 0
+        record = 0
+        paragraph = 0
+        children = []
+        while at < len(raw):
+            require(at + 4 <= len(raw), 'BAD_HWP_RECORD', 'Truncated record header.')
+            bits = u32(raw, at)
+            tag = bits & 1023
+            size = bits >> 20
+            header_size = 4
+            if size == 4095:
+                require(at + 8 <= len(raw), 'BAD_HWP_RECORD', 'Truncated extended record header.')
+                size = u32(raw, at + 4)
+                header_size = 8
+            start = at + header_size
+            end = start + size
+            require(end <= len(raw), 'BAD_HWP_RECORD', 'Record payload exceeds stream bounds.')
+            if tag == 66:
+                paragraph += 1
+            if tag == 67:
+                require(size % 2 == 0, 'BAD_HWP_TEXT', 'Misaligned UTF-16 text record.')
+                # Edit only contiguous printable text; native controls stay opaque.
+                offset = start
+                segment = 0
+                while offset < end:
+                    code = struct.unpack_from('<H', raw, offset)[0]
+                    if code < 32:
+                        width = 16 if (1 <= code <= 9 or 11 <= code <= 12 or 14 <= code <= 23) else 2
+                        require(offset + width <= end, 'BAD_HWP_TEXT', 'Truncated HWP control sequence.')
+                        offset += width
+                        continue
+                    begin = offset
+                    while offset < end and struct.unpack_from('<H', raw, offset)[0] >= 32:
+                        offset += 2
+                    try:
+                        text = raw[begin:offset].decode('utf-16le')
+                    except UnicodeError:
+                        raise WorkbenchError('BAD_HWP_TEXT', 'Invalid UTF-16 in paragraph text.')
+                    node_id = f'{name}#record:{record}:text:{segment}'
+                    self.nodes.append(TextNode(node_id, text, name, 'text-run', True, paragraph, {}))
+                    self.positions[node_id] = {'start': begin, 'end': offset, 'part': name}
+                    children.append({'type': 'paragraph', 'children': [{'type': 'text', 'node': node_id}]})
+                    segment += 1
+            at = end
+            record += 1
+            require(record <= MAX_NODES, 'LIMIT', 'Too many HWP records.')
+        self.view.append({'type': 'section', 'label': name, 'children': children})
 
     def inspect(self):
         return dict(schemaVersion=1,format=self.format,name=self.name,sha256=self.hash,
@@ -298,38 +387,52 @@ class Document:
                 'warnings':self.warnings,'layoutCertified':False}
 
     def serialize(self, acknowledge_risks=False):
-        if not self.edits: return self.original
-        require(not self.block_save,'SAVE_BLOCKED','Saving is blocked.')
-        require(acknowledge_risks,'RISK_ACK_REQUIRED','Edited output requires explicit acknowledgement of compatibility and stale-preview risks.')
-        changed={}
-        by_part={}
-        for nid,value in self.edits.items(): by_part.setdefault(self.by_id[nid].part,[]).append((nid,value))
-        for part,items in by_part.items():
-            raw=self.parts[part] if self.format=='hwpx' else self.sections[part]
-            replacements=[]
-            for nid,value in items:
-                pos=self.positions[nid]
-                if self.format=='hwp': replacements.append((pos['start'],pos['end'],value.encode('utf-16le')))
-                elif pos['selfclose']:
-                    opening=raw[pos['start']:pos['inner_start']]
-                    replacements.append((pos['start'],pos['end'],opening[:-2]+b'>'+esc(value).encode()+b'</'+pos['qname'].encode()+b'>'))
-                else: replacements.append((pos['inner_start'],pos['inner_end'],esc(value).encode('utf-8')))
-            for start,end,new in sorted(replacements,reverse=True): raw=raw[:start]+new+raw[end:]
-            if self.format=='hwpx': self._xml(raw)
+        if not self.edits:
+            return self.original
+        require(not self.block_save, 'SAVE_BLOCKED', 'Saving is blocked.')
+        require(acknowledge_risks, 'RISK_ACK_REQUIRED', 'Edited output requires explicit acknowledgement of compatibility and stale-preview risks.')
+        changed = {}
+        by_part = {}
+        for node_id, value in self.edits.items():
+            by_part.setdefault(self.by_id[node_id].part, []).append((node_id, value))
+        for part, items in by_part.items():
+            raw = self.parts[part] if self.format == 'hwpx' else self.sections[part]
+            replacements = []
+            for node_id, value in items:
+                position = self.positions[node_id]
+                if self.format == 'hwp':
+                    replacements.append((position['start'], position['end'], value.encode('utf-16le')))
+                elif position['selfclose']:
+                    opening = raw[position['start']:position['inner_start']]
+                    new = opening[:-2] + b'>' + esc(value).encode() + b'</' + position['qname'].encode() + b'>'
+                    replacements.append((position['start'], position['end'], new))
+                else:
+                    replacements.append((position['inner_start'], position['inner_end'], esc(value).encode('utf-8')))
+            for start, end, new in sorted(replacements, reverse=True):
+                raw = raw[:start] + new + raw[end:]
+            if self.format == 'hwpx':
+                self._xml(raw)
             elif self.compressed:
-                comp=zlib.compressobj(level=6,wbits=-15);raw=comp.compress(raw)+comp.flush()
-            changed[part]=raw
-        if self.format=='hwp': result=self.cfb.rewrite(changed)
+                compressor = zlib.compressobj(level=6, wbits=-15)
+                compressed = compressor.compress(raw) + compressor.flush()
+                if self.stream_trailers[part]:
+                    compressed += struct.pack('<II', zlib.crc32(raw), len(raw))
+                raw = compressed
+            changed[part] = raw
+        if self.format == 'hwp':
+            result = self.cfb.rewrite(changed)
         else:
-            buf=io.BytesIO()
-            with zipfile.ZipFile(buf,'w') as z:
-                z.comment=self.zip_comment
-                for info in self.zip_infos: z.writestr(info,changed.get(info.filename,self.parts[info.filename]))
-            result=buf.getvalue()
-        check=Document(result,self.name)
-        require(set(check.parts)==set(self.parts),'VERIFY_FAILED','Package inventory changed.')
-        for name,payload in self.parts.items():
-            if name not in changed: require(check.parts[name]==payload,'VERIFY_FAILED','Opaque part changed: '+name)
-        for nid,text in self.edits.items():
-            require(nid in check.by_id and check.by_id[nid].text==text,'VERIFY_FAILED','Edit was not preserved on reopen: '+nid)
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, 'w') as archive:
+                archive.comment = self.zip_comment
+                for info in self.zip_infos:
+                    archive.writestr(info, changed.get(info.filename, self.parts[info.filename]))
+            result = buffer.getvalue()
+        check = Document(result, self.name)
+        require(set(check.parts) == set(self.parts), 'VERIFY_FAILED', 'Package inventory changed.')
+        for name, payload in self.parts.items():
+            if name not in changed:
+                require(check.parts[name] == payload, 'VERIFY_FAILED', 'Opaque part changed: ' + name)
+        for node_id, text in self.edits.items():
+            require(node_id in check.by_id and check.by_id[node_id].text == text, 'VERIFY_FAILED', 'Edit was not preserved on reopen: ' + node_id)
         return result

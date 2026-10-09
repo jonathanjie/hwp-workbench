@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>HWP Workbench — palette concept</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="concept.css">
+<style>
+.scrim { position: fixed; inset: 0; background: rgba(232,231,227,.35); backdrop-filter: blur(1.5px); z-index: 9; }
+.palette {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); width: 640px; z-index: 11;
+  background: var(--island); color: var(--island-ink); border-radius: 22px;
+  box-shadow: 0 0 0 0.5px rgba(255,255,255,.06) inset, 0 30px 80px -20px rgba(0,0,0,.55), 0 4px 14px rgba(0,0,0,.25);
+  overflow: hidden;
+}
+.palette .top { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 10px; border-bottom: 0.5px solid var(--island-hairline); }
+.palette .seal { width: 30px; height: 30px; border-radius: 9px; background: #F4F2EC; display: grid; place-items: center; }
+.palette .seal img { width: 18px; }
+.palette .q { flex: 1; font-size: 15px; color: var(--island-ink); }
+.palette .q .caret { background: #fff; height: 18px; }
+.palette .scope { display: flex; gap: 4px; }
+.palette .scope span { font: 500 11px/1 var(--font-mono); padding: 5px 7px; border-radius: 6px; color: var(--island-ink-2); border: 0.5px solid var(--island-hairline); }
+.palette .scope span.on { color: var(--island-ink); background: var(--island-3); border-color: transparent; }
+.grp { padding: 10px 8px 4px; }
+.grp .lbl { font: 600 10px/1 var(--font-mono); letter-spacing: .09em; color: #6E6D69; padding: 4px 10px 8px; display: flex; justify-content: space-between; }
+.item { display: flex; align-items: center; gap: 11px; padding: 0 10px; height: 38px; border-radius: 10px; color: #DCDBD6; }
+.item.on { background: var(--island-3); color: #fff; }
+.item .ic { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: var(--island-2); color: var(--island-ink-2); }
+.item.on .ic { background: #3A3A38; color: #fff; }
+.item .ic svg { width: 13px; height: 13px; }
+.item .k { margin-left: auto; display: flex; gap: 3px; }
+.item .k span { font: 500 10.5px/1 var(--font-mono); color: var(--island-ink-2); border: 0.5px solid var(--island-hairline); border-radius: 5px; padding: 3px 5px; }
+.item .loc { font: 500 10.5px/1 var(--font-mono); color: #6E6D69; width: 34px; }
+.item mark { background: rgba(226,65,43,.28); color: #FFD9D2; border-radius: 3px; padding: 0 1px; }
+.item .ctx { color: var(--island-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .ctx b { color: #fff; font-weight: 500; }
+.foot { display: flex; gap: 14px; padding: 10px 18px 12px; border-top: 0.5px solid var(--island-hairline); font: 500 10.5px/1 var(--font-mono); color: #6E6D69; }
+.foot span { display: flex; gap: 6px; align-items: center; }
+.foot kbd { background: var(--island-2); border: 0; color: var(--island-ink-2); }
+</style>
+</head>
+<body>
+<div class="lights"><i></i><i></i><i></i></div>
+<main class="canvas" style="inset:0 0 0 0">
+  <div class="page-wrap" style="transform:translateX(-50%)"><div class="page"><img src="page-0.svg" alt=""></div></div>
+</main>
+<div class="scrim"></div>
+<div class="palette">
+  <div class="top">
+    <span class="seal"><img src="logo.svg" alt=""></span>
+    <span class="q">예시 문장<span class="caret"></span></span>
+    <span class="scope"><span class="on">전체</span><span>명령</span><span>본문</span></span>
+  </div>
+  <div class="grp">
+    <div class="lbl"><span>COMMANDS</span></div>
+    <div class="item on"><span class="ic"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 4h6M2 7h10M2 10h4"/><path d="M10 9.5l2 2m0-2l-2 2"/></svg></span>“예시 문장” 모두 바꾸기…<span class="k"><span>⌥</span><span>⌘</span><span>F</span></span></div>
+    <div class="item"><span class="ic"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="6" cy="6" r="3.5"/><path d="M8.6 8.6L12 12" stroke-linecap="round"/></svg></span>본문에서 찾기<span class="k"><span>⌘</span><span>F</span></span></div>
+  </div>
+  <div class="grp">
+    <div class="lbl"><span>IN DOCUMENT</span><span>38</span></div>
+    <div class="item"><span class="loc">P1</span><span class="ctx"><mark>예시 문장</mark> 2입니다. 이 문서는 표·문단 편집 기능 테스트용…</span></div>
+    <div class="item"><span class="loc">P2</span><span class="ctx"><b>(목적)</b> <mark>예시 문장</mark> 3입니다. 이 문서는 표·문단 편집 기능…</span></div>
+    <div class="item"><span class="loc">P3</span><span class="ctx"><b>(추진 전략)</b> <mark>예시 문장</mark> 4입니다. 한빛대학교 관련 가상…</span></div>
+    <div class="item"><span class="loc">T1</span><span class="ctx"><b>표 1 · 2행 3열</b> <mark>예시 문장</mark> 21</span></div>
+  </div>
+  <div class="foot"><span><kbd>↑↓</kbd> 이동</span><span><kbd>↵</kbd> 열기</span><span><kbd>tab</kbd> 범위</span><span style="margin-left:auto">rhwp · 6쪽</span></div>
+</div>
+</body>
+</html>

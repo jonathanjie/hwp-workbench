@@ -1,20 +1,131 @@
-[
-  {
-    "name": "pyhwp-aligns.hwp",
-    "hancomCertified": false,
-    "status": "not-run",
-    "reason": "Fixture not downloaded."
-  },
-  {
-    "name": "pyhwp-borderfill.hwp",
-    "hancomCertified": false,
-    "status": "not-run",
-    "reason": "Fixture not downloaded."
-  },
-  {
-    "name": "hwp-cli-report-tables.hwpx",
-    "hancomCertified": false,
-    "status": "not-run",
-    "reason": "Fixture not downloaded."
-  }
-]
+{
+  "suite": "public corpus: native save/reopen and independent rhwp render",
+  "generatedAt": "2026-10-09T13:58:26.611556+00:00",
+  "host": "MacBook-Air-3.local",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "python": "3.14.6",
+  "success": false,
+  "failures": 0,
+  "skipped": 2,
+  "results": [
+    {
+      "name": "pyhwp-aligns.hwp",
+      "hancomCertified": false,
+      "checks": {
+        "noop": {
+          "status": "passed",
+          "byteIdentical": true
+        },
+        "rhwpNoop": {
+          "status": "passed",
+          "version": "0.8.7",
+          "pageCount": 16,
+          "renderedPage": 0
+        },
+        "edit": {
+          "status": "passed",
+          "equalUtf16Length": true,
+          "reopenedAndVerified": true,
+          "sha256": "abe7095f5d925c79ff5d75e7e68c0533ceb217feb9a380273567c075a019d999"
+        },
+        "rhwpEdit": {
+          "status": "passed",
+          "version": "0.8.7",
+          "pageCount": 16,
+          "renderedPage": 0,
+          "editedTextFound": true
+        }
+      },
+      "sourceSha256": "b101b4faff3c65f88ac9f8f583219cf5825d0747be85dbe45174dcd84207a3d1",
+      "textNodes": 16,
+      "warnings": [
+        "DEFAULT_SCRIPT_STUB",
+        "HWP_EQUAL_LENGTH_ONLY",
+        "HWP_LAYOUT_NOT_RENDERED",
+        "PREVIEW_CACHE_RETAINED",
+        "LAYOUT_UNVERIFIED"
+      ],
+      "status": "passed"
+    },
+    {
+      "name": "pyhwp-borderfill.hwp",
+      "hancomCertified": false,
+      "checks": {
+        "noop": {
+          "status": "passed",
+          "byteIdentical": true
+        },
+        "rhwpNoop": {
+          "status": "passed",
+          "version": "0.8.7",
+          "pageCount": 1,
+          "renderedPage": 0
+        },
+        "edit": {
+          "status": "skipped",
+          "reason": "No printable body text."
+        },
+        "rhwpEdit": {
+          "status": "skipped",
+          "reason": "No edited output exists because the source has no editable text."
+        }
+      },
+      "sourceSha256": "49dee926351d25dcfa3ec448c8955426623bbc68d4a2ee7f1575691e8fd352a6",
+      "textNodes": 0,
+      "warnings": [
+        "DEFAULT_SCRIPT_STUB",
+        "HWP_EQUAL_LENGTH_ONLY",
+        "HWP_LAYOUT_NOT_RENDERED",
+        "PREVIEW_CACHE_RETAINED",
+        "LAYOUT_UNVERIFIED"
+      ],
+      "status": "partial"
+    },
+    {
+      "name": "hwp-cli-report-tables.hwpx",
+      "hancomCertified": false,
+      "checks": {
+        "noop": {
+          "status": "passed",
+          "byteIdentical": true
+        },
+        "rhwpNoop": {
+          "status": "passed",
+          "version": "0.8.7",
+          "pageCount": 6,
+          "renderedPage": 0
+        },
+        "edit": {
+          "status": "passed",
+          "equalUtf16Length": true,
+          "reopenedAndVerified": true,
+          "sha256": "742aeb8d5e76d0cc8631e5b32aae490353d82211fef32e4bffde2e58259e151d"
+        },
+        "rhwpEdit": {
+          "status": "passed",
+          "version": "0.8.7",
+          "pageCount": 6,
+          "renderedPage": 0,
+          "editedTextFound": true
+        }
+      },
+      "sourceSha256": "b304a203d977e3d32a33b2fea5ce7c5b01d0af74916fb30c60d96f355034de24",
+      "textNodes": 262,
+      "warnings": [
+        "FONT_METRICS_UNVERIFIED",
+        "FOOTNOTES",
+        "TABLE_LAYOUT",
+        "SHAPES",
+        "PAGE_NUMBERING",
+        "PREVIEW_CACHE_RETAINED",
+        "LAYOUT_UNVERIFIED"
+      ],
+      "status": "passed"
+    }
+  ],
+  "notTested": [
+    "Hancom reopen and layout comparison",
+    "Font metrics and visual fidelity"
+  ]
+}
