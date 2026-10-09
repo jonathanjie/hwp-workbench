@@ -14,7 +14,7 @@ The product requirement remains full HWP/HWPX editing with close official-docume
 | HWP | Open supported HWP 5.x containers, inspect/extract text, make length-changing text edits in existing plain text runs, save a new HWP copy. Hancom reflow is unverified. |
 | Conversion | Explicit, reported HWP/HWPX/DOCX export through HWPX. Direct Python DOCX mapping; native format export uses optional rhwp. DOC/ODT/RTF import requires optional LibreOffice. Lossy and unqualified for Hancom layout. |
 | Desktop | English/Korean UI; outline/search; selectable structured preview; text inspector; staged undo/redo; change review; local staged-patch recovery; native open/save-dialog wiring. |
-| Preservation | Original file never overwritten; untouched payloads retained; changes bound to the source hash and expected text; output reopened by this engine before publication. |
+| Preservation | `apply` writes new files; explicit `save` verifies and replaces with a kept previous version; untouched payloads retained; changes bound to the source hash and expected text. |
 | Agents | Shared native read/search/edit/plan/apply operations, bounded proposals and session reports, plus an installable Claude Code/Codex skill. CLI and MCP use the same engine as the desktop. |
 | Packaging | Apple Silicon developer `.app` packaging script and private GitHub publishing script. Neither has been executed on a Mac in this build environment. |
 
@@ -77,6 +77,8 @@ Explicit conversion is separate from save. First inspect a dry-run report:
 Without **both** output and risk acknowledgement, conversion returns a report and writes no file. Existing outputs are refused. The report lists the route, engine loss reports, unsupported feature counts, and a comparison of readable paragraph text. A zero-loss rhwp report does not cover Python import losses or prove matching layout. Review the complete report and compare the new file in Hancom before official use. See `docs/COMPATIBILITY.md`.
 
 JSON is the default output. Errors are JSON on stderr with exit code 2. `validate` checks bounded parsing and container structure; it is **not** a full HWPX schema or Hancom-rendering validation. Re-running the final command with an existing output fails instead of replacing the file.
+
+The engine and CLI also support `hwp-workbench save PATH --patch FILE --acknowledge-risks [--backup-dir DIR]`. This verifies a same-format edit, keeps the original bytes in `<document folder>/.hwp-workbench/backups/` by default, and atomically replaces the source while keeping its mode. It retains ten previous versions and refuses changed, read-only or symlinked sources. `apply` and conversions still write new files; agents use new files or proposals by default. Desktop Save wiring comes later. See [the save contract](docs/AGENT-INTERFACE.md#save-in-place) for refusal codes and independent-check limits.
 
 A corresponding HWP example is in `examples/legacy.patch.json`:
 
