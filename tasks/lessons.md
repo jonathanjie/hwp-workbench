@@ -195,3 +195,9 @@
 - **Trigger:** The R6 port found that the Python DOCX writer keeps only one of two model cells that occupy the same grid position, with no loss report. Python integers also let an absurd border width pass, and one 1 MiB text run of tabs produced a million XML objects.
 - **Rule:** When cells overlap, refuse the conversion with an error; never keep one and drop the other. Check generated control counts against the node budget before you allocate XML. Range-check numeric conversions and report `LIMIT` instead of saturating.
 - **Why:** Writers that resolve conflicts quietly lose content that the loss report never mentions.
+
+### Test saves on a real FAT or exFAT volume
+- **Date:** 2026-10-10
+- **Trigger:** Save in place failed on exFAT in both engines: hard links are unsupported (errno 45), the exchange rename fails with `ENOTSUP` (45, not `EOPNOTSUPP` 102 on macOS), and the copy fallback then refused because exFAT invents a new inode number per lookup.
+- **Rule:** Try hard links and exchange first; on unsupported errors use verified exclusive copies and checked renames. Choose identity checks per volume (`fstatfs`): inodes where stable, else device, size, modification time and a descriptor-read SHA-256. Run the save probe on a mounted exFAT disk image (`hdiutil create -fs ExFAT`) as well as APFS; fault seams alone missed two of the three causes.
+- **Why:** USB drives shared with Windows are usually exFAT; documents opened from them must save.
