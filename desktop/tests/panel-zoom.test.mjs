@@ -22,3 +22,11 @@ test('panel fits only overflow and restores zoom unless the person changed it', 
   panel.update(true);
   assert.equal(value, 60);
 });
+
+test('panel opening accounts for canvas padding and page margin space', () => {
+  let fitted = false;
+  const view = {entries: [{width: 794}], canvas: {clientWidth: 917}, zoom: 100, fit: false,
+    setZoom: value => { fitted = value === 'fit'; }};
+  new PanelZoom(view).update(true);
+  assert.equal(fitted, true);
+});

@@ -4,13 +4,14 @@ const {contextBridge, ipcRenderer, webUtils} = require('electron');
 contextBridge.exposeInMainWorld('hwp', Object.freeze({
   onCommand: callback => {
     const listener = (_event, command) => {
-      if (['language', 'palette', 'find', 'replace', 'shortcuts', 'undo', 'redo'].includes(command)) {
+      if (['open', 'save', 'saveCopy', 'language', 'palette', 'find', 'replace', 'shortcuts', 'undo', 'redo'].includes(command)) {
         callback(command);
       }
     };
     ipcRenderer.on('app:command', listener);
     return () => ipcRenderer.removeListener('app:command', listener);
   },
+  keyScheme: scheme => ipcRenderer.invoke('keyboard:scheme', scheme),
   agentsStatus: () => ipcRenderer.invoke('agents:status'),
   installSkill: target => ipcRenderer.invoke('agents:install-skill', target),
   copyMcp: client => ipcRenderer.invoke('agents:copy-mcp', client),
@@ -60,7 +61,10 @@ contextBridge.exposeInMainWorld('hwp', Object.freeze({
   openRecent: id => ipcRenderer.invoke('document:open-recent', id),
   cacheThumbnail: (id, png) => ipcRenderer.invoke('document:cache-thumbnail', id, png),
   preview: patch => ipcRenderer.invoke('document:preview', patch),
+  format: nodeId => ipcRenderer.invoke('document:format', nodeId),
   plan: patch => ipcRenderer.invoke('document:plan', patch),
+  save: (patch, acknowledgement) => ipcRenderer.invoke('document:save-in-place', patch, acknowledgement),
+  showPrevious: () => ipcRenderer.invoke('shell:reveal-previous'),
   saveCopy: (patch, acknowledgement) => ipcRenderer.invoke('document:save', patch, acknowledgement),
   showSaved: () => ipcRenderer.invoke('shell:reveal-output'),
   exportPatch: patch => ipcRenderer.invoke('document:export-patch', patch),

@@ -116,3 +116,9 @@
 - **Trigger:** A save failure-injection test changed the source to invalid native bytes; parsing returned `UNSUPPORTED_FORMAT` before the stale revision was identified.
 - **Rule:** Read bounded source bytes and compare the save patch's source hash before parsing them. Return `SOURCE_CHANGED` for an external revision change; keep the complete patch and native verification checks before replacement.
 - **Why:** A changed file can also become unreadable. Parsing must not hide the save revision conflict.
+
+### Call browser timer functions unbound
+- **Date:** 2026-10-10
+- **Trigger:** The keymap stored `setTimeout` as a property and called `this.setTimer(...)`. Chromium threw "Illegal invocation", so the ⌃G, C chord never ran. Node allows the call, so unit tests passed.
+- **Rule:** Wrap injected timer functions in closures that call them unbound. Unit-test injected platform functions with strict functions that assert `this` is undefined.
+- **Why:** Web platform functions check their receiver; Node's do not.

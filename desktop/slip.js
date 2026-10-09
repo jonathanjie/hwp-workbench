@@ -91,7 +91,7 @@ export class ProofSlip {
     } else if (event.key === 'Enter' && command) {
       event.preventDefault();
       this.stage();
-    } else if (event.key === 'Enter' && !event.isComposing) {
+    } else if (event.key === 'Enter' && !event.isComposing && !event.altKey && !event.shiftKey && !command) {
       // Paragraph text has no line breaks. macOS Korean input also sends a
       // plain Enter after the Enter that commits a syllable.
       event.preventDefault();

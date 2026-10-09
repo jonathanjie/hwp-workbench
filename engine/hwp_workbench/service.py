@@ -8,6 +8,7 @@ from .independent import check_output
 from .errors import require
 from .workspace import Workspace
 from .convert.operation import convert
+from .format_readout import read_format
 
 MAX_PREVIEW_BYTES = 64 * 1024 * 1024
 
@@ -91,7 +92,7 @@ def invoke(root, method: str, args: dict) -> dict:
     require(isinstance(method, str), 'BAD_ARGUMENTS', 'method must be a string.')
     if method == 'capabilities':
         return CAPABILITIES
-    require(method in CAPABILITIES['operations'] or method == 'preview', 'UNKNOWN_METHOD', 'Unknown operation: ' + method)
+    require(method in CAPABILITIES['operations'] or method in {'preview', 'format'}, 'UNKNOWN_METHOD', 'Unknown operation: ' + method)
     ws = Workspace(root)
     if method == 'convert':
         return convert(ws, args)
@@ -104,6 +105,8 @@ def invoke(root, method: str, args: dict) -> dict:
         require(save_patch.get('baseSha256') == sha(source), 'SOURCE_CHANGED',
                 'Document differs from the opened revision; read it again before saving.')
     doc = Document(source, Path(path).name)
+    if method == 'format':
+        return read_format(doc, args.get('nodeId'))
     if method == 'session':
         return agent_link.session(ws, path, doc)
     if method == 'propose':

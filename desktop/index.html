@@ -17,7 +17,7 @@
     <button id="dirty" class="chip edits" hidden></button>
     <button id="agentChip" class="chip agent" hidden></button>
     <button id="paletteButton" class="cmd" data-title="commands"><span>⌘</span><span>K</span></button>
-    <button id="save" class="save" hidden disabled><span data-label="saveCopy"></span><kbd>⌘S</kbd></button>
+    <button id="save" class="save" hidden disabled><span data-label="save"></span><kbd>⌘S</kbd></button>
   </header>
   <section id="empty" class="welcome">
     <div class="center">
@@ -64,7 +64,7 @@
         <div id="changes"></div>
       </section>
       <section id="agentPanel" class="panel-content" role="tabpanel" aria-labelledby="agentTab" hidden><label class="agent-link"><span data-label="agentLink"></span><input id="agentLinkSwitch" type="checkbox" role="switch"></label><div id="agentInbox"></div><div id="panelAgents"></div></section>
-      <section id="checksPanel" class="panel-content" role="tabpanel" aria-labelledby="checksTab" hidden><div id="checkTags" class="check-tags"></div><details id="warningDetails"><summary data-label="warningDetails"></summary><div id="warnings"></div></details><div class="section-label" data-label="fontSubstitutions"></div><div id="fontSubstitutions"></div></section>
+      <section id="checksPanel" class="panel-content" role="tabpanel" aria-labelledby="checksTab" hidden><div id="checkTags" class="check-tags"></div><details id="warningDetails"><summary data-label="warningDetails"></summary><div id="warnings"></div></details><div class="section-label" data-label="fontSubstitutions"></div><div id="fontSubstitutions"></div><div class="font-note" data-label="fontInstall"></div></section>
       <div class="foot"><span class="tag off" data-label="layoutUnverified"></span><span id="structureChip" class="tag part" data-label="structure" hidden></span></div>
     </aside>
     <div class="capsule">
@@ -72,7 +72,7 @@
       <button id="zoomValue" class="val" data-title="fitWidth">100%</button>
       <button id="zoomIn" class="icon-btn" data-title="zoomIn">+</button>
       <span class="sep"></span><span id="pageCounter" class="val">1 / 1</span>
-      <span class="sep"></span><span id="previewStatus" class="note" data-label="preview"></span>
+      <span class="sep"></span><span id="chordPending" class="val" aria-live="polite"></span><span id="previewStatus" class="note" data-label="preview"></span>
     </div>
   </div>
   <div id="status" class="status" role="status" aria-live="polite"></div>
@@ -89,7 +89,9 @@
     <div id="paletteResults" class="results" role="listbox"></div>
     <div class="foot"><span><kbd>↑↓</kbd><span data-label="navigate"></span></span><span><kbd>↵</kbd><span data-label="run"></span></span><span><kbd>tab</kbd><span data-label="scope"></span></span><span class="palette-note" data-label="preview"></span></div>
   </dialog>
-  <dialog id="shortcutsDialog" class="sheet" data-aria="shortcuts"><header><strong data-label="shortcuts"></strong><button id="closeShortcuts" class="btn ghost" data-title="close">×</button></header><div id="shortcutItems"></div></dialog>
+  <dialog id="shortcutsDialog" class="sheet" data-aria="shortcuts"><header><strong data-label="shortcuts"></strong><button id="closeShortcuts" class="btn ghost" data-title="close">×</button></header><select id="keyScheme" data-title="keyScheme"><option value="windows">Windows 한글</option><option value="mac">Mac</option></select><div id="shortcutItems"></div></dialog>
+  <dialog id="symbolDialog" class="sheet symbol-picker"></dialog>
+  <dialog id="formatDialog" class="sheet format-card"></dialog>
   <script type="module" src="renderer.js"></script>
 </body>
 </html>

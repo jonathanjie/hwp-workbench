@@ -1,3 +1,4 @@
+import {controlMarks, inlineFieldMarks} from './control-marks.js';
 import {changedRanges} from './preview.js';
 import {matchBounds} from './search-layout.js';
 import {createFontMapper} from './fonts.js';
@@ -27,6 +28,7 @@ export class PageView {
     this.translate = translate;
     this.zoom = 100;
     this.fit = false;
+    this.controlMarksVisible = false;
     this.entries = [];
     this.resize = new ResizeObserver(() => {
       if (this.fit) {
@@ -63,7 +65,7 @@ export class PageView {
     }
   }
 
-  async open(bytes, nodes, {detached = false, visible = [0]} = {}) {
+  async open(bytes, nodes, {detached = false, visible = [0], requestedFonts = []} = {}) {
     this.clear();
     this.detached = detached;
     this.resize.observe(this.canvas);
@@ -72,6 +74,7 @@ export class PageView {
     this.searchMatches = [];
     this.searchActive = -1;
     this.fonts = createFontMapper(this.onFonts);
+    this.fonts.requested(requestedFonts);
     globalThis.measureTextWidth = this.fonts.measure;
     runtime ??= import(`${VENDOR}rhwp.js`).then(async module => {
       await module.default({module_or_path: `${VENDOR}rhwp_bg.wasm`});
@@ -218,6 +221,11 @@ export class PageView {
     entry.marks.className = 'mark-layer';
     entry.page.append(image, entry.marks, entry.hits);
     entry.groups = paragraphBounds(entry.runs);
+    try {
+      entry.controls = JSON.parse(this.document.getPageControlLayout(index)).controls || [];
+    } catch {
+      entry.controls = [];
+    }
     for (const {run, node} of entry.mapped) {
       const hit = document.createElement('button');
       hit.className = 'text-hit';
@@ -281,6 +289,16 @@ export class PageView {
         }
       });
     }
+    if (this.controlMarksVisible) {
+      entry.fieldMarks ??= inlineFieldMarks(this.document, entry.mapped);
+      const marks = [...controlMarks(entry.controls || [], entry.mapped, entry.groups), ...entry.fieldMarks];
+      for (const mark of marks) {
+        const overlay = this.overlay(entry, mark.bounds, `control-mark ${mark.type}`);
+        overlay.dataset.control = mark.type;
+        overlay.textContent = mark.type === 'paragraphEnd' ? '¶' : mark.type === 'locked' ? '▣' : '';
+        overlay.setAttribute('aria-hidden', 'true');
+      }
+    }
     const ids = Object.keys(this.edits);
     for (const group of entry.groups) {
       const changed = entry.mapped.filter(item => group.runs.includes(item.run) && item.node && Object.hasOwn(this.edits, item.node.id));
@@ -307,6 +325,11 @@ export class PageView {
     }
   }
 
+  showControlMarks(visible) {
+    this.controlMarksVisible = visible;
+    this.entries.forEach(entry => this.drawMarks(entry));
+  }
+
   updateSearch(matches, active) {
     this.searchMatches = matches;
     this.searchActive = active;
@@ -328,7 +351,7 @@ export class PageView {
   setZoom(value) {
     this.fit = value === 'fit';
     const width = this.entries[0]?.width || 794;
-    this.zoom = this.fit ? Math.max(10, Math.min(200, (this.canvas.clientWidth - 108) / width * 100)) : value;
+    this.zoom = this.fit ? Math.max(10, Math.min(200, (this.canvas.clientWidth - 216) / width * 100)) : value;
     this.entries.forEach(entry => this.sizePage(entry));
     const percent = Math.round(this.zoom);
     this.onZoom(percent);

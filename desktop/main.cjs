@@ -12,6 +12,10 @@ const {AgentTools} = require('./agent-tools.cjs');
 const {AgentInbox} = require('./agent-inbox.cjs');
 const {readDocumentBytes} = require('./document-bytes.cjs');
 
+const {installMenu} = require('./menu.cjs');
+const {LatestPreview} = require('./preview-lane.cjs');
+const previews = new LatestPreview();
+
 const ROOT = path.resolve(__dirname, '..');
 const INDEX = 'app://workbench/index.html';
 // Honor Chromium's explicit profile-directory option for isolated app runs.
@@ -36,6 +40,8 @@ const agentTools = new AgentTools({
   copy: text => clipboard.writeText(text),
   reveal: file => shell.showItemInFolder(file)
 });
+const previousReveal = new OutputReveal(file => shell.showItemInFolder(file));
+const reviewedFiles = new Set();
 const outputReveal = new OutputReveal(file => shell.showItemInFolder(file));
 let queue = Promise.resolve();
 let recentStore;
@@ -57,7 +63,7 @@ protocol.registerSchemesAsPrivileged([{scheme: 'app', privileges: {
   corsEnabled: true
 }}]);
 
-function callEngine(root, method, args) {
+function callEngine(root, method, args, signal) {
   const payload = JSON.stringify({method, args});
   if (Buffer.byteLength(payload) > 4 * 1024 * 1024) {
     return Promise.reject(Error('Request too large'));
@@ -91,6 +97,10 @@ function callEngine(root, method, args) {
         resolve(value);
       }
     }
+    signal?.addEventListener('abort', () => {
+      child.kill('SIGKILL');
+      finish(Error('Preview dropped'));
+    }, {once: true});
     child.on('error', () => finish(Error('Python unavailable')));
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
@@ -113,7 +123,11 @@ function callEngine(root, method, args) {
       if (code !== 0) {
         let message = 'Engine failed';
         try {
-          message = JSON.parse(errorOutput).error.message;
+          const engineError = JSON.parse(errorOutput).error;
+          const error = Error(engineError.message);
+          error.code = engineError.code;
+          finish(error);
+          return;
         } catch {}
         finish(Error(message));
         return;
@@ -164,11 +178,13 @@ async function recordRecent(file, format) {
 }
 
 async function load(file) {
+  previews.cancel();
   file = await fs.realpath(file);
   const root = path.dirname(file);
   const document = await callEngine(root, 'inspect', {path: path.basename(file)});
   const recentId = await recordRecent(file, document.format);
-  current = {file, root, name: document.name, format: document.format, sha256: document.sha256, recentId};
+  const baseBytes = await readDocumentBytes(file, document.sha256);
+  current = {file, root, baseBytes, name: document.name, format: document.format, sha256: document.sha256, recentId};
   stagedPatch = null;
   editing = false;
   selection = null;
@@ -176,11 +192,12 @@ async function load(file) {
     await agentInbox.setDocument(current);
   }
   outputReveal.clear();
+  previousReveal.clear();
   let draft = null;
   try {
     draft = JSON.parse(await fs.readFile(draftPath(), 'utf8'));
   } catch {}
-  return {document, draft, recentId, agentLink: agentInbox?.state()};
+  return {document, draft, recentId, saveReviewed: reviewedFiles.has(file), agentLink: agentInbox?.state()};
 }
 
 function register(channel, fn) {
@@ -217,13 +234,23 @@ register('document:cache-thumbnail', (id, png) => {
   }
   return recents().cacheThumbnail(id, png);
 });
+register('document:format', nodeId => {
+  if (!current || (nodeId !== null && typeof nodeId !== 'string')) {
+    throw Error('Invalid format selection');
+  }
+  return callEngine(current.root, 'format', {path: path.basename(current.file), nodeId});
+});
 register('document:plan', patch => {
   validatePatch(patch);
   return callEngine(current.root, 'plan', {path: path.basename(current.file), patch});
 });
-register('document:preview', patch => {
+ipcMain.handle('document:preview', (event, patch) => {
+  guard(event);
   validatePatch(patch);
-  return callEngine(current.root, 'preview', {path: path.basename(current.file), patch});
+  const document = current;
+  return previews.run(signal => callEngine(document.root, 'preview', {
+    path: path.basename(document.file), patch
+  }, signal));
 });
 register('document:save', async (patch, acknowledgement) => {
   validatePatch(patch);
@@ -241,22 +268,70 @@ register('document:save', async (patch, acknowledgement) => {
   }
   // Only the native dialog grants an output path. The engine refuses overwrites.
   const output = path.resolve(result.filePath);
-  const from = path.resolve(current.file).split(path.sep);
-  const to = output.split(path.sep);
-  let index = 0;
-  while (index < from.length - 1 && index < to.length - 1 && from[index] === to[index]) {
-    index += 1;
+  // Save As uses the opened revision, even if another app changed disk bytes.
+  // The native dialog grants this destination folder. The private snapshot is
+  // removed after the engine verifies and publishes a new, non-overwriting file.
+  const root = await fs.realpath(path.dirname(output));
+  const temporary = await fs.mkdtemp(path.join(root, '.hwp-workbench-copy-'));
+  let report;
+  try {
+    const snapshot = path.join(temporary, path.basename(current.file));
+    await fs.writeFile(snapshot, current.baseBytes, {flag: 'wx', mode: 0o600});
+    report = await callEngine(root, 'apply', {
+      path: path.relative(root, snapshot), output: path.basename(output),
+      patch, acknowledgeRisks: true
+    });
+  } finally {
+    await fs.rm(temporary, {recursive: true, force: true});
   }
-  const root = from.slice(0, index).join(path.sep) || path.parse(current.file).root;
-  const report = await callEngine(root, 'apply', {
-    path: path.relative(root, current.file),
-    output: path.relative(root, output),
-    patch,
-    acknowledgeRisks: true
-  });
   outputReveal.saved(output);
   return {...report, name: path.basename(output)};
 });
+register('document:save-in-place', async (patch, acknowledgement) => {
+  validatePatch(patch);
+  const file = current.file;
+  if (!reviewedFiles.has(file) && acknowledgement !== true) {
+    throw Error('Compatibility acknowledgement required');
+  }
+  // The acknowledgement belongs to this document session, including a
+  // cancelled conflict dialog. It does not need another review sheet.
+  reviewedFiles.add(file);
+  previews.cancel();
+  const oldDraft = draftPath();
+  let report;
+  try {
+    report = await callEngine(current.root, 'save', {
+      path: path.basename(file), patch, acknowledgeRisks: true
+    });
+  } catch (error) {
+    if (error.code === 'SOURCE_CHANGED') {
+      const result = await dialog.showMessageBox(win, {
+        type: 'warning', message: 'Source changed / 원본 변경됨',
+        buttons: ['Reload / 불러오기 다시', 'Save As / 다른 이름으로 저장', 'Cancel / 취소'],
+        defaultId: 2, cancelId: 2
+      });
+      if (result.response === 0) {
+        return {action: 'reload', opened: await load(file)};
+      }
+      return {action: result.response === 1 ? 'saveAs' : 'cancel'};
+    }
+    if (error.code === 'READ_ONLY_DOCUMENT') {
+      const result = await dialog.showMessageBox(win, {
+        type: 'warning', message: 'Read-only document / 읽기 전용 문서',
+        buttons: ['Save As / 다른 이름으로 저장', 'Cancel / 취소'],
+        defaultId: 0, cancelId: 1
+      });
+      return {action: result.response === 0 ? 'saveAs' : 'cancel'};
+    }
+    throw error;
+  }
+  await fs.rm(oldDraft, {force: true});
+  const opened = await load(file);
+  // Only an engine-issued workspace-relative backup grants Reveal access.
+  previousReveal.saved(path.resolve(current.root, report.backup));
+  return {action: 'saved', opened, warnings: report.warnings};
+});
+register('shell:reveal-previous', (...args) => previousReveal.show(...args));
 register('shell:reveal-output', (...args) => outputReveal.show(...args));
 register('document:export-patch', async patch => {
   validatePatch(patch);
@@ -314,6 +389,12 @@ register('agent:selection', value => {
   return true;
 });
 register('agent:decide', (file, ids, accepted) => agentInbox.decide(file, ids, accepted));
+register('keyboard:scheme', scheme => {
+  if (!['windows', 'mac'].includes(scheme)) {
+    throw Error('Invalid keyboard scheme');
+  }
+  return installMenu({Menu, app, win}, scheme).then(() => true);
+});
 register('clipboard:copy', text => {
   if (typeof text !== 'string' || text.length > 4096) {
     throw Error('Invalid clipboard text');
@@ -396,7 +477,7 @@ if (primaryInstance) {
     handoff = new OpenHandoff({
       hasStaged: () => !!stagedPatch?.operations.length || editing,
       confirm: async () => (await dialog.showMessageBox(win, {
-        type: 'question', buttons: ['Keep editing / 계속 편집', 'Open document / 문서 열기'],
+        type: 'question', buttons: ['Keep editing / 계속 편집', 'Open document / 문서 불러오기'],
         defaultId: 0, cancelId: 0,
         message: 'Unsaved text / 저장하지 않은 텍스트'
       })).response === 1,
@@ -429,20 +510,7 @@ if (primaryInstance) {
         win.destroy();
       }
     });
-    Menu.setApplicationMenu(Menu.buildFromTemplate([
-      {label: app.name, submenu: [{role: 'about'}, {type: 'separator'}, {role: 'quit'}]},
-      {label: 'Edit / 편집', submenu: [
-        {id: 'undo', label: 'Undo / 실행 취소', accelerator: 'CommandOrControl+Z', click: () => win.webContents.send('app:command', 'undo')},
-        {id: 'redo', label: 'Redo / 다시 실행', accelerator: 'CommandOrControl+Shift+Z', click: () => win.webContents.send('app:command', 'redo')},
-        {type: 'separator'}, {role: 'cut'}, {role: 'copy'}, {role: 'paste'}, {role: 'selectAll'}
-      ]},
-      {label: 'View / 보기', submenu: [
-        {label: 'Commands / 명령', click: () => win.webContents.send('app:command', 'palette')},
-        {label: 'Language / 언어', click: () => win.webContents.send('app:command', 'language')},
-        {label: 'Keyboard shortcuts / 키보드 단축키', click: () => win.webContents.send('app:command', 'shortcuts')},
-        {role: 'togglefullscreen'}
-      ]}
-    ]));
+    installMenu({Menu, app, win}, 'windows');
     win.loadURL(INDEX);
   });
 }

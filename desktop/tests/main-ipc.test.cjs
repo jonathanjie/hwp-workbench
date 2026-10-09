@@ -77,6 +77,7 @@ test('main IPC enforces sender, id, drop, acknowledgement, reveal and non-overwr
     await assert.rejects(app.invoke('document:cache-thumbnail', 'wrong', 'data:image/png;base64,'), /Invalid thumbnail document/);
     await assert.rejects(app.invoke('document:bytes', source), /No document/);
     const node = opened.document.nodes.find(node => node.editable);
+    assert.equal((await app.invoke('document:format', node.id)).character.size, 22);
     const patch = {schemaVersion: 1, baseSha256: opened.document.sha256, operations: [
       {op: 'set_text', nodeId: node.id, expectedText: node.text, text: node.text + ' 검토'}
     ]};
@@ -156,6 +157,75 @@ test('queued handoffs wait for the renderer before switching to the next documen
     assert.equal(app.sent.filter(item => item.channel === 'document:handoff').length, 2);
     await app.invoke('document:handoff-ready');
   } finally {
+    await fs.rm(directory, {recursive: true, force: true});
+  }
+});
+
+test('in-place save reloads its revision, retains two versions and refuses disk conflicts', async () => {
+  const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'hwp-save-ipc-')));
+  try {
+    const source = path.join(directory, 'source.hwpx');
+    const original = await fs.readFile(path.join(root, 'fixtures/generated/review-form.hwpx'));
+    await fs.writeFile(source, original);
+    const app = await host(directory, source);
+    const dialogs = [];
+    app.dialog.showMessageBox = async (_window, options) => {
+      dialogs.push(options);
+      return {response: 2};
+    };
+    let opened = await app.invoke('document:open');
+    const patchFor = () => {
+      const node = opened.document.nodes.find(item => item.editable);
+      return {schemaVersion: 1, baseSha256: opened.document.sha256, operations: [
+        {op: 'set_text', nodeId: node.id, expectedText: node.text, text: node.text + ' 검토'}
+      ]};
+    };
+    await assert.rejects(app.invoke('document:save-in-place', patchFor(), false), /acknowledgement/);
+    await app.invoke('document:draft', patchFor());
+    opened = (await app.invoke('document:save-in-place', patchFor(), true)).opened;
+    assert.equal(opened.draft, null);
+    assert.notDeepEqual(await fs.readFile(source), original);
+    opened = (await app.invoke('document:save-in-place', patchFor(), false)).opened;
+    assert.equal((await fs.readdir(path.join(directory, '.hwp-workbench/backups'))).length, 2);
+    await assert.rejects(app.invoke('shell:reveal-previous', source), /arguments/);
+    await app.invoke('shell:reveal-previous');
+    assert.ok(app.revealed[0].startsWith(path.join(directory, '.hwp-workbench/backups/')));
+    await fs.writeFile(source, original);
+    assert.equal((await app.invoke('document:save-in-place', patchFor(), false)).action, 'cancel');
+    assert.deepEqual(await fs.readFile(source), original);
+    assert.equal(dialogs.length, 1);
+    assert.equal(dialogs[0].buttons.length, 3);
+  } finally {
+    await fs.rm(directory, {recursive: true, force: true});
+  }
+});
+
+test('Save As keeps opened bytes after an external change and read-only save offers a copy', async () => {
+  const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'hwp-copy-ipc-')));
+  try {
+    const source = path.join(directory, 'source.hwpx');
+    const original = await fs.readFile(path.join(root, 'fixtures/generated/review-form.hwpx'));
+    await fs.writeFile(source, original);
+    const app = await host(directory, source);
+    const opened = await app.invoke('document:open');
+    const node = opened.document.nodes.find(item => item.editable);
+    const patch = {schemaVersion: 1, baseSha256: opened.document.sha256, operations: [
+      {op: 'set_text', nodeId: node.id, expectedText: node.text, text: node.text + ' 사본'}
+    ]};
+    const changed = Buffer.from('external bytes');
+    await fs.writeFile(source, changed);
+    await app.invoke('document:save', patch, true);
+    assert.deepEqual(await fs.readFile(source), changed);
+    assert.ok((await fs.stat(path.join(directory, 'copy.hwpx'))).size > 0);
+    await fs.writeFile(source, original);
+    await fs.chmod(source, 0o444);
+    app.dialog.showMessageBox = async (_win, options) => {
+      assert.equal(options.buttons.length, 2);
+      return {response: 0};
+    };
+    assert.equal((await app.invoke('document:save-in-place', patch, true)).action, 'saveAs');
+  } finally {
+    await fs.chmod(path.join(directory, 'source.hwpx'), 0o600).catch(() => {});
     await fs.rm(directory, {recursive: true, force: true});
   }
 });

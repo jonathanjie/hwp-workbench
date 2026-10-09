@@ -14,17 +14,28 @@ import {AgentsCard} from './agents-card.js';
 import {AgentPanel} from './agent-panel.js';
 import {textError} from './edit-model.js';
 import {previewNodes, commitPagePreview} from './preview.js';
+import {nativeCells, adjacentCell, stageCellBeforeMove} from './cells.js';
+import {SymbolPicker, insertSymbol} from './symbols.js';
+import {readRhwpFormat, mergeFormats, showFormat} from './format-card.js';
+import {KEYMAP, Keymap, keyLabel, shortcutFor} from './keymap.js';
 import {PanelZoom} from './panel-zoom.js';
 import {renderStructure} from './structure-view.js';
 
 const $ = id => document.getElementById(id);
+const keys = new Keymap({scheme: localStorage.getItem('hwp-key-scheme') === 'mac' ? 'mac' : 'windows',
+  onPending: value => { $('chordPending').textContent = value; }});
 const toast = new Toast($('toast'));
 let reviewFocus;
+let saveMode = 'save';
+let saveReviewed = false;
 let documentData = null;
 let model = null;
 let busy = false;
 let structure = false;
+let controlMarksVisible = false;
 let substitutions = [];
+let selectedNode = null;
+let compositionActive = false;
 let locations = new Map();
 let lastStatus = null;
 let activeTab = 'changes';
@@ -57,11 +68,32 @@ const slip = new ProofSlip($('slipHost'), (node, text) => {
   return true;
 }, id => revert(id));
 
+const symbolPicker = new SymbolPicker($('symbolDialog'), symbol => {
+  if (!slip.editor || !slip.node.editable) {
+    return;
+  }
+  const editor = slip.editor;
+  const result = insertSymbol(editor.value, symbolCaret.start, symbolCaret.end, symbol);
+  editor.value = result.text;
+  editor.setSelectionRange(result.caret, result.caret);
+  editor.dispatchEvent(new Event('input', {bubbles: true}));
+  editor.focus({preventScroll: true});
+});
+let symbolCaret;
+function openSymbols() {
+  if (!slip.editor || !slip.node.editable || busy) {
+    return;
+  }
+  symbolCaret = {start: slip.editor.selectionStart, end: slip.editor.selectionEnd};
+  symbolPicker.open();
+}
+
 function selectNode(node, location) {
   if (busy || (slip.dirty && !confirm(t('discard')))) {
     return;
   }
   node = model.nodes.get(node.id);
+  selectedNode = node;
   call('agentSelection', {nodeId: node.id, text: model.current(node)}).catch(error => status('failed', {reason: errorReason(error)}, true));
   slip.open(node, model.current(node), documentData.format, location, model.lengthChangingText);
 }
@@ -281,6 +313,9 @@ async function renderPreview(revision) {
   let candidate;
   try {
     const result = patch.operations.length ? await call('preview', patch) : null;
+    if (patch.operations.length && !result) {
+      return;
+    }
     const bytes = result ? Uint8Array.from(atob(result.bytesBase64), character => character.charCodeAt(0)) : await call('documentBytes');
     if (revision !== previewRevision || activeModel !== model) {
       return;
@@ -293,9 +328,10 @@ async function renderPreview(revision) {
       return bounds.bottom >= canvasBounds.top && bounds.top <= canvasBounds.bottom ? [index] : [];
     });
     candidate = new PageView(pageOptions(element('div'), element('div')));
+    candidate.controlMarksVisible = controlMarksVisible;
     candidate.zoom = pageView.zoom;
     candidate.fit = pageView.fit;
-    await candidate.open(bytes, previewNodes(documentData.nodes, activeModel.edits), {detached: true, visible: visible.length ? visible : [0]});
+    await candidate.open(bytes, previewNodes(documentData.nodes, activeModel.edits), {detached: true, visible: visible.length ? visible : [0], requestedFonts: documentData.fonts || []});
     await Promise.all(candidate.entries.flatMap(entry => entry.url ? [entry.page.querySelector('.page-image').decode()] : []));
     if (revision !== previewRevision || activeModel !== model) {
       candidate.clear();
@@ -428,7 +464,9 @@ async function completeOpen(result, failure = null) {
     }
     slip.close(false);
     findBar.close();
+    selectedNode = null;
     documentData = result.document;
+    saveReviewed = !!result.saveReviewed;
     agentsCard.refresh();
     model = new EditModel(documentData);
     locations = nodeLocations(documentData.view);
@@ -451,7 +489,8 @@ async function completeOpen(result, failure = null) {
     renderOutline();
     renderWarnings();
     const bytes = await call('documentBytes');
-    const rendered = await pageView.open(bytes, documentData.nodes);
+    const rendered = await pageView.open(bytes, documentData.nodes, {requestedFonts: documentData.fonts || []});
+    pageView.showControlMarks(controlMarksVisible);
     if (rendered) {
       pageView.updateEdits(model.edits, documentData.nodes, model.origins);
       $('status').textContent = '';
@@ -534,7 +573,8 @@ function renderReview() {
   $('reviewWarnings').replaceChildren(...compatibilityTags(documentData));
 }
 
-async function review() {
+async function review(mode = 'save') {
+  saveMode = mode;
   if (!model || busy || !Object.keys(model.edits).length) {
     return;
   }
@@ -546,7 +586,13 @@ async function review() {
   busy = true;
   updateControls();
   try {
-    await call('plan', model.patch());
+    if (mode === 'save' && saveReviewed) {
+      busy = false;
+      await save(true);
+      return;
+    }
+    // Both save operations validate the complete patch before publication.
+    $('confirmSave').textContent = t(mode === 'save' ? 'save' : 'saveCopy');
     renderReview();
     $('acknowledge').checked = false;
     reviewFocus = document.activeElement;
@@ -559,19 +605,40 @@ async function review() {
   }
 }
 
-async function save() {
-  if (busy || !$('acknowledge').checked || !Object.keys(model?.edits || {}).length || !$('reviewDialog').open) {
+async function save(direct = false) {
+  if (busy || (!direct && (!$('acknowledge').checked || !$('reviewDialog').open)) || !Object.keys(model?.edits || {}).length) {
     return;
   }
   busy = true;
   updateControls();
   try {
-    const result = await call('saveCopy', model.patch(), true);
+    if (saveMode === 'save') {
+      saveReviewed = true;
+    }
+    const result = await call(saveMode === 'save' ? 'save' : 'saveCopy', model.patch(), !direct);
+    if (result?.action === 'saveAs') {
+      busy = false;
+      $('reviewDialog').close();
+      await review('saveCopy');
+      return;
+    }
+    if (result?.opened) {
+      const scrollTop = $('canvas').scrollTop;
+      const scrollLeft = $('canvas').scrollLeft;
+      await completeOpen(result.opened);
+      saveReviewed = result.action === 'saved';
+      $('canvas').scrollTop = scrollTop;
+      $('canvas').scrollLeft = scrollLeft;
+    }
+    if (result?.action === 'cancel' || result?.action === 'reload') {
+      return;
+    }
     if (result) {
       $('reviewDialog').close();
-      toast.show('saved', {name: result.name}, {
+      const savedInPlace = result.action === 'saved';
+      toast.show(savedInPlace ? 'savedInPlace' : 'saved', {name: result.name}, {
         label: 'showInFinder',
-        run: () => call('showSaved').catch(error => status('failed', {reason: errorReason(error)}, true))
+        run: () => call(savedInPlace ? 'showPrevious' : 'showSaved').catch(error => status('failed', {reason: errorReason(error)}, true))
       });
       $('status').textContent = '';
       lastStatus = null;
@@ -661,6 +728,31 @@ function locateNode(node, openSlip = true) {
   }
 }
 
+function moveCell(direction) {
+  if (!slip.editor || slip.node?.role !== 'table-cell' || busy) {
+    return;
+  }
+  const id = slip.node.id;
+  if (!stageCellBeforeMove(slip)) {
+    return;
+  }
+  call('editing', false).catch(() => {});
+  const next = adjacentCell(nativeCells(documentData.view, documentData.nodes), id, direction);
+  if (next.skipped.length) {
+    toast.show('cellsSkipped', {n: next.skipped.length, reason: next.skipped.map(item => t(item.reason)).join(', ')});
+  }
+  if (next.node) {
+    slip.close(false);
+    locateNode(next.node);
+  }
+}
+function openCellSlip() {
+  const id = document.activeElement?.dataset.nodeId;
+  const node = model?.nodes.get(id) || selectedNode;
+  if (node?.role === 'table-cell') {
+    locateNode(node);
+  }
+}
 function nodeLocation(node) {
   return locations.get(node.id) || `P${node.anchor ? node.anchor.paragraph + 1 : node.paragraph || 1}`;
 }
@@ -740,22 +832,16 @@ function shortcuts() {
   if ($('shortcutsDialog').open) {
     return;
   }
-  const entries = [
-    {label: 'commands', shortcut: '⌘K'},
-    ...commandList.filter(command => command.shortcut),
-    {label: 'togglePanel', shortcut: '⌥⌘I'},
-    {label: 'stageShortcut', shortcut: '⌘↵'},
-    {label: 'closeShortcut', shortcut: 'Esc'},
-    {label: 'findNextShortcut', shortcut: '↵'},
-    {label: 'findPreviousShortcut', shortcut: '⇧↵'},
-    {label: 'paletteScopes', shortcut: 'Tab / ⇧Tab'},
-    {label: 'paletteMove', shortcut: '↑ / ↓'},
-    {label: 'paletteRun', shortcut: '↵'},
-    {label: 'panelTabs', shortcut: '← / → / Home / End'}
-  ];
-  $('shortcutItems').replaceChildren(...entries.map(command => {
+  $('keyScheme').value = keys.scheme;
+  const heading = element('div', 'shortcut');
+  heading.append(element('span', '', t('keyScheme')), element('span', '', keys.scheme === 'windows' ? 'Windows 한글 · Mac' : 'Mac'));
+  $('shortcutItems').replaceChildren(heading, ...KEYMAP.map(command => {
     const row = element('div', 'shortcut');
-    row.append(element('span', '', t(command.label)), element('kbd', '', command.shortcut));
+    row.append(element('span', '', t(command.id)));
+    if (keys.scheme === 'windows') {
+      row.append(element('kbd', '', command.windows.filter(key => !key.includes('Meta+')).map(key => keyLabel(key, true)).join(' / ') || '—'));
+    }
+    row.append(element('kbd', '', shortcutFor(command.id, keys.scheme)));
     return row;
   }));
   shortcutFocus = document.activeElement;
@@ -763,18 +849,46 @@ function shortcuts() {
 }
 
 let shortcutFocus;
+async function formatCard(kind) {
+  if (!documentData || busy) {
+    return;
+  }
+  const visible = pageView.entries.find(entry => entry.page.getBoundingClientRect().bottom > $('canvas').getBoundingClientRect().top + 64);
+  const node = (slip.editor && slip.node) || selectedNode || visible?.mapped.find(item => item.node)?.node || documentData.nodes[0];
+  try {
+    const previewNode = pageView.nodes?.find(item => item.id === node?.id) || node;
+    const native = readRhwpFormat(pageView.document, previewNode, [...(slip.editor?.value.slice(0, slip.editor.selectionStart) || '')].length);
+    const fallback = await call('format', node?.id || null);
+    showFormat($('formatDialog'), kind, mergeFormats(native, fallback));
+  } catch (error) {
+    status('failed', {reason: errorReason(error)}, true);
+  }
+}
 const needsDocument = () => !!documentData && !busy;
 const commandList = [
-  {label: 'open', shortcut: '⌘O', run: () => openDocument()},
+  {label: 'open', run: () => openDocument()},
+  {label: 'selectAll', enabled: needsDocument, run: () => runCommand('selectAll')},
+  {label: 'togglePanel', enabled: needsDocument, run: togglePanel},
+  ...['charFormat', 'paraFormat', 'pageFormat', 'styleFormat'].map(label => ({label, enabled: needsDocument, run: () => formatCard(label)})),
+  {label: 'symbols', enabled: () => needsDocument() && !!slip.editor && slip.node.editable, run: openSymbols},
+  {label: 'cellSlip', enabled: needsDocument, run: openCellSlip},
+  {label: 'nextCell', enabled: needsDocument, run: () => moveCell(1)},
+  {label: 'previousCell', enabled: needsDocument, run: () => moveCell(-1)},
+  {label: 'controlMarks', enabled: needsDocument, run: () => {
+    controlMarksVisible = !controlMarksVisible;
+    document.body.classList.toggle('control-marks', controlMarksVisible);
+    pageView.showControlMarks(controlMarksVisible);
+  }},
   {label: 'sample', run: () => openDocument('openDemo')},
-  {label: 'saveCopy', shortcut: '⌘S', enabled: () => needsDocument() && Object.keys(model.edits).length > 0, run: review},
-  {label: 'find', shortcut: '⌘F', enabled: needsDocument, run: () => openFind()},
-  {label: 'replace', shortcut: '⌥⌘F', enabled: needsDocument, run: () => openFind(true)},
-  {label: 'undo', shortcut: '⌘Z', enabled: () => needsDocument() && model.history.length > 0, run: () => historyAction()},
-  {label: 'redo', shortcut: '⇧⌘Z', enabled: () => needsDocument() && model.future.length > 0, run: () => historyAction(true)},
-  {label: 'zoomIn', shortcut: '⌘+', enabled: needsDocument, run: () => zoom(pageView.stepZoom(1))},
-  {label: 'zoomOut', shortcut: '⌘−', enabled: needsDocument, run: () => zoom(pageView.stepZoom(-1))},
-  {label: 'fitWidth', shortcut: '⌘0', enabled: needsDocument, run: () => zoom('fit')},
+  {label: 'save', enabled: () => needsDocument() && Object.keys(model.edits).length > 0, run: () => review()},
+  {label: 'saveCopy', enabled: () => needsDocument() && Object.keys(model.edits).length > 0, run: () => review('saveCopy')},
+  {label: 'find', enabled: needsDocument, run: () => openFind()},
+  {label: 'replace', enabled: needsDocument, run: () => openFind(true)},
+  {label: 'undo', enabled: () => needsDocument() && model.history.length > 0, run: () => historyAction()},
+  {label: 'redo', enabled: () => needsDocument() && model.future.length > 0, run: () => historyAction(true)},
+  {label: 'zoomIn', enabled: needsDocument, run: () => zoom(pageView.stepZoom(1))},
+  {label: 'zoomOut', enabled: needsDocument, run: () => zoom(pageView.stepZoom(-1))},
+  {label: 'fitWidth', enabled: needsDocument, run: () => zoom('fit')},
   {label: 'pages', enabled: needsDocument, run: () => railMode(false)},
   {label: 'outline', enabled: needsDocument, run: () => railMode(true)},
   ...['changes', 'agent', 'checks'].map(name => ({label: name, enabled: needsDocument, run: () => {
@@ -783,8 +897,25 @@ const commandList = [
   }})),
   {label: 'language', run: changeLanguage},
   ...['system', 'light', 'dark'].map(theme => ({label: `theme${theme[0].toUpperCase()}${theme.slice(1)}`, run: () => setTheme(theme)})),
-  {label: 'shortcuts', shortcut: '⌘/', run: shortcuts}
+  {label: 'schemeWindows', run: () => setKeyScheme('windows')},
+  {label: 'schemeMac', run: () => setKeyScheme('mac')},
+  {label: 'shortcuts', run: shortcuts}
 ];
+for (const command of commandList) {
+  Object.defineProperty(command, 'shortcut', {get: () => shortcutFor(command.label, keys.scheme), configurable: true, enumerable: true});
+}
+function setKeyScheme(scheme) {
+  keys.cancel();
+  keys.scheme = scheme;
+  localStorage.setItem('hwp-key-scheme', scheme);
+  call('keyScheme', scheme).catch(error => status('failed', {reason: errorReason(error)}, true));
+  if ($('shortcutsDialog').open) {
+    $('shortcutsDialog').close();
+    shortcuts();
+  }
+}
+$('keyScheme').onchange = event => setKeyScheme(event.target.value);
+call('keyScheme', keys.scheme).catch(() => {});
 const palette = new CommandPalette($('palette'), commandList, paletteTextResults, match => locateNode(match.node));
 $('paletteButton').onclick = () => palette.open();
 document.querySelector('.island').onclick = event => {
@@ -802,9 +933,9 @@ $('dirty').onclick = () => {
 };
 $('emptyOpen').onclick = () => openDocument();
 $('demo').onclick = () => openDocument('openDemo');
-$('save').onclick = review;
-$('review').onclick = review;
-$('confirmSave').onclick = save;
+$('save').onclick = () => review();
+$('review').onclick = () => review();
+$('confirmSave').onclick = () => save();
 $('acknowledge').onchange = updateControls;
 $('closeReview').onclick = () => $('reviewDialog').close();
 $('cancelReview').onclick = () => $('reviewDialog').close();
@@ -868,39 +999,61 @@ document.querySelector('.tabs').onkeydown = event => {
   }
 };
 
-document.addEventListener('keydown', event => {
-  if (!(event.metaKey || event.ctrlKey) || event.isComposing) {
+function runCommand(id) {
+  if (compositionActive) {
     return;
   }
-  const key = event.code.startsWith('Key') ? event.code.slice(3).toLowerCase() : event.code === 'Slash' ? '/' : event.key.toLowerCase();
-  if ($('reviewDialog').open || $('shortcutsDialog').open || (palette.dialog.open && key !== 'k')) {
-    return;
-  }
-  const typing = document.activeElement?.matches('input, textarea, [contenteditable]');
-  if (key === 'k') {
-    event.preventDefault();
+  if (id === 'palette') {
     palette.dialog.open ? palette.close() : palette.open();
-  } else if (key === 'f') {
-    event.preventDefault();
-    openFind(event.altKey);
-  } else if (key === '/') {
-    event.preventDefault();
-    shortcuts();
-  } else if (key === 'i' && event.altKey) {
-    event.preventDefault();
+    return;
+  }
+  if (id === 'selectAll') {
+    const field = document.activeElement;
+    if (typeof field?.select === 'function') {
+      field.select();
+    } else {
+      document.execCommand('selectAll');
+    }
+    return;
+  }
+  if (id === 'togglePanel') {
     togglePanel();
-  } else if (key === 'o') {
+    return;
+  }
+  if (['undo', 'redo'].includes(id) && document.activeElement?.matches('input, textarea, [contenteditable]')) {
+    document.execCommand(id);
+    return;
+  }
+  const command = commandList.find(command => command.label === id);
+  if (command && command.enabled?.() !== false) {
+    command.run();
+  }
+}
+document.addEventListener('compositionstart', () => {
+  compositionActive = true;
+  keys.cancel();
+});
+document.addEventListener('compositionend', () => { compositionActive = false; });
+document.addEventListener('keydown', event => {
+  if (event.defaultPrevented || event.isComposing) {
+    return;
+  }
+  if (compositionActive) {
+    return;
+  }
+  if (document.querySelector('dialog[open]') && !(palette.dialog.open && event.code === 'KeyK')) {
+    return;
+  }
+  // Tab is a cell command only inside a cell slip; elsewhere it stays native.
+  if (event.code === 'Tab' && !(slip.editor === document.activeElement && slip.node?.role === 'table-cell')) {
+    return;
+  }
+  const id = keys.match(event);
+  if (id) {
     event.preventDefault();
-    openDocument();
-  } else if (key === 's') {
-    event.preventDefault();
-    review();
-  } else if (key === 'z' && !typing) {
-    event.preventDefault();
-    historyAction(event.shiftKey);
-  } else if (['+', '=', '-', '0'].includes(key) && !typing) {
-    event.preventDefault();
-    zoom(key === '0' ? 'fit' : pageView.stepZoom(key === '-' ? -1 : 1));
+    if (!['pending', 'cancelChord'].includes(id)) {
+      runCommand(id);
+    }
   }
 });
 window.addEventListener('resize', () => slip.position());
@@ -928,23 +1081,7 @@ $('slipHost').addEventListener('click', () => {
 // Preload obtains a dropped file's path only from a trusted OS event.
 // The renderer accepts the switch before main changes the active document.
 window.hwp?.onDrop(beginOpen, completeOpen);
-window.hwp?.onCommand(command => {
-  if (command === 'language') {
-    changeLanguage();
-  } else if (command === 'palette') {
-    palette.open();
-  } else if (command === 'shortcuts') {
-    shortcuts();
-  } else if (command === 'undo' || command === 'redo') {
-    if (document.activeElement?.matches('input, textarea, [contenteditable]')) {
-      document.execCommand(command);
-    } else {
-      historyAction(command === 'redo');
-    }
-  } else {
-    openFind(command === 'replace');
-  }
-});
+window.hwp?.onCommand(command => command === 'language' ? changeLanguage() : runCommand(command));
 // A drop never navigates to local document content.
 let dragDepth = 0;
 document.addEventListener('dragenter', event => {

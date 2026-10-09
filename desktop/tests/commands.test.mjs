@@ -24,3 +24,9 @@ test('running a palette result leaves focus with the command or proof slip', asy
   assert.equal(restore, false);
   assert.equal(selected, match);
 });
+
+test('aliases search Hangul menu names in Korean and English', () => {
+  const commands = [{id: 'charFormat', en: 'Character format', ko: '글자 모양', aliases: ['글꼴', 'Font', 'Character shape']}];
+  assert.equal(matchingCommands(commands, '글꼴')[0]?.id, 'charFormat');
+  assert.equal(matchingCommands(commands, 'character shape')[0]?.id, 'charFormat');
+});

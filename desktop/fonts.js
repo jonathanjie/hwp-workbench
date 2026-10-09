@@ -1,8 +1,24 @@
+// Shared by canvas/SVG rendering and the requested-font Checks list.
+export const FONT_SUBSTITUTIONS = Object.freeze({
+  '맑은 고딕': 'Apple SD Gothic Neo', '굴림': 'Apple SD Gothic Neo', '돋움': 'Apple SD Gothic Neo',
+  '함초롬돋움': 'Apple SD Gothic Neo', '바탕': 'AppleMyungjo', '궁서': 'AppleMyungjo',
+  '함초롬바탕': 'AppleMyungjo', 'Malgun Gothic': 'Apple SD Gothic Neo',
+  'Gulim': 'Apple SD Gothic Neo', 'Dotum': 'Apple SD Gothic Neo',
+  'Batang': 'AppleMyungjo', 'Gungsuh': 'AppleMyungjo'
+});
+
+export function requestedFontSubstitutions(families, available) {
+  return [...new Set(families)].filter(family => !available(family)).map(from => ({from, to: macFontFamily(from)}));
+}
+
 export function macFontFamily(family) {
+  if (Object.hasOwn(FONT_SUBSTITUTIONS, family)) {
+    return FONT_SUBSTITUTIONS[family];
+  }
   if (/sans|gothic|고딕|돋움|굴림/i.test(family)) {
     return 'Apple SD Gothic Neo';
   }
-  if (/명조|바탕|batang|myeongjo|serif/i.test(family)) {
+  if (/명조|바탕|궁서|batang|gungsuh|myeongjo|serif/i.test(family)) {
     return 'AppleMyungjo';
   }
   return 'Apple SD Gothic Neo';
@@ -15,7 +31,7 @@ export function substituteFontFamily(list, available, onSubstitution = () => {})
   if (replacement !== family) {
     onSubstitution(family, replacement);
   }
-  const fallback = /명조|바탕|batang|myeongjo|serif/i.test(replacement) || replacement === 'AppleMyungjo' ? 'serif' : 'sans-serif';
+  const fallback = /명조|바탕|궁서|batang|gungsuh|myeongjo|serif/i.test(replacement) || replacement === 'AppleMyungjo' ? 'serif' : 'sans-serif';
   return `"${replacement.replaceAll('"', '')}", ${fallback}`;
 }
 
@@ -66,5 +82,11 @@ export function createFontMapper(onSubstitutions) {
     }
     return new XMLSerializer().serializeToString(parsed);
   }
-  return {measure, mapSvg};
+  function requested(families) {
+    for (const {from, to} of requestedFontSubstitutions(families, available)) {
+      substitutions.set(from, to);
+    }
+    onSubstitutions([...substitutions].map(([from, to]) => ({from, to})));
+  }
+  return {measure, mapSvg, requested};
 }

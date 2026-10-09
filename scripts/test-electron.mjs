@@ -202,6 +202,61 @@ try {
   await waitDocument('review-form.hwpx');
   assert.equal(await window.locator('#workspace p').count(), 0);
   assert.equal(await window.locator('#panel').isVisible(), false);
+  // C4: daily Windows Hangul keys run with physical codes in the default scheme.
+  await window.keyboard.press('Control+f');
+  await window.waitForSelector('#findBar:not([hidden])');
+  await window.locator('#findClose').click();
+  await application.evaluate(({dialog}, file) => {
+    dialog.showOpenDialog = async () => ({canceled: false, filePaths: [file]});
+  }, path.join(root, 'fixtures/generated/review-form.hwpx'));
+  await window.keyboard.press('Alt+o');
+  await waitDocument('review-form.hwpx');
+  await window.keyboard.press('Control+g');
+  assert.match(await window.locator('#chordPending').innerText(), /G/);
+  await window.keyboard.press('c');
+  assert.equal(await window.locator('body').evaluate(body => body.classList.contains('control-marks')), true);
+  await window.waitForSelector('.control-mark');
+  await window.keyboard.press('Control+g');
+  await window.keyboard.press('c');
+  await window.locator('.text-hit[data-node-id]:not([data-node-id=""]), .text-node').first().click();
+  await window.keyboard.press('Alt+l');
+  await window.waitForSelector('#formatDialog[open]');
+  assert.match(await window.locator('#formatDialog').innerText(), /Character shape/);
+  assert.match(await window.locator('#formatDialog').innerText(), /Apple SD Gothic Neo/);
+  assert.match(await window.locator('#formatDialog').innerText(), /22 pt/);
+  await window.keyboard.press('Escape');
+  const symbolOriginal = await window.locator('#textEdit').inputValue();
+  await window.locator('#textEdit').evaluate(editor => editor.setSelectionRange(0, 0));
+  await window.keyboard.press('Control+F10');
+  await window.waitForSelector('#symbolDialog[open]');
+  await window.locator('#symbolQuery').fill('reference');
+  await window.locator('.symbol-choice').first().click();
+  assert.equal(await window.locator('#textEdit').inputValue(), '※' + symbolOriginal);
+  await window.locator('#textEdit').fill(symbolOriginal);
+  await window.keyboard.press('Escape');
+  const cellDocument = engineRequest(root, 'inspect', {path: 'fixtures/generated/review-form.hwpx'});
+  const cellNodes = cellDocument.nodes.filter(node => node.role === 'table-cell' && node.editable);
+  await window.locator(`[data-node-id="${cellNodes[0].id}"]`).first().focus();
+  await window.keyboard.press('F5');
+  await window.waitForSelector('.slip');
+  await window.locator('#textEdit').fill(cellNodes[0].text + ' C4');
+  await window.keyboard.press('Tab');
+  await window.waitForFunction(text => document.getElementById('textEdit')?.value === text, cellNodes[1].text);
+  await window.keyboard.press('Shift+Tab');
+  await window.waitForFunction(text => document.getElementById('textEdit')?.value === text, cellNodes[0].text + ' C4');
+  const canvasFit = await window.locator('#canvas').evaluate(canvas => canvas.scrollWidth <= canvas.clientWidth + 1);
+  assert.equal(canvasFit, true);
+  const railFit = await window.locator('#thumbnails .sheet').first().evaluate(sheet => {
+    const bounds = sheet.getBoundingClientRect();
+    const rail = sheet.closest('.rail').getBoundingClientRect();
+    return bounds.width === 56 && bounds.height === 79 && bounds.left >= rail.left && bounds.right <= rail.right;
+  });
+  assert.equal(railFit, true);
+  await window.keyboard.press('Escape');
+  await shortcut('z');
+  await window.waitForFunction(() => document.querySelectorAll('#changes .change').length === 0);
+  checks.push('Windows Control-F, Option-O, Control-G C, Option-L values, F5 and cell Tab, Control-F10 symbol insertion, panel/rail fit');
+
   const closedWidth = await window.locator('#canvas').evaluate(element => element.clientWidth);
   await shortcut('Alt+i');
   assert.equal(await window.locator('#checksPanel').isVisible(), true);
@@ -233,6 +288,7 @@ try {
     };
     const composingEnterPassedToInput = !press('Enter', {isComposing: true});
     const plainEnterBlocked = press('Enter');
+    const optionReturnPassedToInput = !press('Enter', {altKey: true});
     press('Escape', {isComposing: true});
     const openAfterComposingEscape = !!document.querySelector('.slip');
     editor.value += ' 한글';
@@ -242,14 +298,14 @@ try {
     editor.dispatchEvent(new CompositionEvent('compositionend', {data: '글'}));
     await new Promise(resolve => setTimeout(resolve, 50));
     return {
-      composingEnterPassedToInput, plainEnterBlocked, openAfterComposingEscape, stagedBeforeCommit,
+      composingEnterPassedToInput, plainEnterBlocked, optionReturnPassedToInput, openAfterComposingEscape, stagedBeforeCommit,
       staged: document.querySelectorAll('#changes .change').length,
       inserted: document.querySelector('#changes ins')?.textContent,
       slipOpen: !!document.querySelector('.slip')
     };
   });
   assert.deepEqual(imeKeys, {
-    composingEnterPassedToInput: true, plainEnterBlocked: true, openAfterComposingEscape: true,
+    composingEnterPassedToInput: true, plainEnterBlocked: true, optionReturnPassedToInput: true, openAfterComposingEscape: true,
     stagedBeforeCommit: 0, staged: 1, inserted: ' 한글', slipOpen: false
   });
   await shortcut('z');
@@ -372,7 +428,7 @@ try {
   await application.evaluate(({dialog}, file) => {
     dialog.showSaveDialog = async () => ({canceled: false, filePath: file});
   }, output);
-  await window.locator('#save').click();
+  await shortcut('Shift+s');
   await window.waitForSelector('#reviewDialog[open]');
   assert.equal(await window.locator('#confirmSave').isDisabled(), true);
   await window.locator('#acknowledge').check();
@@ -387,7 +443,7 @@ try {
   await assert.rejects(invokeMain('shell:reveal-output', '/tmp/other.hwpx'), /arguments/);
   assert.deepEqual(await fs.readFile(source), before);
   const savedBytes = await fs.readFile(output);
-  await window.locator('#save').click();
+  await shortcut('Shift+s');
   // The closed dialog keeps the earlier tick until openReview resets it, and
   // check() returns at once for a ticked box, so wait for the open dialog.
   await window.waitForSelector('#reviewDialog[open]');
@@ -398,6 +454,48 @@ try {
   await window.locator('#closeReview').click();
   await window.locator('#changes .acts button').click();
   checks.push(`${source === publicFile ? 'Public HWPX' : 'Synthetic sample'}: slip, progressive rail, native save, reveal and no overwrite`);
+
+  const inPlace = path.join(temporary, 'in-place.hwpx');
+  await fs.copyFile(source, inPlace);
+  await openFile(inPlace);
+  const baseBytes = await fs.readFile(inPlace);
+  for (let saveIndex = 0; saveIndex < 2; saveIndex += 1) {
+    await window.locator('.text-hit[data-node-id]:not([data-node-id=""]), .text-node').first().click();
+    const value = await window.locator('#textEdit').inputValue();
+    await window.locator('#textEdit').fill(value + ' 저장');
+    await window.locator('#applyText').click();
+    if (saveIndex === 0) {
+      await command('Save');
+    } else {
+      await shortcut('s');
+    }
+    if (saveIndex === 0) {
+      await window.waitForSelector('#reviewDialog[open]');
+      await window.locator('#acknowledge').check();
+      await window.locator('#confirmSave').click();
+    }
+    await window.waitForFunction(() => document.getElementById('dirty').hidden && document.getElementById('toast').textContent.includes('Saved'));
+    assert.equal(await window.locator('#reviewDialog').evaluate(item => item.open), false);
+  }
+  assert.notDeepEqual(await fs.readFile(inPlace), baseBytes);
+  assert.equal((await fs.readdir(path.join(temporary, '.hwp-workbench/backups'))).filter(name => name.startsWith('in-place.')).length, 2);
+  await window.locator('#toast button').click();
+  await waitForMain(() => globalThis.testRevealedOutput?.includes('/.hwp-workbench/backups/'));
+  await window.locator('.text-hit[data-node-id]:not([data-node-id=""]), .text-node').first().click();
+  await window.locator('#textEdit').fill('conflict');
+  await window.locator('#applyText').click();
+  await fs.writeFile(inPlace, baseBytes);
+  await application.evaluate(({dialog}) => {
+    dialog.showMessageBox = async (_win, options) => {
+      globalThis.testConflictDialog = options;
+      return {response: 2};
+    };
+  });
+  await shortcut('s');
+  await waitForMain(() => globalThis.testConflictDialog?.buttons.length === 3);
+  assert.deepEqual(await fs.readFile(inPlace), baseBytes);
+  await window.locator('#changes .acts button').click();
+  checks.push('In-place save twice, two kept versions, direct later save, conflict dialog refuses replacement');
 
   const recent = await window.evaluate(() => window.hwp.recent());
   assert.ok(recent.length > 0 && recent.length <= 8);
@@ -416,7 +514,8 @@ try {
   await window.waitForSelector('#recentItems .doc-card');
   assert.equal(await window.evaluate(() => document.documentElement.lang), language);
   await window.locator('#recentItems .doc-card').first().click();
-  await waitDocument(path.basename(source));
+  // The newest recent is whichever document the steps above opened last.
+  await waitDocument(recent[0].name);
   checks.push('Recent list persistence and reopen by id, PNG cache, drop extension rejection and Korean persistence');
 
   await command('Language');

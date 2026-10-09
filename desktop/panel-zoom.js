@@ -1,5 +1,5 @@
-// The canvas reserves 54 px on each side for page margins and proof marks.
-const CANVAS_MARGIN = 108;
+// Reserve canvas padding plus 54 px on each side for proof marks.
+const CANVAS_MARGIN = 216;
 
 export class PanelZoom {
   constructor(view) {
