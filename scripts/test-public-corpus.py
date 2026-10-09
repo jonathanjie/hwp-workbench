@@ -11,6 +11,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'engine'))
 from hwp_workbench.document import Document, sha
+from hwp_workbench.errors import WorkbenchError
+from hwp_workbench.independent import probe
 from rhwp_probe import probe_rhwp
 
 
@@ -39,6 +41,44 @@ def independent_check(payload, expected_text=None):
     return result
 
 
+def probe_check(payload):
+    try:
+        observed = probe(payload)
+        if observed.get('available') is False:
+            return {'status': 'skipped', 'reason': observed['reason']}
+        return {'status': 'passed', **observed}
+    except WorkbenchError as error:
+        return {'status': 'failed', 'error': error.as_dict()}
+
+
+def anchor_agreement(document, observed):
+    body = [node for node in document.nodes if node.anchor['charOffset'] is not None]
+    result = {
+        'checkedBodyNodes': len(body),
+        'cellNodes': sum(node.anchor['inCell'] for node in document.nodes),
+        'otherNestedNodes': sum(node.anchor['charOffset'] is None and not node.anchor['inCell']
+                                for node in document.nodes),
+        'scope': 'Top-level paragraph getTextRange, Unicode scalar offsets; nested text has no direct range.',
+    }
+    if observed['status'] != 'passed':
+        return {**result, 'status': 'skipped', 'checkedBodyNodes': 0,
+                'reason': observed.get('reason', 'rhwp probe failed; no independent ranges are available.')}
+    if not body:
+        return {**result, 'status': 'skipped', 'reason': 'No top-level body text nodes; nested text is outside this range API.'}
+    paragraphs = {(section['index'], paragraph['index']): paragraph['text']
+                  for section in observed['sections'] for paragraph in section['paragraphs']}
+    missing = []
+    for node in body:
+        anchor = node.anchor
+        text = paragraphs.get((anchor['section'], anchor['paragraph']))
+        start = anchor['charOffset']
+        # The probe retrieves the full paragraph with getTextRange. Python and
+        # Rust both slice this text by Unicode scalars, rather than UTF-16 units.
+        if text is None or text[start:start + len(node.text)] != node.text:
+            missing.append(node.id)
+    return {**result, 'status': 'failed' if missing else 'passed', 'missing': missing}
+
+
 def test_fixture(item, output_directory):
     path = ROOT / 'fixtures/public' / item['name']
     result = {'name': item['name'], 'hancomCertified': False, 'checks': {}}
@@ -57,6 +97,8 @@ def test_fixture(item, output_directory):
             warnings=[warning['code'] for warning in document.warnings],
         )
         checks = result['checks']
+        checks['rhwpProbe'] = probe_check(raw)
+        checks['anchorAgreement'] = anchor_agreement(document, checks['rhwpProbe'])
         noop_path = output_directory / ('noop-' + path.name)
         with noop_path.open('xb') as output:
             output.write(document.serialize())
@@ -88,6 +130,8 @@ def test_fixture(item, output_directory):
                 raise ValueError('Edited text differs after Python reopen.')
             checks['edit'] = {'status': 'passed', 'equalUtf16Length': True, 'reopenedAndVerified': True, 'sha256': sha(saved)}
             checks['rhwpEdit'] = independent_check(saved, text)
+            checks['rhwpEditedProbe'] = probe_check(saved)
+            checks['editedAnchorAgreement'] = anchor_agreement(reopened, checks['rhwpEditedProbe'])
         statuses = {check['status'] for check in checks.values()}
         result['status'] = 'failed' if 'failed' in statuses else 'partial' if 'skipped' in statuses else 'passed'
     except Exception as error:
@@ -102,7 +146,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='public-corpus-', dir=scratch) as directory:
         results = [test_fixture(item, Path(directory)) for item in manifest['fixtures']]
     report = {
-        'suite': 'public corpus: native save/reopen and independent rhwp render',
+        'suite': 'public corpus: native save/reopen, independent rhwp probe/render and body anchors',
         'generatedAt': datetime.now(timezone.utc).isoformat(),
         'host': platform.node(),
         'platform': platform.platform(),

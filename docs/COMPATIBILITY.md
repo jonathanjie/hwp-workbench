@@ -30,6 +30,10 @@ Files and saved outputs: 64 MiB. One expanded part: 32 MiB. Total ZIP expansion 
 
 `validate` means basic container/XML/record parsing succeeded. `reopenedAndVerified` means our own reader verified the output, not that Hancom or an independent parser accepted it. No metric is reported as a percentage of Hancom compatibility.
 
+The `apply` result reports an independent rhwp reopen and edited-text check; a failed or unavailable rhwp check does not block a save that passes the preservation engine’s own verification.
+
+Node `anchor` values use zero-based section and top-level paragraph indexes and Unicode character offsets from rhwp’s paragraph text API. Table-cell text keeps its containing top-level paragraph with `inCell: true` and `charOffset: null`; other nested text, such as shape text and headers, also has a null offset because this API cannot address it. The independent edited-text check searches the probed top-level paragraphs, so it can report nested edited text as missing even when the native save retains it. The corpus report lists these range checks as skipped when a file has no body text. Node rendering uses approximate text widths and does not qualify font metrics or Hancom layout.
+
 ## Explicitly not implemented
 
 General HWP length changes; HWP 3.x; complete native rendering or pagination; character/paragraph-format edits; paragraph insertion/deletion; table structural changes; images/stamps/object edits; native fields/form operations; new documents; comments/revisions; password/signature workflows; conversion; PDF/DOCX export; collaborative editing; autosaved unstaged typing; bundled native engine/runtime; release signing and notarization.

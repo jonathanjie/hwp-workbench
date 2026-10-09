@@ -1,18 +1,107 @@
 {
-  "suite": "public corpus: native save/reopen and independent rhwp render",
-  "generatedAt": "2026-10-09T13:44:59.477941+00:00",
+  "suite": "public corpus: native save/reopen, independent rhwp probe/render and body anchors",
+  "generatedAt": "2026-10-09T14:10:02.090936+00:00",
   "host": "MacBook-Air-3.local",
   "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
   "machine": "arm64",
   "python": "3.14.6",
   "success": false,
   "failures": 0,
-  "skipped": 2,
+  "skipped": 5,
   "results": [
     {
       "name": "pyhwp-aligns.hwp",
       "hancomCertified": false,
       "checks": {
+        "rhwpProbe": {
+          "status": "passed",
+          "engine": "rhwp",
+          "version": "0.8.7",
+          "pageCount": 16,
+          "sections": [
+            {
+              "index": 0,
+              "paragraphs": [
+                {
+                  "index": 0,
+                  "text": ""
+                },
+                {
+                  "index": 1,
+                  "text": ""
+                },
+                {
+                  "index": 2,
+                  "text": ""
+                },
+                {
+                  "index": 3,
+                  "text": ""
+                },
+                {
+                  "index": 4,
+                  "text": ""
+                },
+                {
+                  "index": 5,
+                  "text": ""
+                },
+                {
+                  "index": 6,
+                  "text": ""
+                },
+                {
+                  "index": 7,
+                  "text": ""
+                },
+                {
+                  "index": 8,
+                  "text": ""
+                },
+                {
+                  "index": 9,
+                  "text": ""
+                },
+                {
+                  "index": 10,
+                  "text": ""
+                },
+                {
+                  "index": 11,
+                  "text": ""
+                },
+                {
+                  "index": 12,
+                  "text": ""
+                },
+                {
+                  "index": 13,
+                  "text": ""
+                },
+                {
+                  "index": 14,
+                  "text": ""
+                },
+                {
+                  "index": 15,
+                  "text": ""
+                },
+                {
+                  "index": 16,
+                  "text": ""
+                }
+              ]
+            }
+          ]
+        },
+        "anchorAgreement": {
+          "checkedBodyNodes": 0,
+          "cellNodes": 0,
+          "otherNestedNodes": 16,
+          "scope": "Top-level paragraph getTextRange, Unicode scalar offsets; nested text has no direct range.",
+          "status": "skipped",
+          "reason": "No top-level body text nodes; nested text is outside this range API."
+        },
         "noop": {
           "status": "passed",
           "byteIdentical": true
@@ -35,6 +124,95 @@
           "pageCount": 16,
           "renderedPage": 0,
           "editedTextFound": true
+        },
+        "rhwpEditedProbe": {
+          "status": "passed",
+          "engine": "rhwp",
+          "version": "0.8.7",
+          "pageCount": 16,
+          "sections": [
+            {
+              "index": 0,
+              "paragraphs": [
+                {
+                  "index": 0,
+                  "text": ""
+                },
+                {
+                  "index": 1,
+                  "text": ""
+                },
+                {
+                  "index": 2,
+                  "text": ""
+                },
+                {
+                  "index": 3,
+                  "text": ""
+                },
+                {
+                  "index": 4,
+                  "text": ""
+                },
+                {
+                  "index": 5,
+                  "text": ""
+                },
+                {
+                  "index": 6,
+                  "text": ""
+                },
+                {
+                  "index": 7,
+                  "text": ""
+                },
+                {
+                  "index": 8,
+                  "text": ""
+                },
+                {
+                  "index": 9,
+                  "text": ""
+                },
+                {
+                  "index": 10,
+                  "text": ""
+                },
+                {
+                  "index": 11,
+                  "text": ""
+                },
+                {
+                  "index": 12,
+                  "text": ""
+                },
+                {
+                  "index": 13,
+                  "text": ""
+                },
+                {
+                  "index": 14,
+                  "text": ""
+                },
+                {
+                  "index": 15,
+                  "text": ""
+                },
+                {
+                  "index": 16,
+                  "text": ""
+                }
+              ]
+            }
+          ]
+        },
+        "editedAnchorAgreement": {
+          "checkedBodyNodes": 0,
+          "cellNodes": 0,
+          "otherNestedNodes": 16,
+          "scope": "Top-level paragraph getTextRange, Unicode scalar offsets; nested text has no direct range.",
+          "status": "skipped",
+          "reason": "No top-level body text nodes; nested text is outside this range API."
         }
       },
       "sourceSha256": "b101b4faff3c65f88ac9f8f583219cf5825d0747be85dbe45174dcd84207a3d1",
@@ -46,12 +224,45 @@
         "PREVIEW_CACHE_RETAINED",
         "LAYOUT_UNVERIFIED"
       ],
-      "status": "passed"
+      "status": "partial"
     },
     {
       "name": "pyhwp-borderfill.hwp",
       "hancomCertified": false,
       "checks": {
+        "rhwpProbe": {
+          "status": "passed",
+          "engine": "rhwp",
+          "version": "0.8.7",
+          "pageCount": 1,
+          "sections": [
+            {
+              "index": 0,
+              "paragraphs": [
+                {
+                  "index": 0,
+                  "text": ""
+                },
+                {
+                  "index": 1,
+                  "text": ""
+                },
+                {
+                  "index": 2,
+                  "text": ""
+                }
+              ]
+            }
+          ]
+        },
+        "anchorAgreement": {
+          "checkedBodyNodes": 0,
+          "cellNodes": 0,
+          "otherNestedNodes": 0,
+          "scope": "Top-level paragraph getTextRange, Unicode scalar offsets; nested text has no direct range.",
+          "status": "skipped",
+          "reason": "No top-level body text nodes; nested text is outside this range API."
+        },
         "noop": {
           "status": "passed",
           "byteIdentical": true
@@ -86,6 +297,231 @@
       "name": "hwp-cli-report-tables.hwpx",
       "hancomCertified": false,
       "checks": {
+        "rhwpProbe": {
+          "status": "passed",
+          "engine": "rhwp",
+          "version": "0.8.7",
+          "pageCount": 6,
+          "sections": [
+            {
+              "index": 0,
+              "paragraphs": [
+                {
+                  "index": 0,
+                  "text": "3-2-1. \uc608\uc2dc \uacfc\uc81c \uc81c\ubaa9 1"
+                },
+                {
+                  "index": 1,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 2\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 2,
+                  "text": "(\ubaa9\uc801) \uc608\uc2dc \ubb38\uc7a5 3\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 3\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 3,
+                  "text": "(\ucd94\uc9c4 \uc804\ub7b5) \uc608\uc2dc \ubb38\uc7a5 4\uc785\ub2c8\ub2e4. \ud55c\ube5b\ub300\ud559\uad50 \uad00\ub828 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uae30\uad00\u00b7\uc0ac\uc5c5\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 4,
+                  "text": "(\ud575\uc2ec \ucee8\uc149) \uc608\uc2dc \ubb38\uc7a5 5\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 5\uc785\ub2c8\ub2e4."
+                },
+                {
+                  "index": 5,
+                  "text": ""
+                },
+                {
+                  "index": 6,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 6\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 7,
+                  "text": "(\uc815\ud569\uc131) \uc608\uc2dc \ubb38\uc7a5 7\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 7\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 8,
+                  "text": "(\uc120\uc815 \uadfc\uac70) \uc608\uc2dc \ubb38\uc7a5 8\uc785\ub2c8\ub2e4. \ub2e4\uc628\ub300\ud559\uad50 \uad00\ub828 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uae30\uad00\u00b7\uc0ac\uc5c5\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 9,
+                  "text": ""
+                },
+                {
+                  "index": 10,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 9\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 11,
+                  "text": "(\uc2e4\uc2b5 \ubc0f \ucc44\uc6a9 \uc5f0\uacc4) \uc608\uc2dc \ubb38\uc7a5 10\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 10\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 12,
+                  "text": "(\uc790\uc6d0 \uacf5\uc720) \uc608\uc2dc \ubb38\uc7a5 11\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 11\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 13,
+                  "text": "(\uc5f0\uad6c\uae30\uad00) \uc608\uc2dc \ubb38\uc7a5 12\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 14,
+                  "text": "\u203b \uc608\uc2dc \ud56d\ubaa9 13 \u2014 \uc608\uc2dc \ubb38\uc7a5 13\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 15,
+                  "text": ""
+                },
+                {
+                  "index": 16,
+                  "text": "3-2-2. \uc608\uc2dc \uacfc\uc81c \uc81c\ubaa9 14"
+                },
+                {
+                  "index": 17,
+                  "text": "\uc608\uc2dc15"
+                },
+                {
+                  "index": 18,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 16\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 16\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 19,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 17\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 17\uc785\ub2c8\ub2e4."
+                },
+                {
+                  "index": 20,
+                  "text": ""
+                },
+                {
+                  "index": 21,
+                  "text": "\uc608\uc2dc19"
+                },
+                {
+                  "index": 22,
+                  "text": "(\uacfc\uc81c 2-1) \uc608\uc2dc \ubb38\uc7a5 20\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 23,
+                  "text": "\u2776 (\uc608\uc2dc \ud56d\ubaa9 21) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 21\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 24,
+                  "text": "\u2777 (\uc608\uc2dc \ud56d\ubaa9 22) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 22\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 25,
+                  "text": ""
+                },
+                {
+                  "index": 26,
+                  "text": "3-2-3. \uc608\uc2dc \uacfc\uc81c \uc81c\ubaa9 23"
+                },
+                {
+                  "index": 27,
+                  "text": "\uc608\uc2dc24"
+                },
+                {
+                  "index": 28,
+                  "text": "(\uc608\uc2dc \ud56d\ubaa9 25) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 25\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 25\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 29,
+                  "text": "(\uc608\uc2dc \ud56d\ubaa9 26) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 26\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 30,
+                  "text": ""
+                },
+                {
+                  "index": 31,
+                  "text": "\uc608\uc2dc28"
+                },
+                {
+                  "index": 32,
+                  "text": "(\uacfc\uc81c 3-1) \uc608\uc2dc \ubb38\uc7a5 29\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 33,
+                  "text": "\u2776 (\uc608\uc2dc \ud56d\ubaa9 30) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 30\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 34,
+                  "text": "\u2777 (\uc608\uc2dc \ud56d\ubaa9 31) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 31\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 35,
+                  "text": ""
+                },
+                {
+                  "index": 36,
+                  "text": "(\uacfc\uc81c 3-2) \uc608\uc2dc \ubb38\uc7a5 32\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 37,
+                  "text": "\u2776 (\uc608\uc2dc \ud56d\ubaa9 33) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 33\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 38,
+                  "text": "\u2777 (\uc608\uc2dc \ud56d\ubaa9 34) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 34\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 39,
+                  "text": ""
+                },
+                {
+                  "index": 40,
+                  "text": ""
+                },
+                {
+                  "index": 41,
+                  "text": ""
+                },
+                {
+                  "index": 42,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 64\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 43,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 65\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 65\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 44,
+                  "text": ""
+                },
+                {
+                  "index": 45,
+                  "text": ""
+                },
+                {
+                  "index": 46,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 116\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 47,
+                  "text": ""
+                },
+                {
+                  "index": 48,
+                  "text": ""
+                },
+                {
+                  "index": 49,
+                  "text": "[\ucca8\ubd80 1]"
+                },
+                {
+                  "index": 50,
+                  "text": ""
+                }
+              ]
+            }
+          ]
+        },
+        "anchorAgreement": {
+          "checkedBodyNodes": 64,
+          "cellNodes": 170,
+          "otherNestedNodes": 28,
+          "scope": "Top-level paragraph getTextRange, Unicode scalar offsets; nested text has no direct range.",
+          "status": "passed",
+          "missing": []
+        },
         "noop": {
           "status": "passed",
           "byteIdentical": true
@@ -108,6 +544,231 @@
           "pageCount": 6,
           "renderedPage": 0,
           "editedTextFound": true
+        },
+        "rhwpEditedProbe": {
+          "status": "passed",
+          "engine": "rhwp",
+          "version": "0.8.7",
+          "pageCount": 6,
+          "sections": [
+            {
+              "index": 0,
+              "paragraphs": [
+                {
+                  "index": 0,
+                  "text": "3-2-1. \uc608\uc2dc \uacfc\uc81c \uc81c\ubaa9 \uac00"
+                },
+                {
+                  "index": 1,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 2\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 2,
+                  "text": "(\ubaa9\uc801) \uc608\uc2dc \ubb38\uc7a5 3\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 3\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 3,
+                  "text": "(\ucd94\uc9c4 \uc804\ub7b5) \uc608\uc2dc \ubb38\uc7a5 4\uc785\ub2c8\ub2e4. \ud55c\ube5b\ub300\ud559\uad50 \uad00\ub828 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uae30\uad00\u00b7\uc0ac\uc5c5\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 4,
+                  "text": "(\ud575\uc2ec \ucee8\uc149) \uc608\uc2dc \ubb38\uc7a5 5\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 5\uc785\ub2c8\ub2e4."
+                },
+                {
+                  "index": 5,
+                  "text": ""
+                },
+                {
+                  "index": 6,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 6\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 7,
+                  "text": "(\uc815\ud569\uc131) \uc608\uc2dc \ubb38\uc7a5 7\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 7\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 8,
+                  "text": "(\uc120\uc815 \uadfc\uac70) \uc608\uc2dc \ubb38\uc7a5 8\uc785\ub2c8\ub2e4. \ub2e4\uc628\ub300\ud559\uad50 \uad00\ub828 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uae30\uad00\u00b7\uc0ac\uc5c5\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 9,
+                  "text": ""
+                },
+                {
+                  "index": 10,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 9\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 11,
+                  "text": "(\uc2e4\uc2b5 \ubc0f \ucc44\uc6a9 \uc5f0\uacc4) \uc608\uc2dc \ubb38\uc7a5 10\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 10\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 12,
+                  "text": "(\uc790\uc6d0 \uacf5\uc720) \uc608\uc2dc \ubb38\uc7a5 11\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 11\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 13,
+                  "text": "(\uc5f0\uad6c\uae30\uad00) \uc608\uc2dc \ubb38\uc7a5 12\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 14,
+                  "text": "\u203b \uc608\uc2dc \ud56d\ubaa9 13 \u2014 \uc608\uc2dc \ubb38\uc7a5 13\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 15,
+                  "text": ""
+                },
+                {
+                  "index": 16,
+                  "text": "3-2-2. \uc608\uc2dc \uacfc\uc81c \uc81c\ubaa9 14"
+                },
+                {
+                  "index": 17,
+                  "text": "\uc608\uc2dc15"
+                },
+                {
+                  "index": 18,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 16\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 16\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 19,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 17\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 17\uc785\ub2c8\ub2e4."
+                },
+                {
+                  "index": 20,
+                  "text": ""
+                },
+                {
+                  "index": 21,
+                  "text": "\uc608\uc2dc19"
+                },
+                {
+                  "index": 22,
+                  "text": "(\uacfc\uc81c 2-1) \uc608\uc2dc \ubb38\uc7a5 20\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 23,
+                  "text": "\u2776 (\uc608\uc2dc \ud56d\ubaa9 21) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 21\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 24,
+                  "text": "\u2777 (\uc608\uc2dc \ud56d\ubaa9 22) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 22\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 25,
+                  "text": ""
+                },
+                {
+                  "index": 26,
+                  "text": "3-2-3. \uc608\uc2dc \uacfc\uc81c \uc81c\ubaa9 23"
+                },
+                {
+                  "index": 27,
+                  "text": "\uc608\uc2dc24"
+                },
+                {
+                  "index": 28,
+                  "text": "(\uc608\uc2dc \ud56d\ubaa9 25) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 25\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 25\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 29,
+                  "text": "(\uc608\uc2dc \ud56d\ubaa9 26) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 26\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 30,
+                  "text": ""
+                },
+                {
+                  "index": 31,
+                  "text": "\uc608\uc2dc28"
+                },
+                {
+                  "index": 32,
+                  "text": "(\uacfc\uc81c 3-1) \uc608\uc2dc \ubb38\uc7a5 29\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 33,
+                  "text": "\u2776 (\uc608\uc2dc \ud56d\ubaa9 30) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 30\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 34,
+                  "text": "\u2777 (\uc608\uc2dc \ud56d\ubaa9 31) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 31\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 35,
+                  "text": ""
+                },
+                {
+                  "index": 36,
+                  "text": "(\uacfc\uc81c 3-2) \uc608\uc2dc \ubb38\uc7a5 32\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 37,
+                  "text": "\u2776 (\uc608\uc2dc \ud56d\ubaa9 33) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 33\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 38,
+                  "text": "\u2777 (\uc608\uc2dc \ud56d\ubaa9 34) \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 34\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 39,
+                  "text": ""
+                },
+                {
+                  "index": 40,
+                  "text": ""
+                },
+                {
+                  "index": 41,
+                  "text": ""
+                },
+                {
+                  "index": 42,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 64\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 43,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 65\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4. \uc608\uc2dc \ubb38\uc7a5 65\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 44,
+                  "text": ""
+                },
+                {
+                  "index": 45,
+                  "text": ""
+                },
+                {
+                  "index": 46,
+                  "text": "\uc608\uc2dc \ubb38\uc7a5 116\uc785\ub2c8\ub2e4. \uc774 \ubb38\uc11c\ub294 \ud45c\u00b7\ubb38\ub2e8 \ud3b8\uc9d1 \uae30\ub2a5 \ud14c\uc2a4\ud2b8\uc6a9 \uac00\uc0c1 \ub0b4\uc6a9\uc73c\ub85c, \uc2e4\uc81c \uc0ac\uc5c5\u00b7\uae30\uad00\uacfc \ubb34\uad00\ud569\ub2c8\ub2e4."
+                },
+                {
+                  "index": 47,
+                  "text": ""
+                },
+                {
+                  "index": 48,
+                  "text": ""
+                },
+                {
+                  "index": 49,
+                  "text": "[\ucca8\ubd80 1]"
+                },
+                {
+                  "index": 50,
+                  "text": ""
+                }
+              ]
+            }
+          ]
+        },
+        "editedAnchorAgreement": {
+          "checkedBodyNodes": 64,
+          "cellNodes": 170,
+          "otherNestedNodes": 28,
+          "scope": "Top-level paragraph getTextRange, Unicode scalar offsets; nested text has no direct range.",
+          "status": "passed",
+          "missing": []
         }
       },
       "sourceSha256": "b304a203d977e3d32a33b2fea5ce7c5b01d0af74916fb30c60d96f355034de24",

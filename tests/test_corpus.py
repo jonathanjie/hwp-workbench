@@ -51,6 +51,9 @@ class CorpusTests(unittest.TestCase):
         self.assertEqual(result['checks']['edit']['status'], 'skipped')
         self.assertEqual(result['checks']['edit']['reason'], 'No printable body text.')
         self.assertEqual(result['checks']['rhwpNoop']['status'], 'skipped')
+        self.assertIn('rhwpProbe', result['checks'])
+        self.assertEqual(result['checks']['anchorAgreement']['status'], 'skipped')
+        self.assertEqual(result['checks']['anchorAgreement']['checkedBodyNodes'], 0)
 
 
 class GeneratedFixtureTests(unittest.TestCase):

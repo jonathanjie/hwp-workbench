@@ -32,7 +32,9 @@ def invoke(root,method,args):
     require(isinstance(out,str) and Path(out).suffix.lower()=='.'+doc.format,'OUTPUT_FORMAT','Output must use the same native extension as the source.')
     require(args.get('acknowledgeRisks') is True,'RISK_ACK_REQUIRED','Pass acknowledgeRisks: true to save edited output.')
     content=doc.serialize(True)
+    from .independent import check_output
+    independent_check = check_output(content, doc.edits)
     # Optimistic concurrency check immediately before publication; sources never get overwritten.
     require(sha(ws.read(path))==doc.hash,'STALE_DOCUMENT','Source changed during processing; output was not published.')
     ws.write_new(out,content)
-    return result|{'output':out,'outputSha256':sha(content),'reopenedAndVerified':True,'sourceUntouched':True}
+    return result|{'output':out,'outputSha256':sha(content),'reopenedAndVerified':True,'sourceUntouched':True,'independentCheck':independent_check}
