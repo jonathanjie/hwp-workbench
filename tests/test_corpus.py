@@ -37,7 +37,7 @@ class CorpusTests(unittest.TestCase):
             'bytes': len(payload),
             'blobSha1': hashlib.sha1(f'blob {len(payload)}\0'.encode() + payload).hexdigest(),
         }
-        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source_directory = root / 'fixtures/public'
             source_directory.mkdir(parents=True)

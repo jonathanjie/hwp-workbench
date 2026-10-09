@@ -7,22 +7,30 @@ permissions:
 jobs:
   core:
     strategy:
+      # Report every platform; one failure should not hide the others.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         python: ['3.11', '3.13']
     runs-on: ${{ matrix.os }}
+    env:
+      # rhwp (independent reader) is needed for tests; the Electron and
+      # browser binaries are not.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - run: npm ci --no-audit --no-fund
       - run: python3 scripts/generate-fixtures.py
       - run: python3 scripts/run-tests.py
       - run: npm run check
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: core-results-${{ matrix.os }}-${{ matrix.python }}
