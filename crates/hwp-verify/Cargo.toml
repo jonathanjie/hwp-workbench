@@ -11,10 +11,15 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-hwp-core.workspace = true
+base64.workspace = true
 rhwp.workspace = true
+rustix = { workspace = true, features = ["event"] }
 serde.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[[bin]]
+name = "hwp-verify-worker"
+path = "src/bin/hwp-verify-worker.rs"
