@@ -114,10 +114,27 @@ def check_output(payload, edited_texts):
             return observed
         texts = [paragraph['text'] for section in observed['sections']
                  for paragraph in section['paragraphs']]
-        missing = [node_id for node_id, text in edited_texts.items()
-                   if not any(text in paragraph for paragraph in texts)]
-        return {'engine': f"rhwp {observed['version']}", 'opened': True,
-                'pageCount': observed['pageCount'], 'editedTextsFound': not missing,
-                'missing': missing}
+        methods = {}
+        missing = []
+        unverified = []
+        for node_id, text in edited_texts.items():
+            if text == '':
+                # Empty substrings match all text. This API has no native node
+                # address, so it cannot independently confirm a deletion.
+                methods[node_id] = 'unverified-empty'
+                unverified.append(node_id)
+            elif any(text in paragraph for paragraph in texts):
+                methods[node_id] = 'paragraphs'
+            elif text in observed.get('fullText', ''):
+                methods[node_id] = 'fullText'
+            else:
+                methods[node_id] = 'missing'
+                missing.append(node_id)
+        result = {'engine': f"rhwp {observed['version']}", 'opened': True,
+                  'pageCount': observed['pageCount'], 'editedTextsFound': not missing and not unverified,
+                  'missing': missing, 'editMethods': methods}
+        if unverified:
+            result['unverified'] = unverified
+        return result
     except WorkbenchError as error:
         return {'engine': 'rhwp 0.8.7', 'opened': False, 'error': error.as_dict()}

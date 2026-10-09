@@ -110,9 +110,23 @@ class ApplyCheckTests(unittest.TestCase):
     def test_apply_reports_confirmed_text(self):
         observed = {'engine': 'rhwp', 'version': '0.8.7', 'pageCount': 1,
                     'sections': [{'index': 0, 'paragraphs': [{'index': 0, 'text': 'Changed 😀'}]}]}
-        result, _ = self.apply_with_probe(observed)
+        result, node_id = self.apply_with_probe(observed)
         self.assertEqual(result, {'engine': 'rhwp 0.8.7', 'opened': True, 'pageCount': 1,
-                                  'editedTextsFound': True, 'missing': []})
+                                  'editedTextsFound': True, 'missing': [],
+                                  'editMethods': {node_id: 'paragraphs'}})
+
+    def test_empty_replacement_cannot_be_confirmed_by_substring(self):
+        from hwp_workbench import independent
+        node_id = 'BodyText/Section0#record:1:text:0'
+        observed = {'version': '0.8.7', 'pageCount': 1,
+                    'sections': [{'paragraphs': [{'text': 'Original text was not deleted'}]}],
+                    'fullText': 'Original text was not deleted'}
+        with patch.object(independent, 'probe', return_value=observed):
+            result = independent.check_output(make_hwpx(), {node_id: ''})
+        self.assertFalse(result['editedTextsFound'])
+        self.assertEqual(result['missing'], [])
+        self.assertEqual(result['unverified'], [node_id])
+        self.assertEqual(result['editMethods'], {node_id: 'unverified-empty'})
 
     def test_apply_reports_missing_text(self):
         observed = {'engine': 'rhwp', 'version': '0.8.7', 'pageCount': 1, 'sections': []}
@@ -159,6 +173,29 @@ class BridgeOperationTests(unittest.TestCase):
                 self.assertIsInstance(result['lossReport'], dict)
                 exported = base64.b64decode(result['bytesBase64'], validate=True)
                 self.assertEqual(Document(exported).format, format)
+
+    def test_table_cell_edit_is_found_in_full_text(self):
+        from hwp_workbench.document import Document
+        payload = (ROOT / 'fixtures/generated/review-form.hwpx').read_bytes()
+        document = Document(payload)
+        node = next(node for node in document.nodes if node.role == 'table-cell')
+        replacement = 'Changed cell 😀 — longer text'
+        document.patch({
+            'schemaVersion': 1, 'baseSha256': document.hash,
+            'operations': [{'op': 'set_text', 'nodeId': node.id,
+                            'expectedText': node.text, 'text': replacement}],
+        })
+        saved = document.serialize(True)
+        observed = self.bridge.probe(saved)
+        paragraphs = [paragraph['text'] for section in observed['sections']
+                      for paragraph in section['paragraphs']]
+        self.assertFalse(any(replacement in text for text in paragraphs))
+        self.assertIn(replacement, observed['fullText'])
+        result = self.bridge.check_output(saved, {node.id: replacement})
+        self.assertTrue(result['editedTextsFound'])
+        self.assertEqual(result['missing'], [])
+        self.assertEqual(result['editMethods'], {node.id: 'fullText'})
+        self.assertGreaterEqual(result['pageCount'], 1)
 
     def test_declared_json_length_is_bounded(self):
         node = shutil.which(os.environ.get('HWP_WORKBENCH_NODE') or 'node')

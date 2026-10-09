@@ -11,7 +11,7 @@ The product requirement remains full HWP/HWPX editing with close official-docume
 | Capability | This build |
 |---|---|
 | HWPX | Open, inspect, extract, edit existing plain text (including table-cell text), save a new HWPX copy. Text length may change. |
-| HWP | Open supported HWP 5.x containers, inspect/extract text, replace existing text with the same UTF-16 length, save a new HWP copy. |
+| HWP | Open supported HWP 5.x containers, inspect/extract text, make length-changing text edits in existing plain text runs, save a new HWP copy. Hancom reflow is unverified. |
 | Desktop | English/Korean UI; outline/search; selectable structured preview; text inspector; staged undo/redo; change review; local staged-patch recovery; native open/save-dialog wiring. |
 | Preservation | Original file never overwritten; untouched payloads retained; changes bound to the source hash and expected text; output reopened by this engine before publication. |
 | Agents | Five shared operations: `inspect`, `extract`, `validate`, `plan`, `apply`. CLI and MCP use the same engine as the desktop. |

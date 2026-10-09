@@ -5,7 +5,7 @@ from .workspace import Workspace
 
 CAPABILITIES={
     'version':'0.1.0-alpha.1',
-    'formats':{'hwp':'HWP 5.x: existing text, equal UTF-16 length only','hwpx':'Existing plain text nodes; variable length; same-format save'},
+    'formats':{'hwp':'HWP 5.x: existing plain text runs; variable length; Hancom reflow unverified','hwpx':'Existing plain text nodes; variable length; same-format save'},
     'operations':['inspect','extract','validate','plan','apply'],
     'notImplemented':['native full-page rendering','formatting and structural edits','new document authoring','HWP/HWPX conversion','DOCX/PDF export','comments/track changes','full Hancom fidelity'],
     'safety':{'overwrite':False,'externalNetwork':False,'execDocumentCode':False,'workspaceRestricted':True,'requireRiskAcknowledgement':True},

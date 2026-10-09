@@ -43,7 +43,7 @@ hwp-workbench mcp --root DIRECTORY
 
 The source, patch and output paths must fall under the CLI workspace. Parent directories must exist. Symlink components are rejected. Normal results are JSON; only `extract --format text` emits plain text. Failures use `{"error":{"code":"...","message":"..."}}` on stderr and exit code 2. The `rpc` subcommand is an internal one-request desktop adapter, not a public network API.
 
-Selected error codes: `STALE_DOCUMENT`, `STALE_TEXT`, `NODE_NOT_FOUND`, `HWP_LENGTH_CHANGE_BLOCKED`, `UNSUPPORTED_ELEMENT`, `SAVE_BLOCKED`, `RISK_ACK_REQUIRED`, `OUTPUT_EXISTS`, `OUTSIDE_WORKSPACE`, `UNSAFE_PATH`, `UNSAFE_XML`, `BAD_CFB`, `BAD_ZIP`, `LIMIT` and `VERIFY_FAILED`. Error text can be localized later; clients should branch on stable codes.
+Selected error codes: `STALE_DOCUMENT`, `STALE_TEXT`, `NODE_NOT_FOUND`, `UNSUPPORTED_ELEMENT`, `SAVE_BLOCKED`, `RISK_ACK_REQUIRED`, `OUTPUT_EXISTS`, `OUTSIDE_WORKSPACE`, `UNSAFE_PATH`, `UNSAFE_XML`, `BAD_CFB`, `BAD_ZIP`, `LIMIT` and `VERIFY_FAILED`. Error text can be localized later; clients should branch on stable codes.
 
 ## MCP
 

@@ -64,7 +64,10 @@ function probe(document, version) {
             break;
         }
     }
-    const result = { engine: 'rhwp', version, pageCount: document.pageCount(), sections };
+    // The Unicode export is JSON-encoded and includes cell and other nested text.
+    const fullText = JSON.parse(document.getTextFileUnicode());
+    requireRequest(typeof fullText === 'string', 'Unicode export must decode to text.');
+    const result = { engine: 'rhwp', version, pageCount: document.pageCount(), sections, fullText };
     if (truncated) {
         result.truncated = true;
     }
