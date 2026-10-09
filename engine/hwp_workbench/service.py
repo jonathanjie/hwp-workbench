@@ -6,6 +6,7 @@ from .document import Document, sha, patch_input
 from .independent import check_output
 from .errors import require
 from .workspace import Workspace
+from .convert.operation import convert
 
 CAPABILITIES = {
     'version': '0.1.0-alpha.1',
@@ -14,10 +15,13 @@ CAPABILITIES = {
         'hwpx': 'Existing plain text nodes; variable length; same-format save',
     },
     'operations': ['inspect', 'extract', 'validate', 'plan', 'apply',
-                   'read', 'search', 'replace', 'fill', 'set', 'propose', 'session'],
+                   'read', 'search', 'replace', 'fill', 'set', 'propose', 'session', 'convert'],
     'notImplemented': ['native full-page rendering', 'formatting and structural edits',
-                       'new document authoring', 'HWP/HWPX conversion', 'DOCX/PDF export',
+                       'new document authoring', 'PDF export',
                        'comments/track changes', 'full Hancom fidelity'],
+    'conversion': {'targets': ['hwp', 'hwpx', 'docx'], 'pivot': 'hwpx', 'lossy': True,
+                   'nativeBackend': 'optional rhwp', 'legacyImportBackend': 'optional LibreOffice',
+                   'dryRunUnlessOutputAndAcknowledgement': True},
     'safety': {'overwrite': False, 'externalNetwork': False, 'execDocumentCode': False,
                'workspaceRestricted': True, 'requireRiskAcknowledgement': True},
 }
@@ -58,6 +62,8 @@ def invoke(root, method: str, args: dict) -> dict:
         return CAPABILITIES
     require(method in CAPABILITIES['operations'], 'UNKNOWN_METHOD', 'Unknown operation: ' + method)
     ws = Workspace(root)
+    if method == 'convert':
+        return convert(ws, args)
     path = args.get('path')
     doc = Document(ws.read(path), Path(path).name)
     if method == 'session':

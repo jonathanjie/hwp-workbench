@@ -1,9 +1,6 @@
 # Project lessons
 
-### Use Unicode text for rhwp evidence
-
 ### Use Unicode text and correct scope for rhwp evidence
-
 - **Date:** 2026-10-09
 - **Trigger:** The independent probe used `getTextFileText()` and reported an em dash as `&#8212;`, even though the saved XML contained the correct UTF-8 text.
 - **Rule:** Use `getTextFileUnicode()` and decode its JSON string when comparing native edited text. Use `getTextRange()` with Unicode scalar offsets for body anchors; its top-level paragraph API omits cell and other nested text, so fall back to decoded full Unicode text and report the search method for each edit. A missing top-level result does not establish data loss. Never confirm a deletion with empty-substring search; report it as independently unverified unless the exact target paragraph is checked. Keep reopen/render evidence separate from Hancom layout qualification. Record corpus checks that cannot run as skipped with the exact reason.
@@ -21,6 +18,7 @@
 - **Rule:** Tests use the system temp folder or create what they need. Before every merge to `main`, run the suite in a clean checkout (`git worktree add <temp> HEAD`, run `python3 scripts/run-tests.py` there, then remove it); do not move shared folders aside, because worker worktrees link to `node_modules`. Check that missing optional tools produce skips with reasons. Gate commits on the test command's exit status, not on `grep` output.
 - **Recurrence (2026-10-09):** Three more tests from a parallel branch used `ROOT / 'work'`; the merge was pushed without the clean-checkout run and CI failed on all four jobs.
 - **Follow-up (B3, 2026-10-09):** A scratch checkout exposed the same assumption in independent-save and missing-parser test helpers. Use system temp folders there too. Build and extract bundle tests in system temp, then test server startup without checkout dependencies.
+- **Follow-up (E, 2026-10-09):** Independent-parser service checks and corpus helpers also used `work/`; they now use system temp folders.
 - **Why:** CI runs a clean checkout; local scratch state hides missing setup.
 
 ### Resolve agent references before validation
@@ -58,3 +56,21 @@
 - **Trigger:** Deleting one run can change the segment IDs of later runs when the saved paragraph is parsed again; empty runs also made corpus anchor checks pass without nonempty text evidence.
 - **Rule:** Keep source revision IDs stable for patches. Verify complete edited native sections on reopen, including controls and metadata. Emit an existing empty paragraph run for insertion, but exclude empty text from corpus body-anchor evidence. Preserve pre-existing duplicate shape starts; drop only starts that newly collapse during an edit.
 - **Why:** Printable-run IDs describe a source revision, and an empty substring alone does not test a reader's text-position agreement.
+
+### Keep real LibreOffice checks opt-in
+- **Date:** 2026-10-09
+- **Trigger:** Headless LibreOffice launches in the restricted macOS worker crashed during application registration and showed crash dialogs to the user.
+- **Rule:** Test and validation scripts must not start real LibreOffice unless `HWP_WORKBENCH_LIBREOFFICE_TESTS=1`. Normal suites skip those checks with the exact opt-in reason; mocked subprocess tests remain active. Run external qualification outside the restricted worker and record failures separately. Do not retry an installed GUI runtime after an environment-level crash.
+- **Why:** Headless flags do not remove macOS application-registration requirements or user-visible crash dialogs.
+
+### Check conversion semantics beyond paragraph text
+- **Date:** 2026-10-09
+- **Trigger:** Review found ignored default DOCX styles, restored list numbering after an explicit disable, and omitted HWPX image modifiers without loss counts.
+- **Rule:** Test default and inherited formatting, explicit removal of inherited properties, and unsupported image modifiers. Apply supported semantics or add named loss counts; matching paragraph text alone cannot establish conversion fidelity.
+- **Why:** Simple direct-format fixtures do not exercise inheritance or unsupported modifiers.
+
+### Check generated packages with a second reader
+- **Date:** 2026-10-09
+- **Trigger:** The DOCX writer passed every self-read test, but LibreOffice refused all its output ("source file could not be loaded") because ElementTree wrote `ns0:Types` and `ns0:Relationships`. LibreOffice also exits 0 in that case.
+- **Rule:** For every new writer, open its output in an independent reader (LibreOffice for DOCX, rhwp for HWPX) and assert the output file exists, not only the exit code. Write OPC package parts with an unprefixed namespace.
+- **Why:** Our own reader accepts what our writer emits; namespace-prefix tolerance differs between readers.
