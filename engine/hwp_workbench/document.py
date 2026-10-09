@@ -143,22 +143,44 @@ class Document:
                     self.nodes.append(node); self.positions[node.id]=t
                 for c in e: scan(c,ancestors+(tag,),style)
             scan(root)
-            def visual(e,depth=0):
-                if depth>32: return []
-                tag=local(e.tag)
-                if tag=='t' and id(e) in token_by_element: return [{'type':'text','node':token_by_element[id(e)]['id']}]
-                if tag in {'pic','ole','chart','equation','rect','line','ellipse','polygon','curve'}:
-                    return [{'type':'opaque','label':tag}]
-                children=[]
-                for c in e: children.extend(visual(c,depth+1))
-                if tag=='tbl': return [{'type':'table','children':children}]
-                if tag=='tr': return [{'type':'row','children':children}]
-                if tag=='tc':
-                    span=next((c for c in e if local(c.tag)=='cellSpan'),None)
-                    try: cs=int(span.attrib.get('colSpan','1')) if span is not None else 1; rs=int(span.attrib.get('rowSpan','1')) if span is not None else 1
-                    except ValueError: cs=rs=1
-                    return [{'type':'cell','colspan':max(1,min(100,cs)),'rowspan':max(1,min(100,rs)),'children':children}]
-                if tag=='p': return [{'type':'paragraph','children':children}]
+            def visual(e, depth=0):
+                if depth > 32:
+                    return []
+                tag = local(e.tag)
+                if tag == 't' and id(e) in token_by_element:
+                    return [{'type': 'text', 'node': token_by_element[id(e)]['id']}]
+                if tag in {'pic', 'ole', 'chart', 'equation', 'rect', 'line', 'ellipse', 'polygon', 'curve'}:
+                    return [{'type': 'opaque', 'label': tag}]
+                children = []
+                for child in e:
+                    children.extend(visual(child, depth + 1))
+                if tag == 'tbl':
+                    return [{'type': 'table', 'children': children}]
+                if tag == 'tr':
+                    return [{'type': 'row', 'children': children}]
+                if tag == 'tc':
+                    span = next((child for child in e if local(child.tag) == 'cellSpan'), None)
+                    try:
+                        columns = int(span.attrib.get('colSpan', '1')) if span is not None else 1
+                        rows = int(span.attrib.get('rowSpan', '1')) if span is not None else 1
+                    except ValueError:
+                        columns = 1
+                        rows = 1
+                    native_span = None if span is None else {
+                        'rows': span.attrib.get('rowSpan', '1'),
+                        'columns': span.attrib.get('colSpan', '1'),
+                    }
+                    address = next((child for child in e if local(child.tag) == 'cellAddr'), None)
+                    # Retain raw addresses so agent operations can refuse malformed positions.
+                    position = None if address is None else {
+                        'row': address.attrib.get('rowAddr'),
+                        'column': address.attrib.get('colAddr'),
+                    }
+                    return [{'type': 'cell', 'colspan': max(1, min(100, columns)),
+                             'rowspan': max(1, min(100, rows)), 'address': position,
+                             'nativeSpan': native_span, 'children': children}]
+                if tag == 'p':
+                    return [{'type': 'paragraph', 'children': children}]
                 return children
             self.view.append({'type':'section','label':section,'children':visual(root)})
         self.warn('PREVIEW_CACHE_RETAINED','info','Embedded preview images/text and line-layout caches are retained unchanged. They may be stale after edits; reopen in Hancom to refresh.')
