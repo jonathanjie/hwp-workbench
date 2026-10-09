@@ -40,6 +40,10 @@
   },
   "tools": [
     {
+      "name": "hwp_convert",
+      "description": "Report lossy HWP/HWPX/DOCX export through HWPX. DOC/ODT/RTF require LibreOffice. Writes a new file only with output plus acknowledgeRisks: true."
+    },
+    {
       "name": "hwp_session",
       "description": "Read the desktop Agent link session and up to 200 bounded proposals and their outcomes. Does not write files."
     },
