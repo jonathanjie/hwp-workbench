@@ -18,7 +18,8 @@
 ### Keep tests independent of local-only folders
 - **Date:** 2026-10-09
 - **Trigger:** A corpus test created its temp folder under the gitignored `work/` folder. It passed locally and failed in every clean GitHub Actions checkout; fail-fast then cancelled the macOS jobs.
-- **Rule:** Tests use the system temp folder or create what they need. Before merging, run the suite once with local-only folders (`work/`, `fixtures/public/`, `node_modules/`) absent or moved aside, and check that missing optional tools produce skips with reasons.
+- **Rule:** Tests use the system temp folder or create what they need. Before every merge to `main`, run the suite in a clean checkout (`git worktree add <temp> HEAD`, run `python3 scripts/run-tests.py` there, then remove it); do not move shared folders aside, because worker worktrees link to `node_modules`. Check that missing optional tools produce skips with reasons. Gate commits on the test command's exit status, not on `grep` output.
+- **Recurrence (2026-10-09):** Three more tests from a parallel branch used `ROOT / 'work'`; the merge was pushed without the clean-checkout run and CI failed on all four jobs.
 - **Why:** CI runs a clean checkout; local scratch state hides missing setup.
 
 ### Resolve agent references before validation
