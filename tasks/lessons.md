@@ -19,6 +19,7 @@
 - **Recurrence (2026-10-09):** Three more tests from a parallel branch used `ROOT / 'work'`; the merge was pushed without the clean-checkout run and CI failed on all four jobs.
 - **Follow-up (B3, 2026-10-09):** A scratch checkout exposed the same assumption in independent-save and missing-parser test helpers. Use system temp folders there too. Build and extract bundle tests in system temp, then test server startup without checkout dependencies.
 - **Follow-up (E, 2026-10-09):** Independent-parser service checks and corpus helpers also used `work/`; they now use system temp folders.
+- **Recurrence (P merge, 2026-10-10):** A chained command ran the full suite, ignored its failure and pushed `main`. Use `cmd; R=$?; [ $R -eq 0 ] && git push`, never `cmd; …; git push`.
 - **Why:** CI runs a clean checkout; local scratch state hides missing setup.
 
 ### Resolve agent references before validation
@@ -80,3 +81,9 @@
 - **Trigger:** A save failure-injection test changed the source to invalid native bytes; parsing returned `UNSUPPORTED_FORMAT` before the stale revision was identified.
 - **Rule:** Read bounded source bytes and compare the save patch's source hash before parsing them. Return `SOURCE_CHANGED` for an external revision change; keep the complete patch and native verification checks before replacement.
 - **Why:** A changed file can also become unreadable. Parsing must not hide the save revision conflict.
+
+### Build fixtures deterministically
+- **Date:** 2026-10-10
+- **Trigger:** A DOCX fixture stamped zip members with the current time; a test that compared a written source with a fresh fixture failed when the run crossed a clock second.
+- **Rule:** Fixtures that tests rebuild and compare must not depend on time, randomness or the environment. Set fixed zip member times.
+- **Why:** Slow or loaded runs cross time boundaries; the failure looks random.
