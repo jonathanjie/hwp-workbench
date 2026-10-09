@@ -183,3 +183,9 @@
 - **Trigger:** A shallow clone of rhwp (about 9 GB with samples and fonts), Cargo's git checkout and `cargo vendor` filled the disk; tool output files could not be written.
 - **Rule:** Check free space and the upstream repository size first. Vendor only the library files the build needs, delete inspection copies when done, and share one Cargo target folder across worktrees.
 - **Why:** Git dependencies vendor the whole package folder, and each worktree's debug build of rhwp and Tauri takes gigabytes.
+
+### Check the screen before native window screenshots
+- **Date:** 2026-10-10
+- **Trigger:** The first Tauri window captured as an empty dark frame in five attempts. The page had loaded and sent IPC calls; the screen was locked, and earlier a leftover Electron test window covered it. WebKit does not paint views that are not visible.
+- **Rule:** Before native visual QA, check `CGSessionCopyCurrentDictionary()` for a locked screen and list the windows in front. Use headless WebKit for visual checks while the user is away. Stop every test app you start, and confirm that it exited (`kill -0`); an unsaved-changes prompt can block a normal quit.
+- **Why:** Playwright's Electron screenshots render without the screen; native window captures do not.
