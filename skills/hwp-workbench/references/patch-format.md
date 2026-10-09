@@ -39,23 +39,22 @@ Neither format supports adding paragraphs, styles or table structure through thi
 and operation-specific reports (`skipped`, or `filled`/`unresolved`). Review all
 reports. Empty previews cannot be applied or proposed as edits.
 
-`plan --patch FILE` and `apply --patch FILE` require the **patch object**, not the
-whole preview envelope. Save it without rerunning an edit operation:
+`plan --patch FILE`, `apply --patch FILE` and `propose --patch FILE` accept either
+a patch object or the whole saved preview envelope. They use its `patch` and run
+all hash, expected-text, unique-target and native-format checks. Review the
+preview, then pass that same file without rerunning the edit:
 
 ```bash
-set -o noclobber
-python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1]))["patch"], ensure_ascii=False))' \
-  work/preview.json > work/review.patch.json
-"{{HWP_WORKBENCH}}" plan form.hwpx --patch work/review.patch.json
-"{{HWP_WORKBENCH}}" apply form.hwpx --patch work/review.patch.json \
+"{{HWP_WORKBENCH}}" plan form.hwpx --patch work/preview.json
+"{{HWP_WORKBENCH}}" apply form.hwpx --patch work/preview.json \
   -o form-reviewed.hwpx --acknowledge-risks
 ```
 
-`propose --patch FILE --title TITLE [--author AUTHOR] [--notes NOTES]` accepts either
-that patch object or the whole preview envelope. It validates the patch, then
-writes a new proposal in `.hwp-workbench/proposals/` beside the document. The author
-defaults to `agent`; the result has `proposal` (workspace-relative path) and `changes`.
-A proposal is limited to 2 MiB and 1000 operations. Publication never overwrites.
+`propose --patch FILE --title TITLE [--author AUTHOR] [--notes NOTES]` validates the
+patch and writes a new proposal in `.hwp-workbench/proposals/` beside the document.
+The author defaults to `agent`; the result has `proposal` (workspace-relative path)
+and `changes`. A proposal is limited to 2 MiB and 1000 operations. Publication
+never overwrites.
 
 `session PATH` is read-only. It returns `linked`, `session` (or null) and at most
 200 proposal summaries with `file`, `title`, `author`, `createdAt`, operation count

@@ -30,6 +30,12 @@ def sha(data: bytes) -> str: return hashlib.sha256(data).hexdigest()
 def local(tag: str) -> str: return tag.rsplit('}',1)[-1]
 def esc(s: str) -> str: return s.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
 
+def patch_input(value):
+    """Accept a native patch or the unchanged edit-preview envelope."""
+    if isinstance(value, dict) and 'schemaVersion' not in value and 'patch' in value:
+        return value['patch']
+    return value
+
 def check_text(value):
     require(isinstance(value,str) and len(value)<=200_000,'BAD_PATCH','Text must be a string of at most 200,000 characters.')
     # Native tabs, paragraph breaks and fields need dedicated document operations.

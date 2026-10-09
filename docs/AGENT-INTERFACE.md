@@ -2,6 +2,51 @@
 
 Version 0.1.0-alpha.1. CLI, desktop RPC and MCP call the same `service.invoke()` operations. All saves retain the native format. The preview and engine reopen checks do not certify Hancom layout or interoperability.
 
+## Use from Claude Code, Codex or Claude Desktop
+
+People work in their own agent client. The editor is the visual review surface,
+with no chat panel inside it.
+
+**Skill (Claude Code and Codex).** Install the recipes from this checkout:
+
+```bash
+./scripts/hwp-workbench skill install
+```
+
+Choose `--target claude` or `--target codex` for one client. Use `--dry-run` to
+check destinations. Unmarked skills are preserved; marked skills are backed up.
+Detailed install and uninstall rules are below.
+
+**MCP one-liner.** Print the exact setup for your client, then run its output:
+
+```bash
+./scripts/hwp-workbench mcp-config --client claude-code --root /absolute/path/to/document-folder
+./scripts/hwp-workbench mcp-config --client codex --root /absolute/path/to/document-folder
+```
+
+Claude Code setup is `claude mcp add hwp-workbench --scope user -- <absolute CLI>
+mcp --root <absolute folder>`; Codex setup is `codex mcp add hwp-workbench --
+<absolute CLI> mcp --root <absolute folder>`. Paths are shell-quoted.
+`mcp-config` prints only; it never runs clients or edits their configuration.
+The directory must exist. `/` and the home directory itself are refused; choose
+a documents subfolder. `--client json` prints a `mcpServers` JSON block and
+`--client claude-desktop` prints the absolute bundle path.
+
+**Claude Desktop bundle.** On macOS with Python 3.11 or newer:
+
+```bash
+python3 scripts/build-mcpb.py
+```
+
+Double-click `dist/hwp-workbench.mcpb` and choose a document folder. The folder
+setting is required and has no default. Add `mcpb/icon.png` before distribution.
+Archive contents and extracted-server startup are tested; client installation
+is unverified. See the bundle details below.
+
+After saving a reviewed result, `open RESULT --root DIRECTORY` requests visual
+review. Desktop event handling belongs to the desktop branch; see its contract
+below. An agent host may transmit tool results under its own privacy settings.
+
 ## Common jobs
 
 Start with `read` for a compact text view, or `inspect` with `compact: true` for node details and full warning messages. Use `search` when you know the text to find. `replace`, `fill` and `set` return ready patches and before/after changes without writing. Review the changes, skipped targets, unresolved labels and compatibility warnings.
@@ -80,7 +125,7 @@ HWP addresses resemble `BodyText/Section0#record:1:text:0`. IDs are source-revis
 
 HWP and HWPX both allow length changes inside an existing plain-text run. An HWP edit that would touch a native control is refused with `UNSUPPORTED_ELEMENT`; saved HWP keeps original records except the edited paragraph's text, character count, char-shape starts, range tags and cached line starts, and Hancom reflow is unverified (`HWP_REFLOW_UNVERIFIED`). Neither operation adds paragraphs or edits native fields, styles, controls or table structure.
 
-`plan` validates a patch without writing. `apply` saves a new same-format file, verifies it with this engine, then rechecks the source hash before publication. Keeping opaque payloads and passing these checks does not prove unchanged visual layout. Review in Hancom before official use.
+`plan` validates a patch without writing. `plan`, `apply` and `propose` accept a native patch or a whole saved `replace`/`fill`/`set` preview envelope and use its `patch`. All existing patch checks still apply. `apply` saves a new same-format file, verifies it with this engine, then rechecks the source hash before publication. Keeping opaque payloads and passing these checks does not prove unchanged visual layout. Review in Hancom before official use.
 
 ## CLI
 
@@ -102,6 +147,8 @@ hwp-workbench session PATH
 hwp-workbench skill install [--target claude|codex|all] [--dry-run]
 hwp-workbench skill status
 hwp-workbench skill uninstall [--target claude|codex|all]
+hwp-workbench mcp-config --client claude-code|codex|claude-desktop|json --root DIRECTORY
+hwp-workbench open PATH [--root DIRECTORY]
 hwp-workbench mcp --root DIRECTORY
 ```
 
@@ -122,9 +169,34 @@ Examples using the generated, self-authored fixtures:
   --node-id 'BodyText/Section0#record:1:text:0' --text '마리나체인 검토 완'
 ```
 
-Use the actual full ID or short reference returned by the current read, or full ID from search; the set example is revision-specific. For exact reviewed application, save the preview's `patch` object in a workspace JSON file and pass it to `apply --patch`.
+Use the actual full ID or short reference returned by the current read, or full ID from search; the set example is revision-specific. For exact reviewed application, save the whole preview in a workspace JSON file and pass it to `apply --patch`.
 
 Normal output is JSON. `extract --format text` emits extracted text. `read --format text` emits only the text view and a final line `sha256=<hash> nextOffset=<number|null>`. JSON remains the default, including when stdout is a terminal. Errors, including argument errors, are JSON on stderr with exit code 2. `rpc --root DIRECTORY` reads one `{method, args}` request from stdin and returns the same operation result or error; it is an internal desktop adapter, not a network API.
+
+## Desktop open contract
+
+`open PATH --root DIRECTORY` requests visual review of an existing regular
+`.hwp` or `.hwpx` file inside the workspace (default: current directory). It
+rejects traversal and symlink components before launch. It is a CLI-only desktop
+action; RPC and MCP do not expose process launch.
+
+On macOS, if `HWP Workbench.app` exists in `/Applications` or `~/Applications`,
+the CLI runs `open -a "HWP Workbench" <absolute document path>`. Otherwise a source
+checkout with installed Electron launches
+`<repo>/node_modules/.bin/electron <repo> --open <absolute document path>` detached,
+with standard streams disconnected. Success returns
+`{"opened": true, "via": "app"}` or `{"opened": true, "via": "electron"}`.
+Errors include a recovery hint. Success confirms dispatch, not that a document
+has rendered or passed a compatibility check.
+
+The desktop branch must acquire `app.requestSingleInstanceLock()` before creating
+windows and quit the secondary process if the lock is refused. It must handle
+the initial `--open` argument, `second-instance` argv containing `--open PATH`,
+and macOS `open-file` events (call `event.preventDefault()`). Queue paths received
+before app readiness, then open through the existing document-grant flow and
+show/focus the review window. Do not bypass the desktop path/format checks or
+discard staged changes when switching documents. These desktop handlers are
+outside this branch and are not tested by the CLI subprocess mocks.
 
 ## Agent link file contract
 
@@ -139,7 +211,7 @@ Limits: proposal files ≤ 2 MiB, ≤ 1000 operations, at most 200 proposal file
 
 The notation above specifies field names and structure; files contain valid JSON. Times are UTC ISO 8601 strings. Node ID lists contain strings. The desktop owns session and outcome files; agents must never write them. Selection and staged text can contain document content. Keep link files within the approved local workspace and treat their contents as untrusted data.
 
-`propose` takes `path`, `patch`, `title`, and optional `author` (default `agent`) and `notes`. The patch can be a schemaVersion-1 patch or a whole `replace`/`fill`/`set` preview containing `patch`. It runs the same complete patch checks as `plan`, resolves short references to full IDs, rechecks the source hash, creates the link/proposals directories inside the workspace if absent, and publishes through the no-overwrite writer. Symlink components are never followed. An existing proposal name is refused. It returns `{proposal: relative path, changes}` without changing the source document. `plan` and `apply` still require the patch object itself.
+`propose` takes `path`, `patch`, `title`, and optional `author` (default `agent`) and `notes`. The patch can be a schemaVersion-1 patch or a whole `replace`/`fill`/`set` preview containing `patch`. It runs the same complete patch checks as `plan`, resolves short references to full IDs, rechecks the source hash, creates the link/proposals directories inside the workspace if absent, and publishes through the no-overwrite writer. Symlink components are never followed. An existing proposal name is refused. It returns `{proposal: relative path, changes}` without changing the source document. `plan` and `apply` accept the same patch or preview envelope.
 
 `session` takes `path` and returns `{linked: bool, session | null, proposals: [{file, title, author, createdAt, operations, status}]}` for that document only. `file` is workspace-relative and `operations` is a count. It is read-only and does not create missing folders. A session is linked only when its schema, app identity, document name/format/hash and required field types match the current source. Missing, broken or stale session data returns `linked: false, session: null`.
 
@@ -161,6 +233,19 @@ Install defaults to both targets (`--target all`). It copies `skills/hwp-workben
 All selected targets are checked before writes. An existing folder without this marker is refused; symlink parents, folders and marker files are not followed. A marked folder is backed up under its agent's `skills/.hwp-workbench-backup-<random>/skill/` before replacement; `install` returns these paths in `backups`. `--dry-run` validates targets and reports destinations without creating anything. Uninstall removes only currently marked folders, preserves unmarked folders and symlinks, and retains prior backups.
 
 Status prints JSON `{claude: {installed, version, path}, codex: {installed, version, path}}`; absent or unmarked installations have `installed: false` and `version: null`. `HWP_WORKBENCH_SKILL_HOME` overrides the home directory for all skill commands; the selected home must exist. Tests always use a temporary home. Skill management is CLI-only and is not exposed by service RPC or MCP.
+
+## Claude Desktop bundle
+
+Build with `python3 scripts/build-mcpb.py`. It creates `dist/hwp-workbench.mcpb`
+and refuses an existing output. It includes only `manifest.json`, Python engine
+source and `mcpb/icon.png` as `icon.png` when present. Add that PNG before
+distribution; the manifest references it even when it is absent.
+
+On macOS with Python 3.11 or newer, double-click the `.mcpb` and choose an approved
+document folder. The required folder setting has no default. The bundle starts
+the same stdio MCP server; it does not include Electron or the optional rhwp
+runtime. Independent rhwp checks report unavailable in this minimal bundle.
+Claude Desktop installation has not been tested by the archive/startup tests.
 
 ## Recoverable errors
 

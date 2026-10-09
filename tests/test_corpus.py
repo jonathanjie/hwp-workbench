@@ -43,7 +43,7 @@ class CorpusTests(unittest.TestCase):
         if observed.get('available') is False:
             self.skipTest(observed['reason'])
         document = Document(make_hwp())
-        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+        with tempfile.TemporaryDirectory() as directory:
             checks = corpus.length_changing_checks(document, Path(directory), 'synthetic.hwp')
             saved = Document((Path(directory) / 'length-edited-synthetic.hwp').read_bytes())
         self.assertEqual(checks['lengthChangingEdit']['status'], 'passed')
@@ -56,7 +56,7 @@ class CorpusTests(unittest.TestCase):
 
     def test_length_changing_checks_report_missing_parser(self):
         document = Document(make_hwp())
-        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+        with tempfile.TemporaryDirectory() as directory:
             with patch.object(corpus, 'probe', return_value={'available': False, 'reason': 'Node.js unavailable.'}):
                 checks = corpus.length_changing_checks(document, Path(directory), 'synthetic.hwp')
         self.assertEqual(checks['lengthChangingEdit']['status'], 'passed')

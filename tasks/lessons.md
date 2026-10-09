@@ -19,6 +19,7 @@
 - **Date:** 2026-10-09
 - **Trigger:** A corpus test created its temp folder under the gitignored `work/` folder. It passed locally and failed in every clean GitHub Actions checkout; fail-fast then cancelled the macOS jobs.
 - **Rule:** Tests use the system temp folder or create what they need. Before merging, run the suite once with local-only folders (`work/`, `fixtures/public/`, `node_modules/`) absent or moved aside, and check that missing optional tools produce skips with reasons.
+- **Follow-up (B3, 2026-10-09):** A scratch checkout exposed the same assumption in independent-save and missing-parser test helpers. Use system temp folders there too. Build and extract bundle tests in system temp, then test server startup without checkout dependencies.
 - **Why:** CI runs a clean checkout; local scratch state hides missing setup.
 
 ### Resolve agent references before validation

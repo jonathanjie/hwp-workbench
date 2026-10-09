@@ -93,7 +93,7 @@ class ApplyCheckTests(unittest.TestCase):
         payload = make_hwpx()
         document = Document(payload)
         node = document.nodes[0]
-        with tempfile.TemporaryDirectory(dir=ROOT / 'work') as directory:
+        with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'source.hwpx'
             source.write_bytes(payload)
             with patch.object(independent, 'probe', return_value=observed, side_effect=error):
