@@ -1,0 +1,72 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/hwp-core",
+    "crates/hwp-convert",
+    "crates/hwp-verify",
+    "crates/hwp-workbench",
+    "crates/app-core",
+    "crates/app-testhost",
+    "app/src-tauri",
+]
+
+[workspace.package]
+version = "0.2.0-alpha.1"
+edition = "2021"
+rust-version = "1.85"
+license = "UNLICENSED"
+publish = false
+
+# Versions are pinned to releases at least two weeks old at scaffold time
+# (2026-10-10). Licenses were reviewed; see THIRD_PARTY_NOTICES.md.
+[workspace.dependencies]
+hwp-core = { path = "crates/hwp-core" }
+hwp-convert = { path = "crates/hwp-convert" }
+hwp-verify = { path = "crates/hwp-verify" }
+hwp-workbench = { path = "crates/hwp-workbench" }
+app-core = { path = "crates/app-core" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+quick-xml = "0.42"
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
+flate2 = "1.1"
+sha2 = "0.11"
+hex = "0.4"
+base64 = "0.23"
+rustix = { version = "1.1", features = ["fs"] }
+time = { version = "0.3", features = ["formatting", "macros"] }
+getrandom = "0.4"
+regex = "1.13"
+unicode-normalization = "0.1"
+clap = { version = "4.6", features = ["derive"] }
+notify = "8.2"
+tiny_http = "0.12"
+tempfile = "3.27"
+
+# rhwp is not published on crates.io. Pin the exact v0.8.7 release commit,
+# the same version as the @rhwp/core WASM package the renderer uses.
+rhwp = { git = "https://github.com/edwardkim/rhwp.git", rev = "1a76570e833917d15817415a53c09ad61ab3203f", default-features = false }
+
+tauri = { version = "=2.11.6", features = [] }
+tauri-build = { version = "=2.6.3", features = [] }
+tauri-plugin-single-instance = "=2.4.5"
+tauri-plugin-dialog = "=2.7.3"
+tauri-plugin-clipboard-manager = "=2.3.3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+# Keep debug builds small: four worktrees share one target folder on a nearly
+# full disk. Dependencies get light optimization so rhwp layout tests run fast.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 1

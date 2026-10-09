@@ -1,0 +1,20 @@
+[package]
+name = "app-testhost"
+description = "Development-only HTTP host that serves the renderer and app-core commands to WebKit tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+app-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tiny_http.workspace = true
+
+[dev-dependencies]
+

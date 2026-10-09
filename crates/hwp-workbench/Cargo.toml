@@ -1,0 +1,33 @@
+[package]
+name = "hwp-workbench"
+description = "Shared service, agent operations, CLI and MCP server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+hwp-core.workspace = true
+hwp-verify.workspace = true
+hwp-convert.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+unicode-normalization.workspace = true
+sha2.workspace = true
+hex.workspace = true
+base64.workspace = true
+time.workspace = true
+getrandom.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[[bin]]
+name = "hwp-workbench"
+path = "src/main.rs"

@@ -24,3 +24,6 @@ reports/cli-smoke-workspace/
 work/
 .claude/settings.local.json
 outputs/mac-arm64/
+
+# Rust builds (workers use a shared target folder outside the repo)
+/target/
