@@ -11,10 +11,10 @@ The product requirement remains full HWP/HWPX editing with close official-docume
 | Capability | This build |
 |---|---|
 | HWPX | Open, inspect, extract, edit existing plain text (including table-cell text), save a new HWPX copy. Text length may change. |
-| HWP | Open supported HWP 5.x containers, inspect/extract text, replace existing text with the same UTF-16 length, save a new HWP copy. |
+| HWP | Open supported HWP 5.x containers, inspect/extract text, make length-changing text edits in existing plain text runs, save a new HWP copy. Hancom reflow is unverified. |
 | Desktop | English/Korean UI; outline/search; selectable structured preview; text inspector; staged undo/redo; change review; local staged-patch recovery; native open/save-dialog wiring. |
 | Preservation | Original file never overwritten; untouched payloads retained; changes bound to the source hash and expected text; output reopened by this engine before publication. |
-| Agents | Five shared operations: `inspect`, `extract`, `validate`, `plan`, `apply`. CLI and MCP use the same engine as the desktop. |
+| Agents | Shared native read/search/edit/plan/apply operations, bounded proposals and session reports, plus an installable Claude Code/Codex skill. CLI and MCP use the same engine as the desktop. |
 | Packaging | Apple Silicon developer `.app` packaging script and private GitHub publishing script. Neither has been executed on a Mac in this build environment. |
 
 The GUI is a **structure preview**, not a faithful page renderer. HWP tables, images, shapes and page layout are not drawn. HWPX table structure and selected character styles are approximated; image/object payloads have placeholders. Keeping bytes does not guarantee unchanged visual layout.
@@ -67,7 +67,7 @@ Run from the project directory. Paths are constrained to the current directory u
 
 JSON is the default output. Errors are JSON on stderr with exit code 2. `validate` checks bounded parsing and container structure; it is **not** a full HWPX schema or Hancom-rendering validation. Re-running the final command with an existing output fails instead of replacing the file.
 
-A corresponding equal-length HWP example is in `examples/legacy.patch.json`:
+A corresponding HWP example is in `examples/legacy.patch.json`:
 
 ```bash
 ./scripts/hwp-workbench apply fixtures/generated/legacy-review.hwp \
@@ -76,6 +76,38 @@ A corresponding equal-length HWP example is in `examples/legacy.patch.json`:
 ```
 
 The bundled documents are self-authored, format-shaped parser fixtures. They contain deliberately opaque test data and are **not certified or intended as complete, submission-ready Hancom documents**. Successfully reopening them in this engine does not prove interoperability with Hancom.
+
+## Use from Claude Code, Codex or Claude Desktop
+
+Keep working in your own agent client. HWP Workbench is the visual review surface;
+there is no chat inside the editor.
+
+**Skill (Claude Code and Codex).** Install the native-edit recipes:
+
+```bash
+scripts/hwp-workbench skill install
+```
+
+This installs the marked skill for both agents. Use `--target claude` or `--target codex` to select one, and `--dry-run` to check destinations without writing. `skill status` shows installed versions and paths; `skill uninstall` removes only marked folders. Existing unmarked skills are preserved, and marked skills are backed up before replacement.
+
+The skill guides `read` → `search` → saved preview → review → `apply --patch preview.json` to a new native file, or `propose` for desktop review. `open RESULT --root DIRECTORY` requests visual review. Desktop Agent link review and open handoff require the desktop integration. Keep source hashes, exact expected text and honest warnings.
+
+**MCP one-liner (Claude Code or Codex).** Print the setup, then run the printed command in your terminal:
+
+```bash
+./scripts/hwp-workbench mcp-config --client claude-code --root /absolute/path/to/document-folder
+./scripts/hwp-workbench mcp-config --client codex --root /absolute/path/to/document-folder
+```
+
+Setup uses absolute paths and shell quoting. It only prints; it never runs either client or edits configuration. The root must exist; `/` and the whole home folder are refused. `--client json` prints a `mcpServers` block.
+
+**Claude Desktop bundle (macOS, Python 3.11+).** Build the local stdio server bundle:
+
+```bash
+python3 scripts/build-mcpb.py
+```
+
+Double-click `dist/hwp-workbench.mcpb` and choose an approved document folder. The required setting has no default. The builder refuses existing outputs. The orchestrator must add `mcpb/icon.png` from the design icon before distribution. Bundle startup is tested; Claude Desktop installation is unverified. See [the agent interface](docs/AGENT-INTERFACE.md) for the contract and limits.
 
 ## Connect an agent through MCP
 
@@ -94,7 +126,7 @@ Example client configuration, replacing both absolute paths:
 }
 ```
 
-Tools are `hwp_inspect`, `hwp_extract`, `hwp_validate`, `hwp_plan`, and `hwp_apply`. Start with inspect, use the returned source hash and node IDs to construct a patch, review plan output, then apply to a new filename. A node ID is scoped to its source revision; re-inspect after changing the file.
+Tools are `hwp_read`, `hwp_search`, `hwp_replace`, `hwp_fill`, `hwp_set`, `hwp_inspect`, `hwp_extract`, `hwp_validate`, `hwp_plan`, `hwp_apply`, `hwp_propose`, and `hwp_session`. Start with inspect, use the returned source hash and node IDs to construct a patch, review plan output, then apply to a new filename. A node ID is scoped to its source revision; re-inspect after changing the file.
 
 Grant the smallest practical workspace. An agent host can transmit extracted content to its model provider even though this application does not upload documents. The `acknowledgeRisks` flag acknowledges a policy; it is not cryptographic evidence of human approval. See `docs/AGENT-INTERFACE.md` and `docs/SECURITY.md`.
 

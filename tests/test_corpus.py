@@ -22,11 +22,47 @@ spec.loader.exec_module(corpus)
 
 
 class CorpusTests(unittest.TestCase):
+    def test_empty_runs_do_not_count_as_body_anchor_evidence(self):
+        streams = dict(CompoundFile(make_hwp(False)).streams)
+        streams['BodyText/Section0'] = record(66, b'\0' * 22) + record(67, b'\r\0', 1)
+        document = Document(cfb_from_streams(streams))
+        observed = {'status': 'passed', 'sections': [{'index': 0, 'paragraphs': [{'index': 0, 'text': ''}]}]}
+        result = corpus.anchor_agreement(document, observed)
+        self.assertEqual(result['status'], 'skipped')
+        self.assertEqual(result['checkedBodyNodes'], 0)
+
     def test_missing_node_is_skipped(self):
         with patch('rhwp_probe.shutil.which', return_value=None):
             result = probe_rhwp(make_hwp())
         self.assertEqual(result['status'], 'skipped')
         self.assertIn('Node.js', result['reason'])
+
+    def test_length_changing_hwp_checks_save_reopen_and_render(self):
+        from hwp_workbench import independent
+        observed = independent.probe(make_hwp())
+        if observed.get('available') is False:
+            self.skipTest(observed['reason'])
+        document = Document(make_hwp())
+        with tempfile.TemporaryDirectory() as directory:
+            checks = corpus.length_changing_checks(document, Path(directory), 'synthetic.hwp')
+            saved = Document((Path(directory) / 'length-edited-synthetic.hwp').read_bytes())
+        self.assertEqual(checks['lengthChangingEdit']['status'], 'passed')
+        self.assertGreater(checks['lengthChangingEdit']['utf16Delta'], 0)
+        self.assertTrue(checks['lengthChangingEdit']['untouchedStreamsIdentical'])
+        self.assertTrue(saved.nodes[0].text.endswith(' edited'))
+        self.assertEqual(checks['rhwpLengthChangingEdit']['status'], 'passed')
+        self.assertEqual(checks['rhwpLengthChangingRender']['status'], 'passed')
+        self.assertEqual(checks['rhwpLengthChangingRender']['page'], 0)
+
+    def test_length_changing_checks_report_missing_parser(self):
+        document = Document(make_hwp())
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(corpus, 'probe', return_value={'available': False, 'reason': 'Node.js unavailable.'}):
+                checks = corpus.length_changing_checks(document, Path(directory), 'synthetic.hwp')
+        self.assertEqual(checks['lengthChangingEdit']['status'], 'passed')
+        self.assertEqual(checks['rhwpLengthChangingEdit']['status'], 'skipped')
+        self.assertEqual(checks['rhwpLengthChangingRender']['status'], 'skipped')
+        self.assertIn('Node.js', checks['rhwpLengthChangingRender']['reason'])
 
     def test_empty_body_edit_is_skipped_and_corpus_is_partial(self):
         streams = dict(CompoundFile(make_hwp(False)).streams)
@@ -51,6 +87,9 @@ class CorpusTests(unittest.TestCase):
         self.assertEqual(result['checks']['edit']['status'], 'skipped')
         self.assertEqual(result['checks']['edit']['reason'], 'No printable body text.')
         self.assertEqual(result['checks']['rhwpNoop']['status'], 'skipped')
+        self.assertIn('rhwpProbe', result['checks'])
+        self.assertEqual(result['checks']['anchorAgreement']['status'], 'skipped')
+        self.assertEqual(result['checks']['anchorAgreement']['checkedBodyNodes'], 0)
 
 
 class GeneratedFixtureTests(unittest.TestCase):

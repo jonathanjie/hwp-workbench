@@ -54,7 +54,7 @@ class AgentOperationTests(unittest.TestCase):
             with self.subTest(options=options), self.assertRaises(WorkbenchError):
                 agent_ops.read(doc, **options)
 
-    def test_replace_patch_is_pure_and_skips_hwp_length_conflict(self):
+    def test_replace_patch_is_pure_and_allows_hwp_length_change(self):
         for doc in self.documents():
             with self.subTest(format=doc.format):
                 result = agent_ops.replace(doc, '검토', '확정')
@@ -65,8 +65,9 @@ class AgentOperationTests(unittest.TestCase):
                 self.assertIn('확정', Document(doc.serialize(True)).nodes[0].text)
         doc = Document(make_hwp())
         result = agent_ops.replace(doc, '검토', '확정됨')
-        self.assertEqual(result['changes'], [])
-        self.assertEqual(result['skipped'][0]['code'], 'HWP_LENGTH_CHANGE_BLOCKED')
+        self.assertEqual(result['skipped'], [])
+        doc.patch(result['patch'])
+        self.assertIn('확정됨', Document(doc.serialize(True)).nodes[0].text)
 
     def test_replace_read_only_scope_and_occurrence_limit(self):
         doc = Document(make_hwpx())
@@ -126,11 +127,11 @@ class AgentOperationTests(unittest.TestCase):
             agent_ops.set_text(Document(make_hwp()), doc.nodes[0].id, 'short')
         self.assertEqual(caught.exception.code, 'NODE_NOT_FOUND')
         doc = Document(make_hwp())
-        with self.assertRaises(WorkbenchError) as caught:
-            agent_ops.set_text(doc, doc.nodes[0].id, 'short')
-        self.assertEqual(caught.exception.code, 'HWP_LENGTH_CHANGE_BLOCKED')
+        result = agent_ops.set_text(doc, doc.nodes[0].id, 'short')
+        doc.patch(result['patch'])
+        self.assertEqual(Document(doc.serialize(True)).nodes[0].text, 'short')
 
-    def test_replace_utf16_length_and_literal_regex_replacement(self):
+    def test_replace_surrogate_pairs_and_literal_regex_replacement(self):
         doc = Document(make_hwp())
         result = agent_ops.replace(doc, '검토', '😀')
         self.assertEqual(result['skipped'], [])
@@ -138,7 +139,9 @@ class AgentOperationTests(unittest.TestCase):
         self.assertIn('😀', Document(doc.serialize(True)).nodes[0].text)
         doc = Document(make_hwp())
         result = agent_ops.replace(doc, '검', '😀')
-        self.assertEqual(result['skipped'][0]['code'], 'HWP_LENGTH_CHANGE_BLOCKED')
+        self.assertEqual(result['skipped'], [])
+        doc.patch(result['patch'])
+        self.assertIn('😀', Document(doc.serialize(True)).nodes[0].text)
         doc = Document(make_hwpx())
         result = agent_ops.replace(doc, 'J[oa]nathan', r'\1', regex=True)
         self.assertEqual(result['changes'][0]['after'], r'\1 Jie')

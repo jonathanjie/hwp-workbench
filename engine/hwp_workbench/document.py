@@ -10,6 +10,7 @@ from xml.parsers import expat
 from xml.etree import ElementTree as ET
 import hashlib, io, re, struct, zipfile, zlib
 from .cfb import CompoundFile, MAGIC, u32
+from .hwp_records import parse_section, rewrite_section, validate_text_edit
 from .errors import WorkbenchError, require, MAX_FILE, MAX_PART, MAX_EXPANDED, MAX_NODES
 
 HP = 'http://www.hancom.co.kr/hwpml/2011/paragraph'
@@ -29,6 +30,12 @@ def sha(data: bytes) -> str: return hashlib.sha256(data).hexdigest()
 def local(tag: str) -> str: return tag.rsplit('}',1)[-1]
 def esc(s: str) -> str: return s.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
 
+def patch_input(value):
+    """Accept a native patch or the unchanged edit-preview envelope."""
+    if isinstance(value, dict) and 'schemaVersion' not in value and 'patch' in value:
+        return value['patch']
+    return value
+
 def check_text(value):
     require(isinstance(value,str) and len(value)<=200_000,'BAD_PATCH','Text must be a string of at most 200,000 characters.')
     # Native tabs, paragraph breaks and fields need dedicated document operations.
@@ -44,6 +51,10 @@ class TextNode:
     editable: bool = True
     paragraph: int = 0
     style: dict | None = None
+    anchor: dict | None = None
+    paragraphRecordIndex: int | None = None
+    textStart: int | None = None
+    textEnd: int | None = None
 
 class Document:
     def __init__(self, data: bytes, name: str = 'document'):
@@ -66,6 +77,7 @@ class Document:
             raise WorkbenchError('UNSUPPORTED_FORMAT','Only HWP 5.x CFB and HWPX ZIP documents are supported. HWP 3.x is not supported.')
         require(len(self.nodes)<=MAX_NODES,'LIMIT','Too many text nodes.')
         self.by_id = {n.id:n for n in self.nodes}
+        self.references = self._references()
         self.warn('LAYOUT_UNVERIFIED','warning','The workspace preview is approximate. Hancom layout, pagination and font fidelity have not been certified.')
         if self.block_save:
             for n in self.nodes: n.editable=False
@@ -127,9 +139,11 @@ class Document:
         self.fonts=sorted(set(self.fonts))
         self.warn('FONT_METRICS_UNVERIFIED','warning','Requested fonts are listed, but installed font identity and text metrics are not verified. No fonts are bundled.')
         feature_names={'tbl':'TABLE_LAYOUT','pic':'IMAGES','equation':'EQUATIONS','ole':'OLE_OBJECTS','chart':'CHARTS','header':'HEADERS_FOOTERS','footer':'HEADERS_FOOTERS','footNote':'FOOTNOTES','endNote':'FOOTNOTES','fieldBegin':'FIELDS','rect':'SHAPES','line':'SHAPES','ellipse':'SHAPES','polygon':'SHAPES','curve':'SHAPES','container':'SHAPES','pageNum':'PAGE_NUMBERING','bookmark':'BOOKMARKS'}
-        for section in section_names:
+        for section_index, section in enumerate(section_names):
             root=trees[section]
-            tokens=self._text_tokens(self.parts[section],section)
+            tokens, empty_control_indexes = self._text_tokens(self.parts[section], section)
+            empty_controls = {id(element) for index, element in enumerate(root.iter())
+                              if index in empty_control_indexes}
             token_by_element={}
             t_elements=[e for e in root.iter() if e.tag=='{'+HP+'}t']
             require(len(t_elements)==len(tokens),'BAD_XML','Text token mapping did not match namespace-aware parse.')
@@ -148,10 +162,11 @@ class Document:
                     t=token_by_element[id(e)]
                     role='table-cell' if 'tc' in ancestors else ('header-footer' if any(k in ancestors for k in ('header','footer')) else 'body')
                     allowed=t['plain'] and not any(k in ancestors for k in ('equation','chart','ole','fieldBegin','fieldEnd'))
-                    node=TextNode(t['id'],''.join(e.itertext()),section,role,allowed,para,style or {})
+                    node=TextNode(t['id'],self._hwpx_text(e, empty_controls),section,role,allowed,para,style or {})
                     self.nodes.append(node); self.positions[node.id]=t
                 for c in e: scan(c,ancestors+(tag,),style)
             scan(root)
+            self._hwpx_anchors(root, token_by_element, section_index, empty_controls)
             def visual(e, depth=0):
                 if depth > 32:
                     return []
@@ -194,40 +209,134 @@ class Document:
             self.view.append({'type':'section','label':section,'children':visual(root)})
         self.warn('PREVIEW_CACHE_RETAINED','info','Embedded preview images/text and line-layout caches are retained unchanged. They may be stale after edits; reopen in Hancom to refresh.')
 
-    def _text_tokens(self,data,part):
-        parser=expat.ParserCreate(namespace_separator='}')
-        tokens=[]; active=[]; depth=0; count=0
+    @staticmethod
+    def _hwpx_text(element, empty_controls):
+        # rhwp's text API counts Unicode scalars, including these inline text
+        # controls. Object and field slots do not occupy its visible text axis.
+        inline_text = {
+            'lineBreak': '\n', 'columnBreak': '\n', 'tab': '\t',
+            'nbSpace': '\u00a0', 'fwSpace': '\u2007', 'hyphen': '\u00ad',
+        }
+        text = element.text or ''
+        for child in element:
+            # rhwp 0.8.7 only emits inline controls from self-closing XML
+            # events. ElementTree alone cannot retain that lexical distinction.
+            tag = local(child.tag)
+            if tag in inline_text and id(child) in empty_controls:
+                text += inline_text[tag]
+            else:
+                text += Document._hwpx_text(child, empty_controls)
+            text += child.tail or ''
+        return text
+
+    def _hwpx_anchors(self, root, tokens, section_index, empty_controls):
+        token_ids = {token['id'] for token in tokens.values()}
+        nodes = {node.id: node for node in self.nodes if node.id in token_ids}
+        for node in nodes.values():
+            node.anchor = {'section': section_index, 'paragraph': 0,
+                           'charOffset': None, 'inCell': node.role == 'table-cell'}
+        paragraphs = [child for child in root if child.tag == '{' + HP + '}p']
+        if root.tag == '{' + HP + '}p':
+            paragraphs = [root]
+        for paragraph_index, paragraph in enumerate(paragraphs):
+            char_offset = 0
+
+            def visit(element, top_level=True, in_cell=False, parent_tag=None):
+                nonlocal char_offset
+                if element is not paragraph and element.tag == '{' + HP + '}p':
+                    top_level = False
+                in_cell = in_cell or element.tag == '{' + HP + '}tc'
+                token = tokens.get(id(element))
+                if token is not None:
+                    node = nodes[token['id']]
+                    node.anchor = {'section': section_index, 'paragraph': paragraph_index,
+                                   'charOffset': char_offset if top_level else None, 'inCell': in_cell}
+                    if top_level:
+                        char_offset += len(node.text)
+                    elif node.role == 'body':
+                        node.role = 'text-box'
+                    return
+                tag = local(element.tag)
+                if top_level:
+                    # Auto-number controls emit one space from either XML form
+                    # inside ctrl; standalone tabs and breaks require Empty events.
+                    if tag == 'autoNum' and parent_tag == 'ctrl':
+                        char_offset += 1
+                    elif id(element) in empty_controls and tag in {'lineBreak', 'columnBreak', 'softHyphen', 'tab'}:
+                        char_offset += 1
+                for child in element:
+                    visit(child, top_level, in_cell, tag)
+
+            visit(paragraph)
+
+    def _text_tokens(self, data, part):
+        parser = expat.ParserCreate(namespace_separator='}')
+        tokens = []
+        active = []
+        depth = 0
+        count = 0
+        empty_control_indexes = set()
+        control_names = {HP + '}' + tag for tag in
+                         ('lineBreak', 'columnBreak', 'softHyphen', 'tab', 'autoNum', 'nbSpace', 'fwSpace', 'hyphen')}
+
         def tag_end(start):
-            quote=None
-            for i in range(start,len(data)):
-                b=data[i]
+            quote = None
+            for index in range(start, len(data)):
+                byte = data[index]
                 if quote:
-                    if b==quote: quote=None
-                elif b in (34,39): quote=b
-                elif b==62: return i+1
-            raise WorkbenchError('BAD_XML','Unterminated XML tag.')
-        def start(name,attrs):
-            nonlocal depth,count
-            depth+=1;count+=1
-            require(depth<=128 and count<=MAX_NODES*10,'LIMIT','XML complexity limit reached.')
-            for a in active: a['plain']=False
-            if name==HP+'}t':
-                at=parser.CurrentByteIndex; end=tag_end(at); raw=data[at:end]
-                qname=raw[1:].split(None,1)[0].split(b'>',1)[0].rstrip(b'/').decode('ascii')
-                t={'id':f'{part}#text:{len(tokens)}','start':at,'inner_start':end,'plain':True,'selfclose':raw.rstrip().endswith(b'/>'),'qname':qname}
-                tokens.append(t);active.append(t)
+                    if byte == quote:
+                        quote = None
+                elif byte in (34, 39):
+                    quote = byte
+                elif byte == 62:
+                    return index + 1
+            raise WorkbenchError('BAD_XML', 'Unterminated XML tag.')
+
+        def start(name, attrs):
+            nonlocal depth, count
+            depth += 1
+            count += 1
+            require(depth <= 128 and count <= MAX_NODES * 10, 'LIMIT', 'XML complexity limit reached.')
+            if name in control_names:
+                at = parser.CurrentByteIndex
+                opening = data[at:tag_end(at)]
+                if opening.rstrip().endswith(b'/>'):
+                    empty_control_indexes.add(count - 1)
+            for token in active:
+                token['plain'] = False
+            if name == HP + '}t':
+                at = parser.CurrentByteIndex
+                end = tag_end(at)
+                opening = data[at:end]
+                qname = opening[1:].split(None, 1)[0].split(b'>', 1)[0].rstrip(b'/').decode('ascii')
+                token = {
+                    'id': f'{part}#text:{len(tokens)}', 'start': at,
+                    'inner_start': end, 'plain': True,
+                    'selfclose': opening.rstrip().endswith(b'/>'), 'qname': qname,
+                }
+                tokens.append(token)
+                active.append(token)
+
         def end(name):
             nonlocal depth
-            if name==HP+'}t':
-                t=active.pop();at=parser.CurrentByteIndex
-                t['inner_end']=t['inner_start'] if t['selfclose'] else at
-                t['end']=t['inner_start'] if t['selfclose'] else tag_end(at)
-            depth-=1
-        parser.StartElementHandler=start;parser.EndElementHandler=end
-        parser.StartDoctypeDeclHandler=lambda *a: (_ for _ in ()).throw(WorkbenchError('UNSAFE_XML','DTD prohibited.'))
-        try: parser.Parse(data,True)
-        except expat.ExpatError as e: raise WorkbenchError('BAD_XML',str(e))
-        return tokens
+            if name == HP + '}t':
+                token = active.pop()
+                at = parser.CurrentByteIndex
+                token['inner_end'] = token['inner_start'] if token['selfclose'] else at
+                token['end'] = token['inner_start'] if token['selfclose'] else tag_end(at)
+            depth -= 1
+
+        def reject_doctype(*args):
+            raise WorkbenchError('UNSAFE_XML', 'DTD prohibited.')
+
+        parser.StartElementHandler = start
+        parser.EndElementHandler = end
+        parser.StartDoctypeDeclHandler = reject_doctype
+        try:
+            parser.Parse(data, True)
+        except expat.ExpatError as error:
+            raise WorkbenchError('BAD_XML', str(error)) from error
+        return tokens, empty_control_indexes
 
     def _hwp_stream(self, name):
         payload = self.parts[name]
@@ -268,20 +377,21 @@ class Document:
         self.stream_trailers = {}
         self._classify_hwp_scripts()
         self.sections = {}
+        self.hwp_sections = {}
         self.fonts = []
         expanded_total = 0
         section_names = sorted(
             (name for name in self.parts if re.fullmatch(r'BodyText/Section\d+', name)),
             key=lambda name: int(name.rsplit('Section', 1)[1]),
         )
-        for name in section_names:
+        for section_index, name in enumerate(section_names):
             raw = self._hwp_stream(name)
             expanded_total += len(raw)
             require(expanded_total <= MAX_EXPANDED, 'LIMIT', 'Expanded HWP sections exceed limit.')
             self.sections[name] = raw
-            self._read_hwp_section(name, raw)
+            self._read_hwp_section(name, raw, section_index)
         require(bool(self.sections), 'NOT_HWP', 'No HWP body sections found.')
-        self.warn('HWP_EQUAL_LENGTH_ONLY', 'warning', 'HWP alpha editing requires the same UTF-16 code-unit length per text run. Length-changing and structural edits are blocked to retain character/line offsets.')
+        self.warn('HWP_REFLOW_UNVERIFIED', 'warning', 'Text length may change in existing plain text runs. Stored line starts are adjusted, but layout is stale; readers must recompute line breaks. Hancom reflow has not been verified.')
         self.warn('HWP_LAYOUT_NOT_RENDERED', 'warning', 'HWP is shown as structured text, not a page-faithful rendering. Table/control/style streams are retained but not visually reconstructed.')
         self.warn('PREVIEW_CACHE_RETAINED', 'info', 'Stored preview content remains unchanged and may be stale after editing.')
 
@@ -300,36 +410,89 @@ class Document:
             self.block_save = True
             self.warn('PROTECTED_OR_ACTIVE_CONTENT', 'error', 'Script or digital-signature metadata detected; editing is blocked.')
 
-    def _read_hwp_section(self, name, raw):
-        at = 0
-        record = 0
+    def _read_hwp_section(self, name, raw, section_index):
+        section = parse_section(raw)
+        self.hwp_sections[name] = section
         paragraph = 0
         children = []
-        while at < len(raw):
-            require(at + 4 <= len(raw), 'BAD_HWP_RECORD', 'Truncated record header.')
-            bits = u32(raw, at)
-            tag = bits & 1023
-            size = bits >> 20
-            header_size = 4
-            if size == 4095:
-                require(at + 8 <= len(raw), 'BAD_HWP_RECORD', 'Truncated extended record header.')
-                size = u32(raw, at + 4)
-                header_size = 8
-            start = at + header_size
+        top_paragraph = -1
+        paragraph_level = 0
+        controls = []
+        for item in section.records:
+            record = item.index
+            tag = item.tag
+            level = item.level
+            size = len(item.data)
+            start = item.payload_start
             end = start + size
-            require(end <= len(raw), 'BAD_HWP_RECORD', 'Record payload exceeds stream bounds.')
+            while controls and level <= controls[-1]['level']:
+                controls.pop()
+            if tag == 71 and size >= 4:
+                controls.append({'level': level, 'id': raw[start:start + 4][::-1],
+                                 'tableSeen': False, 'listRole': None})
+            if controls and controls[-1]['id'] == b'tbl ':
+                table = controls[-1]
+                # Direct TABLE children divide caption lists from cell lists.
+                # Nested tables have their own control stack entry.
+                if level == table['level'] + 1:
+                    if tag == 77:
+                        table['tableSeen'] = True
+                        table['listRole'] = None
+                    elif tag == 72:
+                        table['listRole'] = 'cell' if table['tableSeen'] else 'caption'
             if tag == 66:
                 paragraph += 1
+                paragraph_level = level
+                if level == 0:
+                    top_paragraph += 1
             if tag == 67:
                 require(size % 2 == 0, 'BAD_HWP_TEXT', 'Misaligned UTF-16 text record.')
                 # Edit only contiguous printable text; native controls stay opaque.
                 offset = start
                 segment = 0
+                char_offset = 0
+                control = controls[-1] if controls else None
+                in_cell = bool(control and control['id'] == b'tbl ' and control['listRole'] == 'cell')
+                nested = paragraph_level > 0
+                role = 'text-run'
+                if nested:
+                    role = 'table-cell' if in_cell else 'text-box'
+                    if control and control['id'] == b'tbl ' and control['listRole'] == 'caption':
+                        role = 'table-caption'
+                    if any(item['id'] in {b'head', b'foot'} for item in controls):
+                        role = 'header-footer'
+                def append_text(begin, finish, text):
+                    node_id = f'{name}#record:{record}:text:{segment}'
+                    anchor = {'section': section_index, 'paragraph': max(0, top_paragraph),
+                              'charOffset': None if nested else char_offset, 'inCell': in_cell}
+                    paragraph_record = section.owners.get(record)
+                    text_start = section.text_offsets.get(record, 0) + (begin - start) // 2
+                    text_end = text_start + (finish - begin) // 2
+                    self.nodes.append(TextNode(
+                        node_id, text, name, role, True, paragraph, {}, anchor,
+                        paragraph_record, text_start, text_end,
+                    ))
+                    self.positions[node_id] = {
+                        'start': begin, 'end': finish, 'part': name,
+                        'record': record, 'paragraphRecordIndex': paragraph_record,
+                        'textStart': text_start, 'textEnd': text_end,
+                    }
+                    children.append({'type': 'paragraph', 'children': [{'type': 'text', 'node': node_id}]})
+
                 while offset < end:
                     code = struct.unpack_from('<H', raw, offset)[0]
                     if code < 32:
                         width = 16 if (1 <= code <= 9 or 11 <= code <= 12 or 14 <= code <= 23) else 2
                         require(offset + width <= end, 'BAD_HWP_TEXT', 'Truncated HWP control sequence.')
+                        # rhwp elides extended slots except auto-number. Tabs,
+                        # line breaks and selected single-unit controls each
+                        # contribute one scalar; the paragraph terminator ends text.
+                        if code in {9, 10, 18, 24, 25, 30, 31}:
+                            char_offset += 1
+                        if code == 13:
+                            if segment == 0:
+                                append_text(offset, offset, '')
+                            break
                         offset += width
                         continue
                     begin = offset
@@ -339,47 +502,73 @@ class Document:
                         text = raw[begin:offset].decode('utf-16le')
                     except UnicodeError:
                         raise WorkbenchError('BAD_HWP_TEXT', 'Invalid UTF-16 in paragraph text.')
-                    node_id = f'{name}#record:{record}:text:{segment}'
-                    self.nodes.append(TextNode(node_id, text, name, 'text-run', True, paragraph, {}))
-                    self.positions[node_id] = {'start': begin, 'end': offset, 'part': name}
-                    children.append({'type': 'paragraph', 'children': [{'type': 'text', 'node': node_id}]})
+                    append_text(begin, offset, text)
+                    char_offset += len(text)
                     segment += 1
-            at = end
-            record += 1
-            require(record <= MAX_NODES, 'LIMIT', 'Too many HWP records.')
         self.view.append({'type': 'section', 'label': name, 'children': children})
 
     def inspect(self):
         return dict(schemaVersion=1,format=self.format,name=self.name,sha256=self.hash,
                     nodes=[asdict(n)|{'text':self.edits.get(n.id,n.text)} for n in self.nodes],
                     warnings=self.warnings,view=self.view,fonts=self.fonts,
-                    capabilities={'textEdit':not self.block_save,'lengthChangingText':self.format=='hwpx' and not self.block_save,
+                    capabilities={'textEdit':not self.block_save,'lengthChangingText':not self.block_save,
                                   'structuralEdit':False,'formattingEdit':False,'certifiedLayout':False,'saveAs':not self.block_save},
                     parts=[{'name':k,'size':len(v),'sha256':sha(v)} for k,v in self.parts.items()],
                     pendingChanges=len(self.edits))
 
-    def patch(self,patch: dict):
-        require(isinstance(patch,dict) and patch.get('schemaVersion')==1,'BAD_PATCH','Expected patch schemaVersion 1.')
-        require(patch.get('baseSha256')==self.hash,'STALE_DOCUMENT','Patch hash differs from source document; re-inspect before editing.')
-        operations=patch.get('operations')
-        require(isinstance(operations,list) and 0<len(operations)<=1000,'BAD_PATCH','Supply 1–1000 operations.')
-        require(not self.block_save,'SAVE_BLOCKED','Protected/active content blocks edits.')
-        pending=dict(self.edits);seen=set()
-        for op in operations:
-            require(isinstance(op,dict) and set(op)=={'op','nodeId','expectedText','text'},'BAD_PATCH','Each operation requires exactly op, nodeId, expectedText, text.')
-            require(op['op']=='set_text' and isinstance(op['nodeId'],str),'BAD_PATCH','Only set_text is implemented.')
-            nid=op['nodeId'];require(nid not in seen,'BAD_PATCH','Duplicate target in patch.');seen.add(nid)
-            require(nid in self.by_id,'NODE_NOT_FOUND','Unknown node ID: '+nid)
-            node=self.by_id[nid]
-            require(node.editable,'UNSUPPORTED_ELEMENT','This text is not safely editable.')
-            require(op['expectedText']==pending.get(nid,node.text),'STALE_TEXT','Expected text no longer matches '+nid)
-            value=op['text'];check_text(value)
-            if self.format=='hwp':
-                require(len(value.encode('utf-16le'))==len(node.text.encode('utf-16le')),'HWP_LENGTH_CHANGE_BLOCKED','HWP alpha requires equal UTF-16 length. No output was written.')
-            if value==node.text: pending.pop(nid,None)
-            else: pending[nid]=value
+    def _references(self) -> dict[str, str]:
+        references = {}
+        section_numbers = {}
+        section_counts = {}
+        for node in self.nodes:
+            section = section_numbers.setdefault(node.part, len(section_numbers))
+            index = section_counts.get(node.part, 0)
+            section_counts[node.part] = index + 1
+            references[f's{section}:t{index}'] = node.id
+        return references
+
+    def resolve_node_id(self, node_id: str) -> str:
+        require(isinstance(node_id, str), 'BAD_ARGUMENTS', 'nodeId must be a full ID or short reference.')
+        resolved = self.references.get(node_id, node_id)
+        require(resolved in self.by_id, 'NODE_NOT_FOUND', 'Unknown node ID: ' + node_id)
+        return resolved
+
+    def patch(self, patch: dict):
+        require(isinstance(patch, dict) and patch.get('schemaVersion') == 1,
+                'BAD_PATCH', 'Expected patch schemaVersion 1.')
+        require(patch.get('baseSha256') == self.hash, 'STALE_DOCUMENT',
+                'Patch hash differs from source document; re-inspect before editing.')
+        operations = patch.get('operations')
+        require(isinstance(operations, list) and 0 < len(operations) <= 1000,
+                'BAD_PATCH', 'Supply 1–1000 operations.')
+        require(not self.block_save, 'SAVE_BLOCKED', 'Protected/active content blocks edits.')
+        pending = dict(self.edits)
+        seen = set()
+        for operation in operations:
+            require(isinstance(operation, dict) and set(operation) == {'op', 'nodeId', 'expectedText', 'text'},
+                    'BAD_PATCH', 'Each operation requires exactly op, nodeId, expectedText, text.')
+            require(operation['op'] == 'set_text' and isinstance(operation['nodeId'], str),
+                    'BAD_PATCH', 'Only set_text is implemented.')
+            node_id = self.resolve_node_id(operation['nodeId'])
+            require(node_id not in seen, 'BAD_PATCH', 'Duplicate target in patch.')
+            seen.add(node_id)
+            node = self.by_id[node_id]
+            require(node.editable, 'UNSUPPORTED_ELEMENT', 'This text is not safely editable.')
+            require(operation['expectedText'] == pending.get(node_id, node.text),
+                    'STALE_TEXT', 'Expected text no longer matches ' + node_id)
+            value = operation['text']
+            if self.format == 'hwp' and isinstance(value, str):
+                require(all(ord(char) >= 32 for char in value), 'UNSUPPORTED_ELEMENT',
+                        'Plain text only: do not touch native controls, tabs, fields or paragraph breaks.')
+            check_text(value)
+            if self.format == 'hwp':
+                validate_text_edit(self.hwp_sections[node.part], self.positions[node_id])
+            if value == node.text:
+                pending.pop(node_id, None)
+            else:
+                pending[node_id] = value
         # All-or-nothing; no mutations until every operation has passed.
-        self.edits=pending
+        self.edits = pending
         return self.diff()
 
     def diff(self):
@@ -392,24 +581,29 @@ class Document:
         require(not self.block_save, 'SAVE_BLOCKED', 'Saving is blocked.')
         require(acknowledge_risks, 'RISK_ACK_REQUIRED', 'Edited output requires explicit acknowledgement of compatibility and stale-preview risks.')
         changed = {}
+        expected_sections = {}
         by_part = {}
         for node_id, value in self.edits.items():
             by_part.setdefault(self.by_id[node_id].part, []).append((node_id, value))
         for part, items in by_part.items():
             raw = self.parts[part] if self.format == 'hwpx' else self.sections[part]
-            replacements = []
-            for node_id, value in items:
-                position = self.positions[node_id]
-                if self.format == 'hwp':
-                    replacements.append((position['start'], position['end'], value.encode('utf-16le')))
-                elif position['selfclose']:
-                    opening = raw[position['start']:position['inner_start']]
-                    new = opening[:-2] + b'>' + esc(value).encode() + b'</' + position['qname'].encode() + b'>'
-                    replacements.append((position['start'], position['end'], new))
-                else:
-                    replacements.append((position['inner_start'], position['inner_end'], esc(value).encode('utf-8')))
-            for start, end, new in sorted(replacements, reverse=True):
-                raw = raw[:start] + new + raw[end:]
+            if self.format == 'hwp':
+                native_edits = [(self.positions[node_id], value.encode('utf-16le'))
+                                for node_id, value in items]
+                raw = rewrite_section(self.hwp_sections[part], native_edits)
+                expected_sections[part] = raw
+            else:
+                replacements = []
+                for node_id, value in items:
+                    position = self.positions[node_id]
+                    if position['selfclose']:
+                        opening = raw[position['start']:position['inner_start']]
+                        new = opening[:-2] + b'>' + esc(value).encode() + b'</' + position['qname'].encode() + b'>'
+                        replacements.append((position['start'], position['end'], new))
+                    else:
+                        replacements.append((position['inner_start'], position['inner_end'], esc(value).encode('utf-8')))
+                for start, end, new in sorted(replacements, reverse=True):
+                    raw = raw[:start] + new + raw[end:]
             if self.format == 'hwpx':
                 self._xml(raw)
             elif self.compressed:
@@ -433,6 +627,13 @@ class Document:
         for name, payload in self.parts.items():
             if name not in changed:
                 require(check.parts[name] == payload, 'VERIFY_FAILED', 'Opaque part changed: ' + name)
-        for node_id, text in self.edits.items():
-            require(node_id in check.by_id and check.by_id[node_id].text == text, 'VERIFY_FAILED', 'Edit was not preserved on reopen: ' + node_id)
+        if self.format == 'hwp':
+            # Deleting a run can renumber later text segments in this revision.
+            # Verify complete native sections, including controls and metadata,
+            # rather than binding reopened nodes to the old revision's IDs.
+            for part, expected in expected_sections.items():
+                require(check.sections[part] == expected, 'VERIFY_FAILED', 'Edited HWP section differs on reopen: ' + part)
+        else:
+            for node_id, text in self.edits.items():
+                require(node_id in check.by_id and check.by_id[node_id].text == text, 'VERIFY_FAILED', 'Edit was not preserved on reopen: ' + node_id)
         return result

@@ -1,19 +1,20 @@
 """Shared document operations for CLI, MCP and desktop RPC."""
 from pathlib import Path
 
-from . import agent_ops
-from .document import Document, sha
+from . import agent_ops, agent_link
+from .document import Document, sha, patch_input
+from .independent import check_output
 from .errors import require
 from .workspace import Workspace
 
 CAPABILITIES = {
     'version': '0.1.0-alpha.1',
     'formats': {
-        'hwp': 'HWP 5.x: existing text, equal UTF-16 length only',
+        'hwp': 'HWP 5.x: existing plain text runs; variable length; Hancom reflow unverified',
         'hwpx': 'Existing plain text nodes; variable length; same-format save',
     },
     'operations': ['inspect', 'extract', 'validate', 'plan', 'apply',
-                   'read', 'search', 'replace', 'fill', 'set'],
+                   'read', 'search', 'replace', 'fill', 'set', 'propose', 'session'],
     'notImplemented': ['native full-page rendering', 'formatting and structural edits',
                        'new document authoring', 'HWP/HWPX conversion', 'DOCX/PDF export',
                        'comments/track changes', 'full Hancom fidelity'],
@@ -29,12 +30,14 @@ def _publish(ws: Workspace, path: str, doc: Document, args: dict, result: dict) 
     require(args.get('acknowledgeRisks') is True, 'RISK_ACK_REQUIRED',
             'Pass acknowledgeRisks: true to save edited output.')
     content = doc.serialize(True)
+    independent_check = check_output(content, doc.edits)
     # Re-read immediately before publication. Original sources never get overwritten.
     require(sha(ws.read(path)) == doc.hash, 'STALE_DOCUMENT',
             'Source changed during processing; output was not published.')
     ws.write_new(output, content)
     return result | {'output': output, 'outputSha256': sha(content),
-                     'reopenedAndVerified': True, 'sourceUntouched': True}
+                     'reopenedAndVerified': True, 'sourceUntouched': True,
+                     'independentCheck': independent_check}
 
 
 def _agent_edit(doc: Document, method: str, args: dict) -> dict:
@@ -57,6 +60,10 @@ def invoke(root, method: str, args: dict) -> dict:
     ws = Workspace(root)
     path = args.get('path')
     doc = Document(ws.read(path), Path(path).name)
+    if method == 'session':
+        return agent_link.session(ws, path, doc)
+    if method == 'propose':
+        return agent_link.propose(ws, path, doc, args)
     if method == 'inspect':
         compact = args.get('compact', False)
         require(type(compact) is bool, 'BAD_ARGUMENTS', 'compact must be a boolean.')
@@ -87,7 +94,7 @@ def invoke(root, method: str, args: dict) -> dict:
         # Empty previews are useful; an empty patch cannot be applied as an edit.
         require(bool(patch['operations']), 'BAD_PATCH', 'No editable changes were selected; no output was written.')
         return _publish(ws, path, doc, args, result)
-    doc.patch(args.get('patch'))
+    doc.patch(patch_input(args.get('patch')))
     result = doc.diff()
     if method == 'plan':
         return result

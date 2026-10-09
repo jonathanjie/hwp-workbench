@@ -62,7 +62,15 @@ Each task runs in its own git worktree and branch under `../hwp-workbench-worktr
 **C — Desktop** (design-led; starts after the design direction in section 5 is approved)
 - C1 shell, design system, rhwp page view, click-to-edit popover, Electron end-to-end test.
 - C2 command palette, find and replace, changes panel, review sheet, toasts, checks panel, shortcuts, i18n and accessibility.
-- C3 (after A2 and B2) live preview of staged edits, Agent link panel with proposal inbox and session sharing.
+- C3 (after A2 and B2) live preview of staged edits, Agent link panel with proposal inbox and session sharing, and an Agents card that shows and installs the skill and MCP setup for Claude Code, Codex and Claude Desktop.
+
+Decision (user, 9 October): no chat panel inside the editor. People keep working in their own Claude Code, Codex or Claude app; the editor is the live visual and review surface for what those agents propose.
+
+**B3 — Reach agents where people already work** (after B2)
+- Claude Desktop: an MCP Bundle (`.mcpb`, stdio) for one-click install, with the workspace folder chosen at install time.
+- Claude Code and Codex: documented one-line MCP setup (`claude mcp add …`, `codex mcp add …`) next to the skill.
+- `hwp-workbench open <path>`: brings the document up in the running desktop app (single-instance handoff), so an agent can put its result in front of the person for review.
+- ChatGPT (chat app): no official local stdio MCP support was confirmed on 9 October 2026; ChatGPT users use Codex signed in with ChatGPT. A remote connector would need an internet-reachable endpoint and is out of scope for confidential local documents.
 
 ### Wave 3
 

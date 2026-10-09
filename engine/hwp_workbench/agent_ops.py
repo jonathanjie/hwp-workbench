@@ -154,14 +154,7 @@ def read(doc: Document, offset: int = 0, limit: int = 200) -> dict:
     _integer(offset, 'offset', 0, 100_000)
     _integer(limit, 'limit', 1, 1000)
     references = {}
-    by_id = {}
-    section_numbers = {}
-    section_counts = {}
-    for node in doc.nodes:
-        section = section_numbers.setdefault(node.part, len(section_numbers))
-        index = section_counts.get(node.part, 0)
-        section_counts[node.part] = index + 1
-        by_id[node.id] = f's{section}:t{index}'
+    by_id = {node_id: reference for reference, node_id in doc.references.items()}
     row_by_id = {}
     cell_by_id = {}
     for table_index, cells in enumerate(_tables(doc)):
@@ -234,8 +227,6 @@ def _edit_error(doc: Document, node: TextNode, text: str) -> str | None:
         return 'SAVE_BLOCKED'
     if not node.editable:
         return 'UNSUPPORTED_ELEMENT'
-    if doc.format == 'hwp' and len(text.encode('utf-16le')) != len(node.text.encode('utf-16le')):
-        return 'HWP_LENGTH_CHANGE_BLOCKED'
     return None
 
 
@@ -263,9 +254,8 @@ def replace(doc: Document, find: str, replace_with: str, regex: bool = False,
     if node_ids is not None:
         require(isinstance(node_ids, list) and len(node_ids) <= MAX_PATCH_OPERATIONS
                 and all(isinstance(node_id, str) for node_id in node_ids),
-                'BAD_ARGUMENTS', 'nodeIds must contain at most 1000 full node IDs.')
-        for node_id in node_ids:
-            require(node_id in doc.by_id, 'NODE_NOT_FOUND', 'Unknown node ID: ' + node_id)
+                'BAD_ARGUMENTS', 'nodeIds must contain at most 1000 full IDs or short references.')
+        node_ids = [doc.resolve_node_id(node_id) for node_id in node_ids]
     selected = set(node_ids) if node_ids is not None else None
     operations = []
     changes = []
@@ -281,15 +271,8 @@ def replace(doc: Document, find: str, replace_with: str, regex: bool = False,
             continue
         remaining -= len(matches)
         code = _edit_error(doc, node, node.text)
-        if code is None and doc.format == 'hwp':
-            removed_bytes = sum(len(match.group().encode('utf-16le')) for match in matches)
-            added_bytes = len(matches) * len(replace_with.encode('utf-16le'))
-            if removed_bytes != added_bytes:
-                code = 'HWP_LENGTH_CHANGE_BLOCKED'
         if code:
-            skipped.append({'nodeId': node.id, 'code': code,
-                            'reason': 'Read-only text or protected document.' if code != 'HWP_LENGTH_CHANGE_BLOCKED'
-                            else 'Replacement must keep the same UTF-16 code-unit length.'})
+            skipped.append({'nodeId': node.id, 'code': code, 'reason': 'Read-only text or protected document.'})
             continue
         after = _replacement_text(node.text, matches, replace_with)
         check_text(after)
@@ -365,8 +348,7 @@ def fill(doc: Document, fields: dict[str, str]) -> dict:
 
 
 def set_text(doc: Document, node_id: str, text: str) -> dict:
-    require(isinstance(node_id, str), 'BAD_ARGUMENTS', 'nodeId must be a full node ID.')
-    require(node_id in doc.by_id, 'NODE_NOT_FOUND', 'Unknown node ID: ' + node_id)
+    node_id = doc.resolve_node_id(node_id)
     check_text(text)
     node = doc.by_id[node_id]
     code = _edit_error(doc, node, text)
