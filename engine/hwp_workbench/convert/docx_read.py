@@ -355,7 +355,12 @@ class Reader:
                         next_active[column] = owner
                         # Empty continuation cells are geometry, not source paragraphs.
                         continuation = self._blocks(cell_node)
-                        if any(p.text for block in continuation for p in paragraphs([block])):
+                        has_content = any(
+                            isinstance(block, Table) or block.page_break
+                            or any(run.text or run.image is not None for run in block.runs)
+                            for block in continuation
+                        )
+                        if has_content:
                             owner.blocks.extend(continuation)
                             self.document.loss('nonemptyMergeContinuation')
                         column += span

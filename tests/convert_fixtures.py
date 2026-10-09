@@ -19,7 +19,10 @@ def package(parts):
     output = io.BytesIO()
     with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
         for name, data in parts.items():
-            archive.writestr(name, data)
+            # Source hash checks compare fixture bytes across multiple calls.
+            info = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, data)
     return output.getvalue()
 
 

@@ -7,9 +7,10 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from pathlib import PurePosixPath
 from xml.parsers import expat
-from xml.etree import ElementTree as ET
 import hashlib, io, re, struct, zipfile, zlib
 from .cfb import CompoundFile, MAGIC, u32
+from .package_io import read_zip_member
+from .xml_io import restrict_xml_parser, utf8_xml_text, xml_tree
 from .hwp_records import parse_section, rewrite_section, validate_text_edit
 from .errors import WorkbenchError, require, MAX_FILE, MAX_PART, MAX_EXPANDED, MAX_NODES
 
@@ -87,13 +88,7 @@ class Document:
             self.warnings.append(dict(code=code,severity=severity,message=message,**details))
 
     def _xml(self, payload):
-        require(len(payload)<=MAX_PART,'LIMIT','XML part exceeds 32 MiB.')
-        try: text = payload.decode('utf-8-sig')
-        except UnicodeError: raise WorkbenchError('XML_ENCODING','Only UTF-8 HWPX XML is supported in this alpha.')
-        require(not re.search(r'<!\s*(DOCTYPE|ENTITY)\b',text,re.I),'UNSAFE_XML','DTD and entity declarations are prohibited.')
-        require(not re.search(r'encoding\s*=\s*[\"\'](?!utf-8)[^\"\']+',text[:200],re.I),'XML_ENCODING','XML encoding must be UTF-8.')
-        try: return ET.fromstring(payload)
-        except ET.ParseError as e: raise WorkbenchError('BAD_XML',str(e))
+        return xml_tree(payload)
 
     def _read_hwpx(self):
         try:
@@ -108,9 +103,10 @@ class Document:
                     require(info.filename not in names,'UNSAFE_ZIP','Duplicate ZIP member.')
                     require(not info.flag_bits&1,'ENCRYPTED','Encrypted ZIP members are not supported.')
                     require(info.compress_type in {zipfile.ZIP_STORED,zipfile.ZIP_DEFLATED},'UNSAFE_ZIP','Unsupported ZIP compression.')
-                    names.add(info.filename); total+=info.file_size
-                    require(info.file_size<=MAX_PART and total<=MAX_EXPANDED,'LIMIT','Expanded ZIP exceeds limits.')
-                    self.parts[info.filename]=z.read(info)  # CRC checked by zipfile.
+                    names.add(info.filename)
+                    self.parts[info.filename] = read_zip_member(
+                        z, info, total, part_limit=MAX_PART, total_limit=MAX_EXPANDED)
+                    total += len(self.parts[info.filename])
         except (zipfile.BadZipFile,RuntimeError,zlib.error) as e:
             raise WorkbenchError('BAD_ZIP',str(e))
         require(self.parts.get('mimetype',b'').strip()==b'application/hwp+zip','NOT_HWPX','Missing or invalid HWPX mimetype.')
@@ -120,7 +116,7 @@ class Document:
         require(bool(section_names),'NOT_HWPX','No body sections found.')
         trees={}
         for name,payload in self.parts.items():
-            if name.endswith(('.xml','.hpf')):
+            if name.endswith(('.xml', '.hpf', '.rels')):
                 trees[name]=self._xml(payload)
             if any(s in name.lower() for s in ('signature','_xmlsignatures','scripts/','vbascript','drm/','encrypt')):
                 self.block_save=True
@@ -270,7 +266,9 @@ class Document:
             visit(paragraph)
 
     def _text_tokens(self, data, part):
+        utf8_xml_text(data)
         parser = expat.ParserCreate(namespace_separator='}')
+        restrict_xml_parser(parser)
         tokens = []
         active = []
         depth = 0
@@ -326,12 +324,8 @@ class Document:
                 token['end'] = token['inner_start'] if token['selfclose'] else tag_end(at)
             depth -= 1
 
-        def reject_doctype(*args):
-            raise WorkbenchError('UNSAFE_XML', 'DTD prohibited.')
-
         parser.StartElementHandler = start
         parser.EndElementHandler = end
-        parser.StartDoctypeDeclHandler = reject_doctype
         try:
             parser.Parse(data, True)
         except expat.ExpatError as error:

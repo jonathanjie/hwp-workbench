@@ -1,51 +1,23 @@
 """Shared bounded ZIP/XML I/O; no package member is extracted to disk."""
 import io
 import posixpath
-import re
 import stat
 import zipfile
 import zlib
 from pathlib import PurePosixPath
-from xml.parsers import expat
 from xml.etree import ElementTree as ET
 
-from ..errors import MAX_FILE, MAX_PART, MAX_EXPANDED, MAX_NODES, WorkbenchError, require
+from ..errors import MAX_FILE, MAX_PART, MAX_EXPANDED, WorkbenchError, require
 
-MAX_DEPTH = 128
+from ..package_io import read_zip_member
+from ..xml_io import MAX_DEPTH, xml_tree
+
 MAX_COLUMNS = 1000
 MAX_GRID_WORK = 1_000_000
 
 
 def xml(payload):
-    require(len(payload) <= MAX_PART, 'LIMIT', 'XML part exceeds 32 MiB.')
-    try:
-        text = payload.decode('utf-8-sig')
-    except UnicodeError as error:
-        raise WorkbenchError('XML_ENCODING', 'Conversion XML must be UTF-8.') from error
-    require(not re.search(r'<!\s*(DOCTYPE|ENTITY)\b', text, re.I), 'UNSAFE_XML', 'DTD and entities are prohibited.')
-    require(not re.search(r'encoding\s*=\s*[\"\'](?!utf-8)[^\"\']+', text[:200], re.I),
-            'XML_ENCODING', 'Conversion XML must declare UTF-8.')
-    depth = 0
-    nodes = 0
-    parser = expat.ParserCreate()
-
-    def start(name, attrs):
-        nonlocal depth, nodes
-        depth += 1
-        nodes += 1
-        require(depth <= MAX_DEPTH and nodes <= MAX_NODES * 10, 'LIMIT', 'XML complexity exceeds limits.')
-
-    def end(name):
-        nonlocal depth
-        depth -= 1
-
-    parser.StartElementHandler = start
-    parser.EndElementHandler = end
-    try:
-        parser.Parse(payload, True)
-        return ET.fromstring(payload)
-    except (expat.ExpatError, ET.ParseError) as error:
-        raise WorkbenchError('BAD_XML', str(error)) from error
+    return xml_tree(payload)
 
 
 def read_package(payload):
@@ -64,9 +36,9 @@ def read_package(payload):
                 require(not stat.S_ISLNK(info.external_attr >> 16), 'UNSAFE_ZIP', 'ZIP symlinks are prohibited.')
                 require(not info.flag_bits & 1, 'ENCRYPTED', 'Encrypted ZIP members are not supported.')
                 require(info.compress_type in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}, 'UNSAFE_ZIP', 'Unsupported ZIP compression.')
-                expanded += info.file_size
-                require(info.file_size <= MAX_PART and expanded <= MAX_EXPANDED, 'LIMIT', 'Expanded ZIP exceeds limits.')
-                parts[name] = archive.read(info)
+                parts[name] = read_zip_member(archive, info, expanded,
+                                              part_limit=MAX_PART, total_limit=MAX_EXPANDED)
+                expanded += len(parts[name])
     except (zipfile.BadZipFile, RuntimeError, zlib.error, NotImplementedError) as error:
         raise WorkbenchError('BAD_ZIP', str(error)) from error
     # Validate all XML, including unsupported parts, before any optional native tool.

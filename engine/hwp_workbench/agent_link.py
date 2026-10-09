@@ -61,14 +61,14 @@ def propose(workspace: Workspace, path: str, document: Document, args: dict) -> 
 
 
 def _read_json(workspace: Workspace, path: str):
-    """Return (value, readable); missing files are distinct from broken files."""
+    """Return (value, readable, byte digest); missing files are distinct from broken files."""
     try:
         payload = workspace.read(path, max_bytes=MAX_LINK_FILE, missing_ok=True)
         if payload is None:
-            return MISSING_FILE, True
-        return json.loads(payload), True
+            return MISSING_FILE, True, None
+        return json.loads(payload), True, sha(payload)
     except (WorkbenchError, ValueError, UnicodeError, RecursionError):
-        return None, False
+        return None, False, None
 
 
 def _text(value) -> bool:
@@ -130,20 +130,34 @@ def _valid_outcome(value) -> bool:
     return True
 
 
+def _outcome_matches(outcome, proposal, proposal_sha256) -> bool:
+    if not _valid_outcome(outcome) or outcome.get('proposalSha256') != proposal_sha256:
+        return False
+    proposed_ids = [operation['nodeId'] for operation in proposal['patch']['operations']]
+    accepted = outcome['acceptedNodeIds']
+    declined = outcome['declinedNodeIds']
+    combined = accepted + declined
+    if len(set(proposed_ids)) != len(proposed_ids):
+        return False
+    if len(set(combined)) != len(combined) or set(combined) != set(proposed_ids):
+        return False
+    expected_status = 'partial' if accepted and declined else ('accepted' if accepted else 'declined')
+    return outcome['status'] == expected_status
+
+
 def _proposal_summary(workspace: Workspace, path: str, document: Document) -> dict:
     summary = {'file': path, 'title': None, 'author': None, 'createdAt': None,
                'operations': 0, 'status': 'unreadable'}
-    proposal, readable = _read_json(workspace, path)
+    proposal, readable, proposal_sha256 = _read_json(workspace, path)
     if not readable or not _valid_proposal(proposal, document):
         return summary
     summary.update(title=proposal['title'], author=proposal['author'], createdAt=proposal['createdAt'],
                    operations=len(proposal['patch']['operations']))
     outcome_path = str(Path(path).with_suffix('.outcome.json'))
-    outcome, readable = _read_json(workspace, outcome_path)
-    if not readable:
-        return summary
-    if outcome is not MISSING_FILE:
-        if _valid_outcome(outcome):
+    outcome, readable, _ = _read_json(workspace, outcome_path)
+    if not readable or outcome is not MISSING_FILE:
+        summary['status'] = 'needsReview'
+        if readable and _outcome_matches(outcome, proposal, proposal_sha256):
             summary['status'] = outcome['status']
     else:
         summary['status'] = 'pending' if proposal['document']['sha256'] == document.hash else 'stale'
@@ -153,7 +167,7 @@ def _proposal_summary(workspace: Workspace, path: str, document: Document) -> di
 def session(workspace: Workspace, path: str, document: Document) -> dict:
     folder = _link_folder(workspace, path)
     session_path = str(folder / (document.name + '.session.json'))
-    record, readable = _read_json(workspace, session_path)
+    record, readable, _ = _read_json(workspace, session_path)
     linked = readable and _valid_session(record, document)
     proposal_folder = folder / 'proposals'
     name_pattern = re.compile(re.escape(document.name) + r'\.[0-9]{8}T[0-9]{6}Z-[a-f0-9]{6}\.json')
