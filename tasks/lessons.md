@@ -30,7 +30,7 @@
 ### Clean up only temporary files created by this write
 - **Date:** 2026-10-09
 - **Trigger:** An exclusive temporary-name collision reached cleanup and removed the existing temporary file.
-- **Rule:** Track successful temporary-file creation and unlink only that owned file. Keep a regression case that forces a collision and checks the existing bytes.
+- **Rule:** Track successful temporary-file creation and unlink only that owned file. Keep a regression case that forces a collision and checks the existing bytes. Keep recovery-file cleanup inside the replacement rollback guard; an injected cleanup failure must restore the source before the save returns an error.
 - **Why:** A failed no-overwrite write must not delete another file during cleanup.
 
 ### Match the complete proposal filename
@@ -74,3 +74,9 @@
 - **Trigger:** The DOCX writer passed every self-read test, but LibreOffice refused all its output ("source file could not be loaded") because ElementTree wrote `ns0:Types` and `ns0:Relationships`. LibreOffice also exits 0 in that case.
 - **Rule:** For every new writer, open its output in an independent reader (LibreOffice for DOCX, rhwp for HWPX) and assert the output file exists, not only the exit code. Write OPC package parts with an unprefixed namespace.
 - **Why:** Our own reader accepts what our writer emits; namespace-prefix tolerance differs between readers.
+
+### Check the save revision before parsing current disk bytes
+- **Date:** 2026-10-10
+- **Trigger:** A save failure-injection test changed the source to invalid native bytes; parsing returned `UNSUPPORTED_FORMAT` before the stale revision was identified.
+- **Rule:** Read bounded source bytes and compare the save patch's source hash before parsing them. Return `SOURCE_CHANGED` for an external revision change; keep the complete patch and native verification checks before replacement.
+- **Why:** A changed file can also become unreadable. Parsing must not hide the save revision conflict.

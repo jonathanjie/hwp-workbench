@@ -14,7 +14,7 @@ CAPABILITIES = {
         'hwp': 'HWP 5.x: existing plain text runs; variable length; Hancom reflow unverified',
         'hwpx': 'Existing plain text nodes; variable length; same-format save',
     },
-    'operations': ['inspect', 'extract', 'validate', 'plan', 'apply',
+    'operations': ['inspect', 'extract', 'validate', 'plan', 'apply', 'save',
                    'read', 'search', 'replace', 'fill', 'set', 'propose', 'session', 'convert'],
     'notImplemented': ['native full-page rendering', 'formatting and structural edits',
                        'new document authoring', 'PDF export',
@@ -22,7 +22,8 @@ CAPABILITIES = {
     'conversion': {'targets': ['hwp', 'hwpx', 'docx'], 'pivot': 'hwpx', 'lossy': True,
                    'nativeBackend': 'optional rhwp', 'legacyImportBackend': 'optional LibreOffice',
                    'dryRunUnlessOutputAndAcknowledgement': True},
-    'safety': {'overwrite': False, 'externalNetwork': False, 'execDocumentCode': False,
+    'safety': {'overwrite': 'save operation only, verified, with backup',
+               'externalNetwork': False, 'execDocumentCode': False,
                'workspaceRestricted': True, 'requireRiskAcknowledgement': True},
 }
 
@@ -55,6 +56,33 @@ def _agent_edit(doc: Document, method: str, args: dict) -> dict:
     return agent_ops.set_text(doc, args.get('nodeId'), args.get('text'))
 
 
+def _save(ws: Workspace, path: str, doc: Document, args: dict) -> dict:
+    require(Path(path).suffix.lower() == '.' + doc.format,
+            'OUTPUT_FORMAT', 'Save must retain the source native extension and format.')
+    require(args.get('acknowledgeRisks') is True, 'RISK_ACK_REQUIRED',
+            'Pass acknowledgeRisks: true to replace the opened document.')
+    require('output' not in args, 'BAD_ARGUMENTS', 'Save replaces path; use apply for a new output.')
+    doc.patch(patch_input(args.get('patch')))
+    content = doc.serialize(True)
+    require(Document(content, doc.name).format == doc.format,
+            'VERIFY_FAILED', 'Verified output must keep the source native format.')
+    independent_check = check_output(content, doc.edits)
+    require(independent_check.get('opened') is not False and
+            'error' not in independent_check and not independent_check.get('missing'),
+            'VERIFY_FAILED', 'Independent reader failed to reopen the output or reported missing edited text.')
+    # Unavailable readers and empty-text searches supply no independent proof.
+    # Keep that report honest; the native self-reparse still verifies deletion.
+    require(independent_check.get('editedTextsFound') is not False or independent_check.get('unverified'),
+            'VERIFY_FAILED', 'Independent reader could not find the edited text.')
+    require(sha(ws.read(path)) == doc.hash, 'SOURCE_CHANGED',
+            'Document changed during verification; no replacement was made.')
+    backup = ws.backup_existing(path, doc.original, args.get('backupDirectory'))
+    saved_hash = ws.replace_existing(path, content, doc.hash)
+    return {'saved': True, 'path': path, 'previousSha256': doc.hash,
+            'sha256': saved_hash, 'backup': backup,
+            'independentCheck': independent_check, 'warnings': doc.warnings}
+
+
 def invoke(root, method: str, args: dict) -> dict:
     require(isinstance(args, dict), 'BAD_ARGUMENTS', 'Arguments must be an object.')
     require(isinstance(method, str), 'BAD_ARGUMENTS', 'method must be a string.')
@@ -65,7 +93,14 @@ def invoke(root, method: str, args: dict) -> dict:
     if method == 'convert':
         return convert(ws, args)
     path = args.get('path')
-    doc = Document(ws.read(path), Path(path).name)
+    source = ws.read(path)
+    if method == 'save':
+        save_patch = patch_input(args.get('patch'))
+        require(isinstance(save_patch, dict) and save_patch.get('schemaVersion') == 1,
+                'BAD_PATCH', 'Expected patch schemaVersion 1.')
+        require(save_patch.get('baseSha256') == sha(source), 'SOURCE_CHANGED',
+                'Document differs from the opened revision; read it again before saving.')
+    doc = Document(source, Path(path).name)
     if method == 'session':
         return agent_link.session(ws, path, doc)
     if method == 'propose':
@@ -89,6 +124,8 @@ def invoke(root, method: str, args: dict) -> dict:
     if method == 'validate':
         return {'valid': True, 'scope': 'bounded container/XML/record parsing only; not Hancom rendering certification',
                 'sha256': doc.hash, 'format': doc.format, 'textNodes': len(doc.nodes), 'warnings': doc.warnings}
+    if method == 'save':
+        return _save(ws, path, doc, args)
     if method in {'replace', 'fill', 'set'}:
         result = _agent_edit(doc, method, args)
         patch = result['patch']

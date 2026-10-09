@@ -6,7 +6,7 @@ Preserve the product requirement: full native HWP/HWPX editing and closely match
 
 All document operations belong in the shared engine/service layer. CLI, MCP and desktop must agree. Keep original bytes and opaque native payloads alongside semantic data. Never silently convert on save or discard unsupported objects. Capability and warning reports must stay honest.
 
-Maintain fail-closed, non-overwriting saves. Validate source hashes, expected text, complete patches and output format. Retain bounded parsing, no-follow workspace access, no document-code execution, and an IPC API with no generic shell/filesystem command.
+Saves are fail-closed; `apply` and conversions never overwrite; `save` replaces the opened file only after verification, atomically, with a kept previous version, and refuses when the file changed on disk. Validate source hashes, expected text, complete patches and output format. Retain bounded parsing, no-follow workspace access, no document-code execution, and an IPC API with no generic shell/filesystem command.
 
 Run `python3 scripts/run-tests.py` and `npm run check` after changes. Add regression tests for every data-loss or compatibility defect. Public corpus failures, unsupported documents and skipped external tests must be reported as such, never converted to passing self-generated fixtures. `scripts/test-ui.py` is an optional renderer test; it does not test Electron or Hancom.
 

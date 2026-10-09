@@ -24,6 +24,7 @@ COMMAND_HELP = {
     'validate': 'Check bounded native container and parse integrity.',
     'plan': 'Validate a patch and show changes without writing.',
     'apply': 'Apply a reviewed patch to a new native document file.',
+    'save': 'Replace the source after native verification, with a kept previous version.',
     'read': 'Read paged text with short node references.',
     'search': 'Find text and return native node IDs and offsets.',
     'replace': 'Preview term replacements or save a new document copy.',
@@ -41,11 +42,14 @@ def _parser() -> argparse.ArgumentParser:
         operation = sub.add_parser(command, help=COMMAND_HELP[command], description=COMMAND_HELP[command])
         operation.add_argument('path', help='Source HWP/HWPX path inside the workspace.')
         operation.add_argument('--root', default='.', help='Allowed workspace (default: current directory).')
-        if command in {'plan', 'apply', 'propose'}:
+        if command in {'plan', 'apply', 'propose', 'save'}:
             operation.add_argument('--patch', required=True, help='JSON patch or edit-preview file inside workspace.')
         if command in {'apply', 'replace', 'fill', 'set'}:
             operation.add_argument('-o', '--output', required=command == 'apply', help='New same-format output path; must not exist.')
             operation.add_argument('--acknowledge-risks', action='store_true', help='Acknowledge compatibility warnings before saving.')
+        if command == 'save':
+            operation.add_argument('--acknowledge-risks', action='store_true', help='Acknowledge compatibility warnings before replacing the source.')
+            operation.add_argument('--backup-dir', help='Backup folder inside the workspace (default: beside the source in .hwp-workbench/backups).')
         if command == 'convert':
             operation.add_argument('--to', choices=['hwp', 'hwpx', 'docx'], required=True, help='Requested export format.')
             operation.add_argument('-o', '--output', help='New output path with the target extension; must not exist.')
@@ -116,10 +120,14 @@ def _fields(values: list[str]) -> dict:
 
 def _payload(args) -> dict:
     payload = {'path': args.path}
-    if args.command in {'plan', 'apply', 'propose'}:
+    if args.command in {'plan', 'apply', 'propose', 'save'}:
         payload['patch'] = json.loads(Workspace(args.root).read(args.patch))
     if args.command in {'apply', 'replace', 'fill', 'set'} and args.output is not None:
         payload.update(output=args.output, acknowledgeRisks=args.acknowledge_risks)
+    if args.command == 'save':
+        payload['acknowledgeRisks'] = args.acknowledge_risks
+        if args.backup_dir is not None:
+            payload['backupDirectory'] = args.backup_dir
     if args.command == 'convert':
         payload['to'] = args.to
         payload['acknowledgeRisks'] = args.acknowledge_risks
