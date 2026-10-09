@@ -1,3 +1,4 @@
+import {matchBounds} from './search-layout.js';
 import {createFontMapper} from './fonts.js';
 import {mapTextRuns, paragraphBounds} from './hit-map.js';
 
@@ -36,6 +37,10 @@ export class PageView {
 
   clear() {
     this.observer?.disconnect();
+    if (this.idleRender) {
+      cancelIdleCallback(this.idleRender);
+      this.idleRender = null;
+    }
     for (const entry of this.entries) {
       if (entry.url) {
         URL.revokeObjectURL(entry.url);
@@ -52,6 +57,8 @@ export class PageView {
     this.clear();
     this.nodes = nodes;
     this.edits = {};
+    this.searchMatches = [];
+    this.searchActive = -1;
     this.fonts = createFontMapper(this.onFonts);
     globalThis.measureTextWidth = this.fonts.measure;
     runtime ??= import(`${VENDOR}rhwp.js`).then(async module => {
@@ -93,6 +100,7 @@ export class PageView {
       }
       this.setZoom(this.fit ? 'fit' : this.zoom);
       this.render(0);
+      this.scheduleThumbnails();
       this.observer = new IntersectionObserver(entries => {
         for (const item of entries) {
           if (item.isIntersecting) {
@@ -115,6 +123,43 @@ export class PageView {
       this.onFailure(error);
       return false;
     }
+  }
+
+  async thumbnail() {
+    const entry = this.entries[0];
+    const image = entry?.page.querySelector('.page-image');
+    if (!image) {
+      return null;
+    }
+    await image.decode();
+    if (entry !== this.entries[0]) {
+      return null;
+    }
+    const canvas = document.createElement('canvas');
+    const scale = Math.min(128 / entry.width, 384 / entry.height);
+    canvas.width = Math.max(1, Math.round(entry.width * scale));
+    canvas.height = Math.max(1, Math.round(entry.height * scale));
+    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
+  }
+
+  scheduleThumbnails() {
+    // One synchronous rhwp render per idle turn caps concurrency at one.
+    // Existing page URLs also serve the rail; no duplicate render is needed.
+    this.idleRender = requestIdleCallback(() => {
+      this.idleRender = null;
+      const index = this.entries.findIndex(entry => !entry.url);
+      if (index === -1) {
+        return;
+      }
+      try {
+        this.render(index);
+        this.scheduleThumbnails();
+      } catch (error) {
+        this.clear();
+        this.onFailure(error);
+      }
+    }, {timeout: 500});
   }
 
   render(index) {
@@ -198,6 +243,17 @@ export class PageView {
       return;
     }
     entry.marks.replaceChildren();
+    for (const {run, node} of entry.mapped) {
+      if (!node) {
+        continue;
+      }
+      this.searchMatches.forEach((match, index) => {
+        const bounds = matchBounds(run, node, match);
+        if (bounds) {
+          this.overlay(entry, bounds, index === this.searchActive ? 'find active' : 'find');
+        }
+      });
+    }
     const ids = Object.keys(this.edits);
     for (const group of entry.groups) {
       const changed = entry.mapped.filter(item => group.runs.includes(item.run) && item.node && Object.hasOwn(this.edits, item.node.id));
@@ -213,6 +269,12 @@ export class PageView {
       margin.append(number);
       entry.marks.append(margin);
     }
+  }
+
+  updateSearch(matches, active) {
+    this.searchMatches = matches;
+    this.searchActive = active;
+    this.entries.forEach(entry => this.drawMarks(entry));
   }
 
   updateEdits(edits) {

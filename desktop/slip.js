@@ -21,11 +21,12 @@ export class ProofSlip {
     return !!this.editor && this.editor.value !== this.initial;
   }
 
-  open(node, value, format, location) {
+  open(node, value, format, location, lengthChangingText) {
     this.close(false);
     this.node = node;
     this.initial = value;
     this.format = format;
+    this.lengthChangingText = lengthChangingText;
     this.location = location;
     this.slip = element('section', 'slip');
     this.slip.setAttribute('role', 'dialog');
@@ -96,9 +97,9 @@ export class ProofSlip {
     }
     this.editor.style.height = 'auto';
     this.editor.style.height = `${Math.min(220, this.editor.scrollHeight)}px`;
-    const error = textError(this.editor.value, this.node.text, this.format);
+    const error = textError(this.editor.value, this.node.text, this.lengthChangingText);
     this.error.textContent = !this.node.editable ? t('locked') : error ? t(error) : '';
-    this.counter.textContent = this.format === 'hwp' ? t('sameLength', {a: this.editor.value.length, b: this.node.text.length}) : `${this.editor.value.length} / ${this.node.text.length}`;
+    this.counter.textContent = !this.lengthChangingText ? t('sameLength', {a: this.editor.value.length, b: this.node.text.length}) : `${this.editor.value.length} / ${this.node.text.length}`;
     this.stageButton.disabled = !!error || !this.node.editable || !this.dirty;
   }
 

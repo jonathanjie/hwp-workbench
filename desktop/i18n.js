@@ -1,5 +1,9 @@
 const strings = {
   en: {
+    warningDetails: 'Warnings', fonts: 'Fonts', tables: 'Tables', images: 'Images', previewCache: 'Preview cache', sameLengthFeature: 'Same length', scriptStub: 'Default script', textEdits: 'Text edits', formatting: 'Formatting', structureEdits: 'Structure edits', ok: 'OK', partial: 'Partial', off: 'Off', noHeadings: 'No headings', recentFailed: 'Recent files unavailable', thumbnailFailed: 'Thumbnail unavailable',
+    stagedToast: 'Staged · {n}', remove: 'Remove', pageLabel: 'Page {n}', unlocated: 'Page unavailable',
+    previousMatch: 'Previous match', nextMatch: 'Next match', matchCase: 'Match case', replacement: 'Replacement', replaceOne: 'Replace', replaceAll: 'Replace all', skipped: 'Skipped · {n}', tooManyEdits: 'Edit limit exceeded',
+    paletteQuery: 'Search commands and text', all: 'All', commands: 'Commands', commandGroup: 'COMMANDS', documentGroup: 'IN DOCUMENT', noResults: 'No matches', navigate: 'Move', run: 'Open', scope: 'Scope', find: 'Find', replace: 'Replace…', shortcuts: 'Keyboard shortcuts', theme: 'Theme', themeSystem: 'Theme · System', themeLight: 'Theme · Light', themeDark: 'Theme · Dark', togglePanel: 'Panel', stageShortcut: 'Stage text', closeShortcut: 'Close', findNextShortcut: 'Next match', findPreviousShortcut: 'Previous match', paletteScopes: 'Palette scope', paletteMove: 'Palette selection', paletteRun: 'Run command', panelTabs: 'Panel tabs', system: 'System', light: 'Light', dark: 'Dark',
     open: 'Open…', sample: 'Sample', recent: 'Recent', saveCopy: 'Save copy',
     edits: '{n} edits', edit: '1 edit', pages: 'Pages', outline: 'Outline',
     revert: 'Revert', stage: 'Stage', changes: 'Changes', agent: 'Agent', checks: 'Checks',
@@ -34,6 +38,10 @@ const strings = {
     bookmarks: 'Bookmarks', defaultScript: 'Default script stub retained · not executed', unknownRisk: 'Native payload retained · compatibility unverified'
   },
   ko: {
+    warningDetails: '경고', fonts: '글꼴', tables: '표', images: '이미지', previewCache: '미리보기 캐시', sameLengthFeature: '길이 유지', scriptStub: '기본 스크립트', textEdits: '본문 수정', formatting: '서식', structureEdits: '구조 수정', ok: '가능', partial: '부분', off: '미지원', noHeadings: '제목 없음', recentFailed: '최근 문서 사용 불가', thumbnailFailed: '썸네일 사용 불가',
+    stagedToast: '수정 적용 · {n}', remove: '삭제', pageLabel: '{n}쪽', unlocated: '쪽 위치 없음',
+    previousMatch: '이전 일치', nextMatch: '다음 일치', matchCase: '대소문자 구분', replacement: '바꿀 내용', replaceOne: '바꾸기', replaceAll: '모두 바꾸기', skipped: '건너뜀 · {n}', tooManyEdits: '수정 한도 초과',
+    paletteQuery: '명령 및 본문 검색', all: '전체', commands: '명령', commandGroup: '명령', documentGroup: '문서 본문', noResults: '일치 없음', navigate: '이동', run: '열기', scope: '범위', find: '찾기', replace: '바꾸기…', shortcuts: '키보드 단축키', theme: '테마', themeSystem: '테마 · 시스템', themeLight: '테마 · 밝게', themeDark: '테마 · 어둡게', togglePanel: '패널', stageShortcut: '본문 수정 적용', closeShortcut: '닫기', findNextShortcut: '다음 일치', findPreviousShortcut: '이전 일치', paletteScopes: '명령 범위', paletteMove: '명령 선택', paletteRun: '명령 실행', panelTabs: '패널 탭', system: '시스템', light: '밝게', dark: '어둡게',
     open: '문서 열기', sample: '샘플', recent: '최근', saveCopy: '사본 저장',
     edits: '수정 {n}', edit: '수정 1', pages: '쪽', outline: '개요',
     revert: '되돌리기', stage: '수정 적용', changes: '변경', agent: '에이전트', checks: '호환성',
@@ -67,9 +75,17 @@ const strings = {
     bookmarks: '책갈피', defaultScript: '기본 스크립트 보존 · 실행 안 함', unknownRisk: '네이티브 데이터 보존 · 호환성 미검증'
   }
 };
-let language = localStorage.getItem('hwp-language');
+let language = typeof window === 'undefined' ? null : localStorage.getItem('hwp-language');
 if (!['en', 'ko'].includes(language)) {
-  language = navigator.language.toLowerCase().startsWith('ko') ? 'ko' : 'en';
+  language = (globalThis.navigator?.language || 'en').toLowerCase().startsWith('ko') ? 'ko' : 'en';
+}
+
+export function currentLanguage() {
+  return language;
+}
+
+export function labelFor(locale, key) {
+  return strings[locale][key] || key;
 }
 
 export function t(key, values = {}) {
@@ -82,11 +98,13 @@ export function applyLanguage() {
   for (const element of document.querySelectorAll('[data-label]')) {
     element.textContent = t(element.dataset.label);
   }
+  for (const element of document.querySelectorAll('[data-aria]')) {
+    element.setAttribute('aria-label', t(element.dataset.aria));
+  }
   for (const element of document.querySelectorAll('[data-title]')) {
     element.title = t(element.dataset.title);
     element.setAttribute('aria-label', t(element.dataset.title));
   }
-  document.getElementById('language').textContent = language === 'en' ? '한국어' : 'English';
 }
 
 export function toggleLanguage() {

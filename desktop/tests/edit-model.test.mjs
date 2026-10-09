@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {EditModel, textError} from '../edit-model.js';
 
 const node = {id: 'body#1', text: 'Original', editable: true};
-const document = {sha256: 'source-hash', format: 'hwpx', nodes: [node]};
+const document = {sha256: 'source-hash', format: 'hwpx', capabilities: {lengthChangingText: true}, nodes: [node]};
 
 test('stage, revert and undo/redo retain expected original text in hash-bound patches', () => {
   const model = new EditModel(document);
@@ -29,7 +29,7 @@ test('draft recovery refuses stale expected text, controls and read-only edits',
     {op: 'set_text', nodeId: node.id, expectedText: node.text, text: 'bad\ntext'}
   ]});
   assert.equal(model.patch().operations.length, 0);
-  assert.equal(textError('😀', 'ab', 'hwp'), null);
-  assert.equal(textError('😀', 'a', 'hwp'), 'lengthError');
-  assert.equal(textError('\ud800', '', 'hwpx'), 'controls');
+  assert.equal(textError('😀', 'ab', false), null);
+  assert.equal(textError('😀', 'a', false), 'lengthError');
+  assert.equal(textError('\ud800', '', true), 'controls');
 });

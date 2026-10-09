@@ -8,6 +8,17 @@ export function macFontFamily(family) {
   return 'Apple SD Gothic Neo';
 }
 
+// Canvas measurements and SVG text must use the same complete family list.
+export function substituteFontFamily(list, available, onSubstitution = () => {}) {
+  const family = list.split(',')[0].trim().replace(/^['"]|['"]$/g, '');
+  const replacement = available(family) ? family : macFontFamily(family);
+  if (replacement !== family) {
+    onSubstitution(family, replacement);
+  }
+  const fallback = /명조|바탕|batang|myeongjo|serif/i.test(replacement) || replacement === 'AppleMyungjo' ? 'serif' : 'sans-serif';
+  return `"${replacement.replaceAll('"', '')}", ${fallback}`;
+}
+
 export function createFontMapper(onSubstitutions) {
   const context = document.createElement('canvas').getContext('2d');
   const installed = new Map();
@@ -28,20 +39,16 @@ export function createFontMapper(onSubstitutions) {
     return installed.get(family);
   }
   function mapFamily(list) {
-    const family = list.split(',')[0].trim().replace(/^['"]|['"]$/g, '');
-    if (available(family)) {
-      return family;
-    }
-    const replacement = macFontFamily(family);
-    if (family !== replacement && !substitutions.has(family)) {
-      substitutions.set(family, replacement);
-      onSubstitutions([...substitutions].map(([from, to]) => ({from, to})));
-    }
-    return replacement;
+    return substituteFontFamily(list, available, (family, replacement) => {
+      if (!substitutions.has(family)) {
+        substitutions.set(family, replacement);
+        onSubstitutions([...substitutions].map(([from, to]) => ({from, to})));
+      }
+    });
   }
   function measure(font, text) {
     const match = /^(.*?\d+(?:\.\d+)?px(?:\/[\d.]+)?\s+)(.+)$/.exec(font);
-    context.font = match ? `${match[1]}"${mapFamily(match[2])}"` : font;
+    context.font = match ? `${match[1]}${mapFamily(match[2])}` : font;
     return context.measureText(text).width;
   }
   function mapSvg(svg) {
@@ -50,6 +57,12 @@ export function createFontMapper(onSubstitutions) {
     const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml');
     for (const text of parsed.querySelectorAll('[font-family]')) {
       text.setAttribute('font-family', mapFamily(text.getAttribute('font-family')));
+    }
+    for (const element of parsed.querySelectorAll('[style]')) {
+      const family = element.style.getPropertyValue('font-family');
+      if (family) {
+        element.style.setProperty('font-family', mapFamily(family));
+      }
     }
     return new XMLSerializer().serializeToString(parsed);
   }

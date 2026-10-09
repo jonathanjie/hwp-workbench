@@ -14,12 +14,10 @@
     <span class="seal"><img src="assets/logo.svg" alt=""></span>
     <span id="filename" class="doc">HWP Workbench</span>
     <span id="format" class="chip fmt" hidden></span>
-    <span id="dirty" class="chip edits" hidden></span>
-    <span class="sep"></span>
-    <button id="open" class="btn" data-label="open"></button>
-    <button id="save" class="save" disabled><span data-label="saveCopy"></span><kbd>⌘S</kbd></button>
+    <button id="dirty" class="chip edits" hidden></button>
+    <button id="paletteButton" class="cmd" data-title="commands"><span>⌘</span><span>K</span></button>
+    <button id="save" class="save" hidden disabled><span data-label="saveCopy"></span><kbd>⌘S</kbd></button>
   </header>
-  <button id="language" class="language btn" data-title="language"></button>
   <section id="empty" class="welcome">
     <div class="center">
       <div id="dropSheet" class="drop">
@@ -33,7 +31,7 @@
         <button id="demo" class="btn line lg" data-label="sample"></button>
       </div>
     </div>
-    <div class="recent"><span class="lbl" data-label="recent"></span><div id="recentItems" class="row"></div></div>
+    <div id="recentRow" class="recent" hidden><span class="lbl" data-label="recent"></span><div id="recentItems" class="row"></div></div>
   </section>
   <div id="workspace" hidden>
     <nav class="rail">
@@ -48,7 +46,12 @@
       <div id="pages" class="pages"></div>
       <div id="slipHost"></div>
     </main>
-    <aside class="panel">
+    <section id="findBar" class="find-bar" role="search" hidden>
+      <div class="find-row"><input id="findQuery" data-title="find" autocomplete="off"><span id="findCount" class="mono" aria-live="polite">0 / 0</span><button id="findPrevious" class="icon-btn" data-title="previousMatch">↑</button><button id="findNext" class="icon-btn" data-title="nextMatch">↓</button><button id="findCase" class="icon-btn mono" data-title="matchCase" aria-pressed="false">Aa</button><button id="findReplaceToggle" class="icon-btn" data-title="replace" aria-expanded="false" aria-controls="replaceRow">⇄</button><button id="findClose" class="icon-btn" data-title="close">×</button></div>
+      <div id="replaceRow" class="find-row" hidden><input id="replaceQuery" data-title="replacement" autocomplete="off"><button id="replaceOne" class="btn ghost" data-label="replaceOne"></button><button id="replaceAll" class="btn seal" data-label="replaceAll"></button></div>
+      <button id="skippedButton" class="btn ghost" popovertarget="skippedPopover" hidden></button><div id="skippedPopover" class="skipped-popover" popover></div>
+    </section>
+    <aside id="panel" class="panel" hidden>
       <div class="tabs" role="tablist">
         <button id="changesTab" class="tab on" role="tab" aria-selected="true" aria-controls="changesPanel"><span data-label="changes"></span><span id="changeCount" class="n">0</span></button>
         <button id="agentTab" class="tab" role="tab" aria-selected="false" aria-controls="agentPanel" data-label="agent"></button>
@@ -59,7 +62,7 @@
         <div id="changes"></div>
       </section>
       <section id="agentPanel" class="panel-content" role="tabpanel" aria-labelledby="agentTab" hidden><div class="section-label" data-label="agentPending"></div></section>
-      <section id="checksPanel" class="panel-content" role="tabpanel" aria-labelledby="checksTab" hidden><div id="warnings"></div><div class="section-label" data-label="fontSubstitutions"></div><div id="fontSubstitutions"></div></section>
+      <section id="checksPanel" class="panel-content" role="tabpanel" aria-labelledby="checksTab" hidden><div id="checkTags" class="check-tags"></div><details id="warningDetails"><summary data-label="warningDetails"></summary><div id="warnings"></div></details><div class="section-label" data-label="fontSubstitutions"></div><div id="fontSubstitutions"></div></section>
       <div class="foot"><span class="tag off" data-label="layoutUnverified"></span><span id="structureChip" class="tag part" data-label="structure" hidden></span></div>
     </aside>
     <div class="capsule">
@@ -71,13 +74,20 @@
     </div>
   </div>
   <div id="status" class="status" role="status" aria-live="polite"></div>
-  <dialog id="reviewDialog">
+  <dialog id="reviewDialog" class="sheet review-sheet" data-aria="reviewAll">
     <header><strong data-label="reviewAll"></strong><button id="closeReview" class="btn ghost" data-title="close">×</button></header>
     <div id="reviewChanges"></div>
     <div id="reviewWarnings"></div>
     <label class="ack"><input id="acknowledge" type="checkbox"><span data-label="ack"></span></label>
     <footer><button id="cancelReview" class="btn ghost" data-label="cancel"></button><button id="confirmSave" class="btn seal" data-label="saveCopy" disabled></button></footer>
   </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="palette" class="palette" data-aria="commands">
+    <div class="top"><span class="seal"><img src="assets/logo.svg" alt=""></span><input id="paletteQuery" class="q" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="paletteResults"><div class="scope"></div></div>
+    <div id="paletteResults" class="results" role="listbox"></div>
+    <div class="foot"><span><kbd>↑↓</kbd><span data-label="navigate"></span></span><span><kbd>↵</kbd><span data-label="run"></span></span><span><kbd>tab</kbd><span data-label="scope"></span></span><span class="palette-note" data-label="preview"></span></div>
+  </dialog>
+  <dialog id="shortcutsDialog" class="sheet" data-aria="shortcuts"><header><strong data-label="shortcuts"></strong><button id="closeShortcuts" class="btn ghost" data-title="close">×</button></header><div id="shortcutItems"></div></dialog>
   <script type="module" src="renderer.js"></script>
 </body>
 </html>

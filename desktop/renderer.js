@@ -3,15 +3,27 @@ import {PageView} from './page-view.js';
 import {ProofSlip} from './slip.js';
 import {EditModel} from './edit-model.js';
 import {changeCards} from './changes.js';
+import {headingNodes, nodeLocations} from './navigation.js';
+import {renderChecks, compatibilityTags} from './checks.js';
+import {Toast} from './toast.js';
+import {FindBar} from './find-bar.js';
+import {findMatches} from './search.js';
+import {CommandPalette} from './palette.js';
+import {element} from './dom.js';
 import {renderStructure} from './structure-view.js';
 
 const $ = id => document.getElementById(id);
+const toast = new Toast($('toast'));
+let reviewFocus;
 let documentData = null;
 let model = null;
 let busy = false;
 let structure = false;
 let substitutions = [];
+let locations = new Map();
 let lastStatus = null;
+let activeTab = 'changes';
+let panelDismissed = false;
 
 function status(key, values = {}, error = false) {
   lastStatus = {key, values, error};
@@ -34,7 +46,9 @@ const slip = new ProofSlip($('slipHost'), (node, text) => {
   if (busy || !model.stage(node, text)) {
     return false;
   }
+  panelDismissed = false;
   refreshEdits();
+  stagedToast(1);
   return true;
 }, id => revert(id));
 
@@ -42,7 +56,7 @@ function selectNode(node, location) {
   if (busy || (slip.dirty && !confirm(t('discard')))) {
     return;
   }
-  slip.open(node, model.current(node), documentData.format, location);
+  slip.open(node, model.current(node), documentData.format, location, model.lengthChangingText);
 }
 
 const pageView = new PageView({
@@ -81,21 +95,9 @@ function renderFonts() {
   }));
 }
 
-function warningCards() {
-  return documentData.warnings.map(warning => {
-    const card = document.createElement('div');
-    card.className = `warning ${warning.severity}`;
-    const code = document.createElement('span');
-    code.className = 'code';
-    code.textContent = warning.code;
-    card.append(code, document.createTextNode(warningLabel(warning)));
-    return card;
-  });
-}
-
 function renderWarnings() {
   if (documentData) {
-    $('warnings').replaceChildren(...warningCards());
+    renderChecks(documentData, $('checkTags'), $('warnings'));
   }
   renderFonts();
 }
@@ -109,36 +111,26 @@ function updateControls() {
   for (const id of ['save', 'review']) {
     $(id).disabled = !count || busy;
   }
-  for (const id of ['open', 'emptyOpen', 'demo']) {
+  $('save').hidden = !documentData;
+  updatePanel();
+  for (const id of ['emptyOpen', 'demo']) {
     $(id).disabled = busy;
   }
-  $('confirmSave').disabled = !$('acknowledge').checked || busy;
+  $('confirmSave').disabled = !$('acknowledge').checked || !count || busy;
 }
 
 function renderOutline() {
-  $('outlineItems').replaceChildren(...documentData.nodes.map(node => {
-    const button = document.createElement('button');
-    button.className = 'outline-item';
-    button.classList.toggle('edited', Object.hasOwn(model.edits, node.id));
-    button.textContent = model.current(node) || t('empty');
-    button.title = node.id;
-    button.onclick = () => {
-      const hit = [...$('pages').querySelectorAll('[data-node-id]')].find(element => element.dataset.nodeId === node.id);
-      if (hit) {
-        hit.scrollIntoView({block: 'center'});
-        hit.click();
-      } else if (!structure) {
-        const entry = pageView.entries.find(entry => entry.mapped.some(item => item.node?.id === node.id));
-        if (entry) {
-          pageView.render(Number(entry.page.dataset.page));
-          const target = [...entry.page.querySelectorAll('[data-node-id]')].find(element => element.dataset.nodeId === node.id);
-          target?.scrollIntoView({block: 'center'});
-          target?.click();
-        }
-      }
-    };
+  const headings = headingNodes(documentData.nodes);
+  $('outlineItems').replaceChildren(...headings.map(({node, nodes}) => {
+    const button = element('button', 'outline-item', nodes.map(item => model.current(item)).join(''));
+    button.classList.toggle('edited', nodes.some(item => Object.hasOwn(model.edits, item.id)));
+    button.title = nodeLocation(node);
+    button.onclick = () => locateNode(node, false);
     return button;
   }));
+  if (!headings.length) {
+    $('outlineItems').append(element('div', 'empty-outline', t('noHeadings')));
+  }
 }
 
 function renderFallback() {
@@ -184,6 +176,12 @@ function refreshEdits() {
     pageView.updateEdits(model.edits);
   }
   updateControls();
+  findBar.refresh();
+  if ($('reviewDialog').open) {
+    $('acknowledge').checked = false;
+    renderReview();
+    updateControls();
+  }
   call('saveDraft', model.patch()).catch(error => status('failed', {reason: errorReason(error)}, true));
 }
 
@@ -212,15 +210,27 @@ function historyAction(redo = false) {
 async function renderRecent() {
   try {
     const recent = await call('recent');
-    $('recentItems').replaceChildren(...recent.map((item, index) => {
+    $('recentRow').hidden = recent.length === 0;
+    $('recentItems').replaceChildren(...recent.map(item => {
       const button = document.createElement('button');
       button.className = 'doc-card';
-      button.textContent = item.name;
-      button.onclick = () => openDocument('openRecent', index);
+      const mini = element('span', 'mini');
+      if (item.thumbnail) {
+        const image = element('img');
+        image.src = item.thumbnail;
+        image.alt = '';
+        mini.append(image);
+      }
+      const meta = element('span', 'meta');
+      meta.append(element('span', 'name', item.name), element('span', 'sub', item.format.toUpperCase()));
+      button.append(mini, meta);
+      button.onclick = () => openDocument('openRecent', item.id);
       return button;
     }));
   } catch {
     $('recentItems').replaceChildren();
+    $('recentRow').hidden = true;
+    status('recentFailed', {}, true);
   }
 }
 
@@ -245,8 +255,14 @@ async function completeOpen(result, failure = null) {
       return;
     }
     slip.close(false);
+    findBar.close();
     documentData = result.document;
     model = new EditModel(documentData);
+    locations = nodeLocations(documentData.view);
+    activeTab = 'changes';
+    panelDismissed = false;
+    panelTab('changes');
+    toast.clear();
     structure = false;
     substitutions = [];
     $('filename').textContent = documentData.name;
@@ -268,6 +284,16 @@ async function completeOpen(result, failure = null) {
       lastStatus = null;
     }
     $('changes').replaceChildren(...changeCards(model, revert));
+    if (rendered && result.recentId) {
+      try {
+        const png = await pageView.thumbnail();
+        if (png) {
+          await call('cacheThumbnail', result.recentId, png);
+        }
+      } catch {
+        status('thumbnailFailed');
+      }
+    }
     renderRecent();
   } catch (error) {
     status('openFailed', {reason: errorReason(error)}, true);
@@ -294,6 +320,42 @@ async function openDocument(method = 'open', ...args) {
   }
 }
 
+function stagedToast(count) {
+  const history = model.history.length;
+  toast.show('stagedToast', {n: count}, {label: 'undo', run: () => {
+    if (model.history.length === history) {
+      historyAction();
+    }
+  }});
+}
+
+function pageForNode(id) {
+  if (!structure) {
+    const index = pageView.entries.findIndex(entry => entry.mapped.some(item => item.node?.id === id));
+    return index === -1 ? null : index + 1;
+  }
+  const target = [...$('pages').querySelectorAll('[data-node-id]')].find(element => element.dataset.nodeId === id);
+  return target ? [...$('pages').children].indexOf(target.closest('.page')) + 1 : null;
+}
+
+function renderReview() {
+  const groups = new Map();
+  for (const id of Object.keys(model.edits)) {
+    const page = pageForNode(id);
+    if (!groups.has(page)) {
+      groups.set(page, []);
+    }
+    groups.get(page).push(id);
+  }
+  $('reviewChanges').replaceChildren(...[...groups].sort((a, b) => (a[0] ?? Infinity) - (b[0] ?? Infinity)).map(([page, ids]) => {
+    const group = element('section', 'review-group');
+    group.append(element('div', 'section-label', page ? t('pageLabel', {n: page}) : t('unlocated')));
+    group.append(...changeCards(model, revert, ids, 'remove'));
+    return group;
+  }));
+  $('reviewWarnings').replaceChildren(...compatibilityTags(documentData));
+}
+
 async function review() {
   if (!model || busy || !Object.keys(model.edits).length) {
     return;
@@ -307,9 +369,9 @@ async function review() {
   updateControls();
   try {
     await call('plan', model.patch());
-    $('reviewChanges').replaceChildren(...changeCards(model));
-    $('reviewWarnings').replaceChildren(...warningCards());
+    renderReview();
     $('acknowledge').checked = false;
+    reviewFocus = document.activeElement;
     $('reviewDialog').showModal();
   } catch (error) {
     status('failed', {reason: errorReason(error)}, true);
@@ -320,7 +382,7 @@ async function review() {
 }
 
 async function save() {
-  if (busy || !$('acknowledge').checked) {
+  if (busy || !$('acknowledge').checked || !Object.keys(model?.edits || {}).length || !$('reviewDialog').open) {
     return;
   }
   busy = true;
@@ -329,12 +391,12 @@ async function save() {
     const result = await call('saveCopy', model.patch(), true);
     if (result) {
       $('reviewDialog').close();
-      status('saved', {name: result.name});
-      const finder = document.createElement('button');
-      finder.className = 'btn ghost';
-      finder.textContent = t('showInFinder');
-      finder.onclick = () => call('showSaved').catch(error => status('failed', {reason: errorReason(error)}, true));
-      $('status').append(finder);
+      toast.show('saved', {name: result.name}, {
+        label: 'showInFinder',
+        run: () => call('showSaved').catch(error => status('failed', {reason: errorReason(error)}, true))
+      });
+      $('status').textContent = '';
+      lastStatus = null;
     }
   } catch (error) {
     status('failed', {reason: errorReason(error)}, true);
@@ -367,6 +429,8 @@ function railMode(outline) {
 }
 
 function panelTab(name) {
+  activeTab = name;
+  panelDismissed = false;
   for (const item of ['changes', 'agent', 'checks']) {
     $(`${item}Panel`).hidden = item !== name;
     $(`${item}Tab`).classList.toggle('on', item === name);
@@ -375,7 +439,187 @@ function panelTab(name) {
   }
 }
 
-$('open').onclick = () => openDocument();
+function updatePanel() {
+  const content = Object.keys(model?.edits || {}).length > 0 || activeTab === 'checks';
+  const visible = !!documentData && content && !panelDismissed;
+  $('panel').hidden = !visible;
+  document.body.classList.toggle('panel-open', visible);
+  slip.position();
+}
+
+function togglePanel() {
+  if (!documentData) {
+    return;
+  }
+  if (activeTab !== 'checks' && !Object.keys(model.edits).length) {
+    panelTab('checks');
+  } else {
+    panelDismissed = !$('panel').hidden;
+  }
+  updatePanel();
+}
+
+function locateNode(node, openSlip = true) {
+  if (!model) {
+    return;
+  }
+  let target;
+  if (!structure) {
+    const index = pageView.entries.findIndex(entry => entry.mapped.some(item => item.node?.id === node.id));
+    if (index !== -1) {
+      pageView.render(index);
+      target = [...pageView.entries[index].page.querySelectorAll('[data-node-id]')].find(hit => hit.dataset.nodeId === node.id);
+    }
+  } else {
+    target = [...$('pages').querySelectorAll('[data-node-id]')].find(hit => hit.dataset.nodeId === node.id);
+  }
+  if (target) {
+    target.scrollIntoView({block: 'center'});
+    if (openSlip) {
+      target.click();
+    }
+  }
+}
+
+function nodeLocation(node) {
+  return locations.get(node.id) || `P${node.anchor ? node.anchor.paragraph + 1 : node.paragraph || 1}`;
+}
+
+function paletteTextResults(query) {
+  return findMatches(model, query).slice(0, 100).map(match => ({...match, location: nodeLocation(match.node)}));
+}
+
+function highlightMatches(matches, active) {
+  pageView.updateSearch(matches, active);
+  if (!structure || !model) {
+    return;
+  }
+  for (const span of $('pages').querySelectorAll('.text-node')) {
+    const node = model.nodes.get(span.dataset.nodeId);
+    const text = model.current(node);
+    const ranges = matches.filter(match => match.node.id === node.id);
+    span.replaceChildren();
+    let offset = 0;
+    for (const match of ranges) {
+      span.append(document.createTextNode(text.slice(offset, match.start)));
+      const mark = element('mark', matches[active] === match ? 'active' : '', text.slice(match.start, match.end));
+      span.append(mark);
+      offset = match.end;
+    }
+    span.append(document.createTextNode(text.slice(offset) || (!text ? t('empty') : '')));
+  }
+}
+
+const findBar = new FindBar($('findBar'), () => busy ? null : model, {
+  beforeReplace: () => {
+    if (busy) {
+      return false;
+    }
+    if (slip.dirty) {
+      status('unstaged', {}, true);
+      return false;
+    }
+    slip.close();
+    return true;
+  },
+  onHighlight: highlightMatches,
+  onLocate: match => locateNode(match.node, false),
+  onStaged: count => {
+    panelDismissed = false;
+    refreshEdits();
+    stagedToast(count);
+  },
+  location: nodeLocation
+});
+
+function openFind(replace = false, query) {
+  if (!documentData || busy) {
+    return;
+  }
+  if (slip.dirty) {
+    status('unstaged', {}, true);
+    return;
+  }
+  slip.close();
+  findBar.open(replace, query);
+}
+
+function setTheme(theme) {
+  if (!['system', 'light', 'dark'].includes(theme)) {
+    theme = 'system';
+  }
+  if (theme === 'system') {
+    delete document.documentElement.dataset.theme;
+  } else {
+    document.documentElement.dataset.theme = theme;
+  }
+  localStorage.setItem('hwp-theme', theme);
+}
+
+function shortcuts() {
+  if ($('shortcutsDialog').open) {
+    return;
+  }
+  const entries = [
+    {label: 'commands', shortcut: '⌘K'},
+    ...commandList.filter(command => command.shortcut),
+    {label: 'togglePanel', shortcut: '⌥⌘I'},
+    {label: 'stageShortcut', shortcut: '⌘↵'},
+    {label: 'closeShortcut', shortcut: 'Esc'},
+    {label: 'findNextShortcut', shortcut: '↵'},
+    {label: 'findPreviousShortcut', shortcut: '⇧↵'},
+    {label: 'paletteScopes', shortcut: 'Tab / ⇧Tab'},
+    {label: 'paletteMove', shortcut: '↑ / ↓'},
+    {label: 'paletteRun', shortcut: '↵'},
+    {label: 'panelTabs', shortcut: '← / → / Home / End'}
+  ];
+  $('shortcutItems').replaceChildren(...entries.map(command => {
+    const row = element('div', 'shortcut');
+    row.append(element('span', '', t(command.label)), element('kbd', '', command.shortcut));
+    return row;
+  }));
+  shortcutFocus = document.activeElement;
+  $('shortcutsDialog').showModal();
+}
+
+let shortcutFocus;
+const needsDocument = () => !!documentData && !busy;
+const commandList = [
+  {label: 'open', shortcut: '⌘O', run: () => openDocument()},
+  {label: 'sample', run: () => openDocument('openDemo')},
+  {label: 'saveCopy', shortcut: '⌘S', enabled: () => needsDocument() && Object.keys(model.edits).length > 0, run: review},
+  {label: 'find', shortcut: '⌘F', enabled: needsDocument, run: () => openFind()},
+  {label: 'replace', shortcut: '⌥⌘F', enabled: needsDocument, run: () => openFind(true)},
+  {label: 'undo', shortcut: '⌘Z', enabled: () => needsDocument() && model.history.length > 0, run: () => historyAction()},
+  {label: 'redo', shortcut: '⇧⌘Z', enabled: () => needsDocument() && model.future.length > 0, run: () => historyAction(true)},
+  {label: 'zoomIn', shortcut: '⌘+', enabled: needsDocument, run: () => zoom(pageView.stepZoom(1))},
+  {label: 'zoomOut', shortcut: '⌘−', enabled: needsDocument, run: () => zoom(pageView.stepZoom(-1))},
+  {label: 'fitWidth', shortcut: '⌘0', enabled: needsDocument, run: () => zoom('fit')},
+  {label: 'pages', enabled: needsDocument, run: () => railMode(false)},
+  {label: 'outline', enabled: needsDocument, run: () => railMode(true)},
+  ...['changes', 'agent', 'checks'].map(name => ({label: name, enabled: needsDocument, run: () => {
+    panelTab(name);
+    updatePanel();
+  }})),
+  {label: 'language', run: changeLanguage},
+  ...['system', 'light', 'dark'].map(theme => ({label: `theme${theme[0].toUpperCase()}${theme.slice(1)}`, run: () => setTheme(theme)})),
+  {label: 'shortcuts', shortcut: '⌘/', run: shortcuts}
+];
+const palette = new CommandPalette($('palette'), commandList, paletteTextResults, match => locateNode(match.node));
+$('paletteButton').onclick = () => palette.open();
+document.querySelector('.island').onclick = event => {
+  if (!event.target.closest('button')) {
+    palette.open();
+  }
+};
+$('closeShortcuts').onclick = () => $('shortcutsDialog').close();
+$('shortcutsDialog').addEventListener('close', () => shortcutFocus?.focus({preventScroll: true}));
+setTheme(localStorage.getItem('hwp-theme') || 'system');
+
+$('dirty').onclick = () => {
+  panelTab('changes');
+  updatePanel();
+};
 $('emptyOpen').onclick = () => openDocument();
 $('demo').onclick = () => openDocument('openDemo');
 $('save').onclick = review;
@@ -384,12 +628,13 @@ $('confirmSave').onclick = save;
 $('acknowledge').onchange = updateControls;
 $('closeReview').onclick = () => $('reviewDialog').close();
 $('cancelReview').onclick = () => $('reviewDialog').close();
+$('reviewDialog').addEventListener('close', () => reviewFocus?.focus({preventScroll: true}));
 $('pagesToggle').onclick = () => railMode(false);
 $('outlineToggle').onclick = () => railMode(true);
 $('zoomIn').onclick = () => zoom(pageView.stepZoom(1));
 $('zoomOut').onclick = () => zoom(pageView.stepZoom(-1));
 $('zoomValue').onclick = () => zoom('fit');
-$('language').onclick = () => {
+function changeLanguage() {
   toggleLanguage();
   updateControls();
   slip.relabel();
@@ -410,15 +655,24 @@ $('language').onclick = () => {
       });
     }
     $('changes').replaceChildren(...changeCards(model, revert));
-    $('reviewChanges').replaceChildren(...changeCards(model));
-    $('reviewWarnings').replaceChildren(...warningCards());
+  }
+  toast.render();
+  findBar.refresh();
+  if ($('reviewDialog').open) {
+    renderReview();
   }
   if (lastStatus) {
     status(lastStatus.key, lastStatus.values, lastStatus.error);
   }
-};
+  if (palette.dialog.open) {
+    palette.render();
+  }
+}
 for (const name of ['changes', 'agent', 'checks']) {
-  $(`${name}Tab`).onclick = () => panelTab(name);
+  $(`${name}Tab`).onclick = () => {
+    panelTab(name);
+    updatePanel();
+  };
 }
 document.querySelector('.tabs').onkeydown = event => {
   const tabs = ['changes', 'agent', 'checks'];
@@ -427,6 +681,7 @@ document.querySelector('.tabs').onkeydown = event => {
     event.preventDefault();
     const index = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (current + (event.key === 'ArrowRight' ? 1 : 2)) % 3;
     panelTab(tabs[index]);
+    updatePanel();
     $(`${tabs[index]}Tab`).focus();
   }
 };
@@ -435,17 +690,33 @@ document.addEventListener('keydown', event => {
   if (!(event.metaKey || event.ctrlKey) || event.isComposing) {
     return;
   }
-  const key = event.key.toLowerCase();
-  if (key === 'o') {
+  const key = event.code.startsWith('Key') ? event.code.slice(3).toLowerCase() : event.code === 'Slash' ? '/' : event.key.toLowerCase();
+  if ($('reviewDialog').open || $('shortcutsDialog').open || (palette.dialog.open && key !== 'k')) {
+    return;
+  }
+  const typing = document.activeElement?.matches('input, textarea, [contenteditable]');
+  if (key === 'k') {
+    event.preventDefault();
+    palette.dialog.open ? palette.close() : palette.open();
+  } else if (key === 'f') {
+    event.preventDefault();
+    openFind(event.altKey);
+  } else if (key === '/') {
+    event.preventDefault();
+    shortcuts();
+  } else if (key === 'i' && event.altKey) {
+    event.preventDefault();
+    togglePanel();
+  } else if (key === 'o') {
     event.preventDefault();
     openDocument();
   } else if (key === 's') {
     event.preventDefault();
     review();
-  } else if (key === 'z' && document.activeElement !== slip.editor) {
+  } else if (key === 'z' && !typing) {
     event.preventDefault();
     historyAction(event.shiftKey);
-  } else if (['+', '=', '-', '0'].includes(key) && document.activeElement !== slip.editor) {
+  } else if (['+', '=', '-', '0'].includes(key) && !typing) {
     event.preventDefault();
     zoom(key === '0' ? 'fit' : pageView.stepZoom(key === '-' ? -1 : 1));
   }
@@ -460,10 +731,48 @@ window.addEventListener('beforeunload', event => {
 // Preload obtains a dropped file's path only from a trusted OS event.
 // The renderer accepts the switch before main changes the active document.
 window.hwp?.onDrop(beginOpen, completeOpen);
+window.hwp?.onCommand(command => {
+  if (command === 'language') {
+    changeLanguage();
+  } else if (command === 'palette') {
+    palette.open();
+  } else if (command === 'shortcuts') {
+    shortcuts();
+  } else if (command === 'undo' || command === 'redo') {
+    if (document.activeElement?.matches('input, textarea, [contenteditable]')) {
+      document.execCommand(command);
+    } else {
+      historyAction(command === 'redo');
+    }
+  } else {
+    openFind(command === 'replace');
+  }
+});
 // A drop never navigates to local document content.
-document.addEventListener('dragover', event => event.preventDefault());
+let dragDepth = 0;
+document.addEventListener('dragenter', event => {
+  if (event.dataTransfer?.types.includes('Files')) {
+    event.preventDefault();
+    dragDepth += 1;
+    $('dropSheet').classList.add('over');
+  }
+});
+document.addEventListener('dragleave', () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) {
+    $('dropSheet').classList.remove('over');
+  }
+});
+document.addEventListener('dragover', event => {
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy';
+  }
+});
 document.addEventListener('drop', event => {
   event.preventDefault();
+  dragDepth = 0;
+  $('dropSheet').classList.remove('over');
 });
 applyLanguage();
 panelTab('changes');

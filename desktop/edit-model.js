@@ -1,4 +1,4 @@
-export function textError(text, original, format) {
+export function textError(text, original, lengthChangingText) {
   if ([...text].length > 200000) {
     return 'tooLong';
   }
@@ -8,7 +8,7 @@ export function textError(text, original, format) {
       return 'controls';
     }
   }
-  if (format === 'hwp' && text.length !== original.length) {
+  if (!lengthChangingText && text.length !== original.length) {
     return 'lengthError';
   }
   return null;
@@ -17,6 +17,7 @@ export function textError(text, original, format) {
 export class EditModel {
   constructor(document) {
     this.document = document;
+    this.lengthChangingText = document.capabilities?.lengthChangingText === true;
     this.nodes = new Map(document.nodes.map(node => [node.id, node]));
     this.edits = {};
     this.history = [];
@@ -28,16 +29,27 @@ export class EditModel {
   }
 
   stage(node, text) {
-    if (!node.editable || textError(text, node.text, this.document.format) || text === this.current(node)) {
+    return this.stageBatch([{node, text}]);
+  }
+
+  stageBatch(changes) {
+    const next = {...this.edits};
+    for (const {node, text} of changes) {
+      if (this.nodes.get(node.id) !== node || !node.editable || textError(text, node.text, this.lengthChangingText)) {
+        return false;
+      }
+      if (text === node.text) {
+        delete next[node.id];
+      } else {
+        next[node.id] = text;
+      }
+    }
+    if (Object.keys(next).length > 1000 || JSON.stringify(next) === JSON.stringify(this.edits)) {
       return false;
     }
     this.history.push({...this.edits});
     this.future = [];
-    if (text === node.text) {
-      delete this.edits[node.id];
-    } else {
-      this.edits[node.id] = text;
-    }
+    this.edits = next;
     return true;
   }
 
@@ -70,7 +82,7 @@ export class EditModel {
     for (const operation of draft.operations) {
       const node = this.nodes.get(operation.nodeId);
       if (operation.op === 'set_text' && node?.editable && operation.expectedText === node.text && typeof operation.text === 'string' &&
-          !textError(operation.text, node.text, this.document.format)) {
+          !textError(operation.text, node.text, this.lengthChangingText)) {
         this.stage(node, operation.text);
       }
     }

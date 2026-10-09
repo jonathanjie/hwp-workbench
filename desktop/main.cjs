@@ -5,15 +5,29 @@ const fsSync = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const {serveAppRequest} = require('./protocol.cjs');
+const {RecentStore, validateDroppedFile} = require('./recent-store.cjs');
+const {OutputReveal} = require('./output-reveal.cjs');
 const {readDocumentBytes} = require('./document-bytes.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const INDEX = 'app://workbench/index.html';
+// Honor Chromium's explicit profile-directory option for isolated app runs.
+const profileDirectory = app.commandLine.getSwitchValue('user-data-dir');
+if (profileDirectory) {
+  app.setPath('userData', path.resolve(profileDirectory));
+}
 let win;
 let current = null;
-let savedOutput = null;
+const outputReveal = new OutputReveal(file => shell.showItemInFolder(file));
 let queue = Promise.resolve();
-const recentFiles = [];
+let recentStore;
+function recents() {
+  const directory = app.getPath('userData');
+  if (!recentStore || recentStore.directory !== directory) {
+    recentStore = new RecentStore(directory);
+  }
+  return recentStore;
+}
 
 protocol.registerSchemesAsPrivileged([{scheme: 'app', privileges: {
   standard: true,
@@ -114,22 +128,29 @@ function draftPath() {
   return path.join(app.getPath('userData'), 'drafts', current.sha256 + '.json');
 }
 
+// Recent files are a convenience. A failure to record one must not block
+// opening the document; the welcome screen then shows its own short status.
+async function recordRecent(file, format) {
+  try {
+    return await recents().record(file, format);
+  } catch (error) {
+    console.error('Recent files unavailable:', error.message);
+    return null;
+  }
+}
+
 async function load(file) {
+  file = await fs.realpath(file);
   const root = path.dirname(file);
   const document = await callEngine(root, 'inspect', {path: path.basename(file)});
-  current = {file, root, sha256: document.sha256};
-  savedOutput = null;
-  const index = recentFiles.indexOf(file);
-  if (index !== -1) {
-    recentFiles.splice(index, 1);
-  }
-  recentFiles.unshift(file);
-  recentFiles.length = Math.min(recentFiles.length, 3);
+  const recentId = await recordRecent(file, document.format);
+  current = {file, root, sha256: document.sha256, recentId};
+  outputReveal.clear();
   let draft = null;
   try {
     draft = JSON.parse(await fs.readFile(draftPath(), 'utf8'));
   } catch {}
-  return {document, draft};
+  return {document, draft, recentId};
 }
 
 function register(channel, fn) {
@@ -148,13 +169,9 @@ register('document:open', async () => {
   });
   return result.canceled ? null : load(result.filePaths[0]);
 });
-// Only preload's trusted OS drop listener sends this grant; no path API is exposed.
-register('document:drop', file => {
-  if (typeof file !== 'string' || !path.isAbsolute(file) || !/\.hwpx?$/i.test(file)) {
-    throw Error('Unsupported document');
-  }
-  return load(file);
-});
+// The preload grants paths only from trusted OS file drops. Recheck the grant
+// before passing it to the engine; directories and symlinks are not documents.
+register('document:open-dropped', async file => load(await validateDroppedFile(file)));
 register('document:demo', () => load(path.join(ROOT, 'fixtures', 'generated', 'review-form.hwpx')));
 register('document:bytes', (...args) => {
   if (args.length || !current) {
@@ -162,12 +179,13 @@ register('document:bytes', (...args) => {
   }
   return readDocumentBytes(current.file, current.sha256);
 });
-register('document:recent', () => recentFiles.map(file => ({name: path.basename(file)})));
-register('document:open-recent', index => {
-  if (!Number.isInteger(index) || index < 0 || index >= recentFiles.length) {
-    throw Error('Invalid recent document');
+register('document:recent', () => recents().list());
+register('document:open-recent', async id => load(await recents().fileFor(id)));
+register('document:cache-thumbnail', (id, png) => {
+  if (!current || id !== current.recentId) {
+    throw Error('Invalid thumbnail document');
   }
-  return load(recentFiles[index]);
+  return recents().cacheThumbnail(id, png);
 });
 register('document:plan', patch => {
   validatePatch(patch);
@@ -202,16 +220,10 @@ register('document:save', async (patch, acknowledgement) => {
     patch,
     acknowledgeRisks: true
   });
-  savedOutput = output;
-  return {...report, output, name: path.basename(output)};
+  outputReveal.saved(output);
+  return {...report, name: path.basename(output)};
 });
-register('document:show-saved', () => {
-  if (!savedOutput) {
-    throw Error('No saved copy');
-  }
-  shell.showItemInFolder(savedOutput);
-  return true;
-});
+register('shell:reveal-output', (...args) => outputReveal.show(...args));
 register('document:export-patch', async patch => {
   validatePatch(patch);
   const result = await dialog.showSaveDialog(win, {
@@ -262,7 +274,7 @@ app.whenReady().then(() => {
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: {x: 18, y: 18},
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0F0F0E' : '#E8E7E3',
-    icon: path.join(__dirname, 'assets', 'icon.svg'),
+    icon: fsSync.existsSync(path.join(__dirname, 'assets', 'icon.png')) ? path.join(__dirname, 'assets', 'icon.png') : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -290,8 +302,17 @@ app.whenReady().then(() => {
   });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     {label: app.name, submenu: [{role: 'about'}, {type: 'separator'}, {role: 'quit'}]},
-    {label: 'Edit / 편집', submenu: [{role: 'undo'}, {role: 'redo'}, {type: 'separator'}, {role: 'cut'}, {role: 'copy'}, {role: 'paste'}, {role: 'selectAll'}]},
-    {label: 'View / 보기', submenu: [{role: 'togglefullscreen'}]}
+    {label: 'Edit / 편집', submenu: [
+      {id: 'undo', label: 'Undo / 실행 취소', accelerator: 'CommandOrControl+Z', click: () => win.webContents.send('app:command', 'undo')},
+      {id: 'redo', label: 'Redo / 다시 실행', accelerator: 'CommandOrControl+Shift+Z', click: () => win.webContents.send('app:command', 'redo')},
+      {type: 'separator'}, {role: 'cut'}, {role: 'copy'}, {role: 'paste'}, {role: 'selectAll'}
+    ]},
+    {label: 'View / 보기', submenu: [
+      {label: 'Commands / 명령', click: () => win.webContents.send('app:command', 'palette')},
+      {label: 'Language / 언어', click: () => win.webContents.send('app:command', 'language')},
+      {label: 'Keyboard shortcuts / 키보드 단축키', click: () => win.webContents.send('app:command', 'shortcuts')},
+      {role: 'togglefullscreen'}
+    ]}
   ]));
   win.loadURL(INDEX);
 });
