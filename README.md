@@ -14,7 +14,7 @@ The product requirement remains full HWP/HWPX editing with close official-docume
 | HWP | Open supported HWP 5.x containers, inspect/extract text, replace existing text with the same UTF-16 length, save a new HWP copy. |
 | Desktop | English/Korean UI; outline/search; selectable structured preview; text inspector; staged undo/redo; change review; local staged-patch recovery; native open/save-dialog wiring. |
 | Preservation | Original file never overwritten; untouched payloads retained; changes bound to the source hash and expected text; output reopened by this engine before publication. |
-| Agents | Five shared operations: `inspect`, `extract`, `validate`, `plan`, `apply`. CLI and MCP use the same engine as the desktop. |
+| Agents | Shared native read/search/edit/plan/apply operations, bounded proposals and session reports, plus an installable Claude Code/Codex skill. CLI and MCP use the same engine as the desktop. |
 | Packaging | Apple Silicon developer `.app` packaging script and private GitHub publishing script. Neither has been executed on a Mac in this build environment. |
 
 The GUI is a **structure preview**, not a faithful page renderer. HWP tables, images, shapes and page layout are not drawn. HWPX table structure and selected character styles are approximated; image/object payloads have placeholders. Keeping bytes does not guarantee unchanged visual layout.
@@ -77,6 +77,16 @@ A corresponding equal-length HWP example is in `examples/legacy.patch.json`:
 
 The bundled documents are self-authored, format-shaped parser fixtures. They contain deliberately opaque test data and are **not certified or intended as complete, submission-ready Hancom documents**. Successfully reopening them in this engine does not prove interoperability with Hancom.
 
+## Use with Claude Code or Codex
+
+```bash
+scripts/hwp-workbench skill install
+```
+
+This installs the marked skill for both agents. Use `--target claude` or `--target codex` to select one, and `--dry-run` to check destinations without writing. `skill status` shows installed versions and paths; `skill uninstall` removes only marked folders. Existing unmarked skills are preserved, and marked skills are backed up before replacement.
+
+The skill guides `read` → `search` → edit preview → diff review → `propose` for desktop review or `apply` to a new native file. `session` reports Agent link state and recorded decisions. Desktop session publishing and blue-pencil review require the separate desktop integration; this task supplies the engine file contract. Keep hashes, exact expected text and honest compatibility warnings. See `docs/AGENT-INTERFACE.md`.
+
 ## Connect an agent through MCP
 
 Use a compatible client supporting the negotiated 2025-11-25, 2025-06-18 or 2025-03-26 profile. This server does not claim conformance to later MCP revisions. It has no HTTP endpoint and opens no network listener.
@@ -94,7 +104,7 @@ Example client configuration, replacing both absolute paths:
 }
 ```
 
-Tools are `hwp_inspect`, `hwp_extract`, `hwp_validate`, `hwp_plan`, and `hwp_apply`. Start with inspect, use the returned source hash and node IDs to construct a patch, review plan output, then apply to a new filename. A node ID is scoped to its source revision; re-inspect after changing the file.
+Tools are `hwp_read`, `hwp_search`, `hwp_replace`, `hwp_fill`, `hwp_set`, `hwp_inspect`, `hwp_extract`, `hwp_validate`, `hwp_plan`, `hwp_apply`, `hwp_propose`, and `hwp_session`. Start with inspect, use the returned source hash and node IDs to construct a patch, review plan output, then apply to a new filename. A node ID is scoped to its source revision; re-inspect after changing the file.
 
 Grant the smallest practical workspace. An agent host can transmit extracted content to its model provider even though this application does not upload documents. The `acknowledgeRisks` flag acknowledges a policy; it is not cryptographic evidence of human approval. See `docs/AGENT-INTERFACE.md` and `docs/SECURITY.md`.
 

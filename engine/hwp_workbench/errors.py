@@ -6,6 +6,7 @@ RECOVERY = {
     'STALE_TEXT': ('Re-run read or inspect and rebuild the patch with the current expectedText.', True),
     'NODE_NOT_FOUND': ('Re-run read or search and use a full node ID from the current source.', True),
     'HWP_LENGTH_CHANGE_BLOCKED': ('Use replacement text with the same UTF-16 code-unit length as the original node.', True),
+    'SKILL_NOT_OWNED': ('Keep the existing skill folder; install only into an absent or application-marked folder.', True),
     'OUTPUT_EXISTS': ('Choose a new output filename; existing files cannot be replaced.', True),
     'OUTPUT_FORMAT': ('Use an output filename with the same native extension as the source format.', True),
     'RISK_ACK_REQUIRED': ('Review the patch and compatibility warnings, then pass acknowledgeRisks: true to save.', True),

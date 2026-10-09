@@ -16,7 +16,7 @@ class MCPTests(unittest.TestCase):
     def test_initialize_tools(self):
         replies = self.run_messages([{'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list'}])
         self.assertEqual(replies[0]['result']['protocolVersion'], '2025-11-25')
-        self.assertEqual(len(replies[1]['result']['tools']), 10)
+        self.assertEqual(len(replies[1]['result']['tools']), 12)
 
     def test_inspect(self):
         r=self.run_messages([{'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':'hwp_inspect','arguments':{'path':'form.hwpx'}}}]);self.assertFalse(r[-1]['result']['isError']);self.assertEqual(r[-1]['result']['structuredContent']['format'],'hwpx')

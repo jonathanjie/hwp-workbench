@@ -66,6 +66,7 @@ class Document:
             raise WorkbenchError('UNSUPPORTED_FORMAT','Only HWP 5.x CFB and HWPX ZIP documents are supported. HWP 3.x is not supported.')
         require(len(self.nodes)<=MAX_NODES,'LIMIT','Too many text nodes.')
         self.by_id = {n.id:n for n in self.nodes}
+        self.references = self._references()
         self.warn('LAYOUT_UNVERIFIED','warning','The workspace preview is approximate. Hancom layout, pagination and font fidelity have not been certified.')
         if self.block_save:
             for n in self.nodes: n.editable=False
@@ -358,28 +359,57 @@ class Document:
                     parts=[{'name':k,'size':len(v),'sha256':sha(v)} for k,v in self.parts.items()],
                     pendingChanges=len(self.edits))
 
-    def patch(self,patch: dict):
-        require(isinstance(patch,dict) and patch.get('schemaVersion')==1,'BAD_PATCH','Expected patch schemaVersion 1.')
-        require(patch.get('baseSha256')==self.hash,'STALE_DOCUMENT','Patch hash differs from source document; re-inspect before editing.')
-        operations=patch.get('operations')
-        require(isinstance(operations,list) and 0<len(operations)<=1000,'BAD_PATCH','Supply 1–1000 operations.')
-        require(not self.block_save,'SAVE_BLOCKED','Protected/active content blocks edits.')
-        pending=dict(self.edits);seen=set()
-        for op in operations:
-            require(isinstance(op,dict) and set(op)=={'op','nodeId','expectedText','text'},'BAD_PATCH','Each operation requires exactly op, nodeId, expectedText, text.')
-            require(op['op']=='set_text' and isinstance(op['nodeId'],str),'BAD_PATCH','Only set_text is implemented.')
-            nid=op['nodeId'];require(nid not in seen,'BAD_PATCH','Duplicate target in patch.');seen.add(nid)
-            require(nid in self.by_id,'NODE_NOT_FOUND','Unknown node ID: '+nid)
-            node=self.by_id[nid]
-            require(node.editable,'UNSUPPORTED_ELEMENT','This text is not safely editable.')
-            require(op['expectedText']==pending.get(nid,node.text),'STALE_TEXT','Expected text no longer matches '+nid)
-            value=op['text'];check_text(value)
-            if self.format=='hwp':
-                require(len(value.encode('utf-16le'))==len(node.text.encode('utf-16le')),'HWP_LENGTH_CHANGE_BLOCKED','HWP alpha requires equal UTF-16 length. No output was written.')
-            if value==node.text: pending.pop(nid,None)
-            else: pending[nid]=value
+    def _references(self) -> dict[str, str]:
+        references = {}
+        section_numbers = {}
+        section_counts = {}
+        for node in self.nodes:
+            section = section_numbers.setdefault(node.part, len(section_numbers))
+            index = section_counts.get(node.part, 0)
+            section_counts[node.part] = index + 1
+            references[f's{section}:t{index}'] = node.id
+        return references
+
+    def resolve_node_id(self, node_id: str) -> str:
+        require(isinstance(node_id, str), 'BAD_ARGUMENTS', 'nodeId must be a full ID or short reference.')
+        resolved = self.references.get(node_id, node_id)
+        require(resolved in self.by_id, 'NODE_NOT_FOUND', 'Unknown node ID: ' + node_id)
+        return resolved
+
+    def patch(self, patch: dict):
+        require(isinstance(patch, dict) and patch.get('schemaVersion') == 1,
+                'BAD_PATCH', 'Expected patch schemaVersion 1.')
+        require(patch.get('baseSha256') == self.hash, 'STALE_DOCUMENT',
+                'Patch hash differs from source document; re-inspect before editing.')
+        operations = patch.get('operations')
+        require(isinstance(operations, list) and 0 < len(operations) <= 1000,
+                'BAD_PATCH', 'Supply 1–1000 operations.')
+        require(not self.block_save, 'SAVE_BLOCKED', 'Protected/active content blocks edits.')
+        pending = dict(self.edits)
+        seen = set()
+        for operation in operations:
+            require(isinstance(operation, dict) and set(operation) == {'op', 'nodeId', 'expectedText', 'text'},
+                    'BAD_PATCH', 'Each operation requires exactly op, nodeId, expectedText, text.')
+            require(operation['op'] == 'set_text' and isinstance(operation['nodeId'], str),
+                    'BAD_PATCH', 'Only set_text is implemented.')
+            node_id = self.resolve_node_id(operation['nodeId'])
+            require(node_id not in seen, 'BAD_PATCH', 'Duplicate target in patch.')
+            seen.add(node_id)
+            node = self.by_id[node_id]
+            require(node.editable, 'UNSUPPORTED_ELEMENT', 'This text is not safely editable.')
+            require(operation['expectedText'] == pending.get(node_id, node.text),
+                    'STALE_TEXT', 'Expected text no longer matches ' + node_id)
+            value = operation['text']
+            check_text(value)
+            if self.format == 'hwp':
+                require(len(value.encode('utf-16le')) == len(node.text.encode('utf-16le')),
+                        'HWP_LENGTH_CHANGE_BLOCKED', 'HWP alpha requires equal UTF-16 length. No output was written.')
+            if value == node.text:
+                pending.pop(node_id, None)
+            else:
+                pending[node_id] = value
         # All-or-nothing; no mutations until every operation has passed.
-        self.edits=pending
+        self.edits = pending
         return self.diff()
 
     def diff(self):

@@ -45,7 +45,7 @@ Each search match has `nodeId`, zero-based `start` and exclusive `end`, a contex
 
 Regex patterns are limited to 256 characters. Supported syntax includes literals, character classes, escapes, dots and anchors. Examples: `J[oa]nathan`, `검토`, `^INTERNAL`. Repetitions (`*`, `+`, `?`, `{…}`), groups, alternation, lookaround and backreferences are refused to bound backtracking cost. Use literal search for other text. Search returns at most 1000 matches; `limitReached` means processing stopped at the cap and more matches may exist.
 
-Replace values are always literal, including backslashes; regex capture substitution is not supported. `nodeIds` restricts targets to at most 1000 full IDs. `limit` caps matched occurrences across the document, including skipped occurrences. Each changed node gets one `set_text` operation. Read-only/protected targets and HWP UTF-16 length conflicts appear in `skipped` with `nodeId`, `code` and `reason`. An oversized resulting node is refused before allocation.
+Replace values are always literal, including backslashes; regex capture substitution is not supported. `nodeIds` restricts targets to at most 1000 full IDs or short references. `limit` caps matched occurrences across the document, including skipped occurrences. Each changed node gets one `set_text` operation. Read-only/protected targets and HWP UTF-16 length conflicts appear in `skipped` with `nodeId`, `code` and `reason`. An oversized resulting node is refused before allocation.
 
 ### Form filling
 
@@ -76,7 +76,7 @@ A preview with no editable changes has an empty operations array. It cannot be a
 }
 ```
 
-HWP addresses resemble `BodyText/Section0#record:1:text:0`. IDs are source-revision addresses. Only `set_text` is accepted. Unknown operations or operation keys, duplicate targets, stale hashes and stale expected text are refused. Patches contain 1–1000 unique targets. Text values contain at most 200,000 Unicode characters and cannot contain native controls, tabs or newlines.
+HWP addresses resemble `BodyText/Section0#record:1:text:0`. IDs are source-revision addresses. Short references printed by `read` (for example `s0:t6`) are accepted everywhere a node ID is used, including CLI, MCP, `set`, scoped `replace`, and `plan`/`apply` patches. They resolve against the current source. Generated patches and proposals use full native IDs; aliases for the same node count as duplicate targets. Only `set_text` is accepted. Unknown operations or operation keys, duplicate targets, stale hashes and stale expected text are refused. Patches contain 1–1000 unique targets. Text values contain at most 200,000 Unicode characters and cannot contain native controls, tabs or newlines.
 
 HWP requires equal UTF-16 code-unit length, which differs from character count and visual width. HWPX allows length changes in existing plain-text nodes. Neither operation adds paragraphs or edits native fields, styles, controls or table structure.
 
@@ -86,21 +86,26 @@ HWP requires equal UTF-16 code-unit length, which differs from character count a
 
 ```text
 hwp-workbench capabilities
-hwp-workbench read PATH [--offset 0] [--limit 200]
-hwp-workbench search PATH --query TEXT [--regex] [--case-sensitive | --ignore-case] [--limit 100]
+hwp-workbench read PATH [--offset 0] [--limit 200] [--format json|text]
+hwp-workbench search PATH [QUERY | --query TEXT] [--regex] [--case-sensitive | --ignore-case] [--limit 100]
 hwp-workbench replace PATH --find TEXT --replace-with TEXT [--regex] [--ignore-case | --case-sensitive]
-                      [--node-id FULL_ID ...] [--limit 1000] [-o NEW_PATH --acknowledge-risks]
-hwp-workbench fill PATH --json FIELDS.json [-o NEW_PATH --acknowledge-risks]
-hwp-workbench set PATH --node-id FULL_ID --text TEXT [-o NEW_PATH --acknowledge-risks]
+                      [--node-id NODE_ID ...] [--limit 1000] [-o NEW_PATH --acknowledge-risks]
+hwp-workbench fill PATH (--json FIELDS.json | --field LABEL=VALUE ...) [-o NEW_PATH --acknowledge-risks]
+hwp-workbench set PATH --node-id NODE_ID --text TEXT [-o NEW_PATH --acknowledge-risks]
 hwp-workbench inspect PATH [--compact]
 hwp-workbench extract PATH [--format json|text]
 hwp-workbench validate PATH
 hwp-workbench plan PATH --patch PATCH.json
 hwp-workbench apply PATH --patch PATCH.json -o NEW_PATH --acknowledge-risks
+hwp-workbench propose PATH --patch PATCH_OR_PREVIEW.json --title TITLE [--author agent] [--notes TEXT]
+hwp-workbench session PATH
+hwp-workbench skill install [--target claude|codex|all] [--dry-run]
+hwp-workbench skill status
+hwp-workbench skill uninstall [--target claude|codex|all]
 hwp-workbench mcp --root DIRECTORY
 ```
 
-Each document subcommand accepts `--root DIRECTORY` (default: current directory). Source, patch, fields JSON and output paths must stay within it. Parent directories must exist. Symlink components and traversal are rejected. `--node-id` on replace can be repeated. `fill --json` reads a label/value object directly, such as `{"기관명":"새 기관","담당자":"Jane"}`.
+Each document subcommand accepts `--root DIRECTORY` (default: current directory). Source, patch, fields JSON and output paths must stay within it. Parent directories must exist, except that `propose` creates its link/proposal directories after validation. Symlink components and traversal are rejected. `--node-id` on replace can be repeated. `fill --field LABEL=VALUE` can be repeated; values can contain `=` and be empty. Duplicate labels and missing `=` are refused. Choose either `--field` or `--json`. Search accepts either a positional query or `--query`; supplying both is refused. `fill --json` reads a label/value object directly, such as `{"기관명":"새 기관","담당자":"Jane"}`.
 
 Examples using the generated, self-authored fixtures:
 
@@ -117,9 +122,45 @@ Examples using the generated, self-authored fixtures:
   --node-id 'BodyText/Section0#record:1:text:0' --text '마리나체인 검토 완'
 ```
 
-Use the actual full ID returned by your read or search; the set example is revision-specific. For exact reviewed application, save the preview's `patch` object in a workspace JSON file and pass it to `apply --patch`.
+Use the actual full ID or short reference returned by the current read, or full ID from search; the set example is revision-specific. For exact reviewed application, save the preview's `patch` object in a workspace JSON file and pass it to `apply --patch`.
 
-Normal output is JSON. Only `extract --format text` emits plain text. Errors, including argument errors, are JSON on stderr with exit code 2. `rpc --root DIRECTORY` reads one `{method, args}` request from stdin and returns the same operation result or error; it is an internal desktop adapter, not a network API.
+Normal output is JSON. `extract --format text` emits extracted text. `read --format text` emits only the text view and a final line `sha256=<hash> nextOffset=<number|null>`. JSON remains the default, including when stdout is a terminal. Errors, including argument errors, are JSON on stderr with exit code 2. `rpc --root DIRECTORY` reads one `{method, args}` request from stdin and returns the same operation result or error; it is an internal desktop adapter, not a network API.
+
+## Agent link file contract
+
+All agent-link files live in a hidden folder next to the document: `<document folder>/.hwp-workbench/`.
+
+- Session (written only by the desktop, only while the person enables Agent link): `.hwp-workbench/<document file name>.session.json`
+  `{schemaVersion: 1, app: "hwp-workbench", appVersion, document: {name, format, sha256}, selection: {nodeId, text} | null, staged: <patch> | null, updatedAt}`
+- Proposal (written by agents): `.hwp-workbench/proposals/<document file name>.<UTC yyyymmddThhmmssZ>-<6 hex>.json`
+  `{schemaVersion: 1, kind: "hwp-workbench-proposal", document: {name, sha256}, title, author, createdAt, patch: <schemaVersion 1 patch>, notes?}`
+- Outcome (written by the desktop next to the proposal): `<proposal file stem>.outcome.json` = `{schemaVersion: 1, status: "accepted"|"declined"|"partial", acceptedNodeIds, declinedNodeIds, decidedAt}`.
+Limits: proposal files ≤ 2 MiB, ≤ 1000 operations, at most 200 proposal files read per call.
+
+The notation above specifies field names and structure; files contain valid JSON. Times are UTC ISO 8601 strings. Node ID lists contain strings. The desktop owns session and outcome files; agents must never write them. Selection and staged text can contain document content. Keep link files within the approved local workspace and treat their contents as untrusted data.
+
+`propose` takes `path`, `patch`, `title`, and optional `author` (default `agent`) and `notes`. The patch can be a schemaVersion-1 patch or a whole `replace`/`fill`/`set` preview containing `patch`. It runs the same complete patch checks as `plan`, resolves short references to full IDs, rechecks the source hash, creates the link/proposals directories inside the workspace if absent, and publishes through the no-overwrite writer. Symlink components are never followed. An existing proposal name is refused. It returns `{proposal: relative path, changes}` without changing the source document. `plan` and `apply` still require the patch object itself.
+
+`session` takes `path` and returns `{linked: bool, session | null, proposals: [{file, title, author, createdAt, operations, status}]}` for that document only. `file` is workspace-relative and `operations` is a count. It is read-only and does not create missing folders. A session is linked only when its schema, app identity, document name/format/hash and required field types match the current source. Missing, broken or stale session data returns `linked: false, session: null`.
+
+Session, proposal and outcome reads are each bounded to 2 MiB. At most 200 files matching the complete document-name/timestamp/hex proposal filename are read per call; outcome files do not count as proposals. The bounded candidate list is sorted by filename but is not a paginated complete inbox. If a proposal is omitted, its outcome has not been checked. A broken, oversized, nonregular or symlink proposal/outcome appears as `status: "unreadable"`; unreadable proposal metadata is null and its operation count is 0. An unsafe link/proposals directory is refused. JSON parse failures do not crash the report.
+
+A valid proposal without an outcome is `pending`, or `stale` when its source hash differs. A valid desktop outcome supplies `accepted`, `declined` or `partial`. These statuses report the recorded decision; they do not prove a saved output or Hancom qualification. No desktop Agent link UI is added by this engine/skill task; session publishing and blue-pencil accept/decline review belong to the desktop integration.
+
+## Install the agent skill
+
+```bash
+./scripts/hwp-workbench skill install
+./scripts/hwp-workbench skill install --target codex --dry-run
+./scripts/hwp-workbench skill status
+./scripts/hwp-workbench skill uninstall
+```
+
+Install defaults to both targets (`--target all`). It copies `skills/hwp-workbench/` into `~/.claude/skills/hwp-workbench/` and/or `~/.codex/skills/hwp-workbench/`. It replaces `{{HWP_WORKBENCH}}` in both Markdown files with the absolute `scripts/hwp-workbench` path and appends `<!-- installed by hwp-workbench <version> -->` to `SKILL.md`. Keep this checkout at that path or reinstall after moving it.
+
+All selected targets are checked before writes. An existing folder without this marker is refused; symlink parents, folders and marker files are not followed. A marked folder is backed up under its agent's `skills/.hwp-workbench-backup-<random>/skill/` before replacement; `install` returns these paths in `backups`. `--dry-run` validates targets and reports destinations without creating anything. Uninstall removes only currently marked folders, preserves unmarked folders and symlinks, and retains prior backups.
+
+Status prints JSON `{claude: {installed, version, path}, codex: {installed, version, path}}`; absent or unmarked installations have `installed: false` and `version: null`. `HWP_WORKBENCH_SKILL_HOME` overrides the home directory for all skill commands; the selected home must exist. Tests always use a temporary home. Skill management is CLI-only and is not exposed by service RPC or MCP.
 
 ## Recoverable errors
 
@@ -141,8 +182,9 @@ CLI and RPC errors have this shape:
 | Code | Next action |
 |---|---|
 | `STALE_DOCUMENT`, `STALE_TEXT` | Read/inspect again; rebuild the patch with current hash and expected text |
-| `NODE_NOT_FOUND` | Get a full node ID from the current read/search result |
+| `NODE_NOT_FOUND` | Get a full node ID or short reference from the current read/search result |
 | `HWP_LENGTH_CHANGE_BLOCKED` | Keep the same UTF-16 code-unit length |
+| `SKILL_NOT_OWNED` | Keep the existing unmarked folder; choose an absent or application-marked install target |
 | `OUTPUT_EXISTS` | Choose a new filename |
 | `OUTPUT_FORMAT` | Keep the source's native extension |
 | `RISK_ACK_REQUIRED` | Review changes and warnings, then acknowledge risks |
@@ -163,6 +205,8 @@ The transport is newline-delimited JSON-RPC over stdin/stdout. There is no HTTP 
 | `hwp_replace` | `path`, `find`, `replaceWith` | Only with `output` and acknowledgement |
 | `hwp_fill` | `path`, `fields` | Only with `output` and acknowledgement |
 | `hwp_set` | `path`, `nodeId`, `text` | Only with `output` and acknowledgement |
+| `hwp_propose` | `path`, `patch` (patch or edit-preview envelope), `title`; optional `author`, `notes` | New proposal only |
+| `hwp_session` | `path` | No |
 | `hwp_inspect` | `path` | No |
 | `hwp_extract` | `path` | No |
 | `hwp_validate` | `path` | No |

@@ -1,7 +1,7 @@
 """Shared document operations for CLI, MCP and desktop RPC."""
 from pathlib import Path
 
-from . import agent_ops
+from . import agent_ops, agent_link
 from .document import Document, sha
 from .errors import require
 from .workspace import Workspace
@@ -13,7 +13,7 @@ CAPABILITIES = {
         'hwpx': 'Existing plain text nodes; variable length; same-format save',
     },
     'operations': ['inspect', 'extract', 'validate', 'plan', 'apply',
-                   'read', 'search', 'replace', 'fill', 'set'],
+                   'read', 'search', 'replace', 'fill', 'set', 'propose', 'session'],
     'notImplemented': ['native full-page rendering', 'formatting and structural edits',
                        'new document authoring', 'HWP/HWPX conversion', 'DOCX/PDF export',
                        'comments/track changes', 'full Hancom fidelity'],
@@ -57,6 +57,10 @@ def invoke(root, method: str, args: dict) -> dict:
     ws = Workspace(root)
     path = args.get('path')
     doc = Document(ws.read(path), Path(path).name)
+    if method == 'session':
+        return agent_link.session(ws, path, doc)
+    if method == 'propose':
+        return agent_link.propose(ws, path, doc, args)
     if method == 'inspect':
         compact = args.get('compact', False)
         require(type(compact) is bool, 'BAD_ARGUMENTS', 'compact must be a boolean.')
