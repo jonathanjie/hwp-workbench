@@ -85,6 +85,32 @@ Python tests (`python3 scripts/run-tests.py`) and `npm run check` keep passing o
 | rhwp embeds a 13 KB blank HWP template (`saved/blank2010.hwp`) in library code | It already ships inside `@rhwp/core`; list it with rhwp in the notices. Fonts and large samples in rhwp are test-only and do not enter our binary |
 | Workers must not launch GUI apps | Workers run Rust tests and Tauri's mock runtime only; the orchestrator runs WebKit, the app and the IME test |
 
+## Status (2026-10-10, end of day)
+
+R1–R9 are merged into `feat/rust`, with R9 split into R9a (Rust engine inside the app, one binary), R9b (packaging), R9c (Claude Desktop bundle outside the signed app) and R9d (native QA driver).
+
+| Gate | Result |
+|---|---|
+| G1 | Pass: 524 Rust tests (including the live test host), `fmt`, `clippy -D warnings` |
+| G2 | Pass: differential 97/97 for the CLI binary and for the app binary through its `hwp-workbench` symlink |
+| G3 | Pass: WebKit 13/13 against `app-testhost` with the Rust engine |
+| G4 | Pass, packaged app: open through the macOS open event, edit, save in place with a backup, second file handed to the running instance, clean quit (`npm run qa:native`, 21 checks). Packaged CLI read, replace, save and MCP `tools/list` (13 tools) pass. Not yet: drag-and-drop, the Claude Desktop bundle from the app, first open after download (Gatekeeper) |
+| G5 | Pass in the edit slip with real 2-Set Korean keys (7 cases). The Electron-only bare control field does not exist in the app |
+| G6 | App 26.3 MB, DMG 12.4 MB. Memory with the sample open: Tauri ≈ 214 MB (app 48, WebContent 141, GPU 19, Networking 6) against Electron ≈ 310 MB (main 49, renderer 102, GPU 152, utility 7; its per-call Python and Node processes not counted). Engine CLI: read ≈ 5–10 ms against ≈ 260 ms (Python), save with verification ≈ 25 ms against ≈ 770 ms |
+| G7 | Not done: needs the cofounder's Windows 한글 |
+
+### Follow-ups
+
+1. Review sheet: clicks on the right part of the "I'll check the saved document in Hancom" label do not toggle the box (the box and the left part of the label work). Find the element under those points in the WebKit test host with `elementFromPoint` and fix the overlap.
+2. Keyboard: WKWebView's default Tab order skips buttons and checkboxes. R8b gave the review dialog buttons explicit tab stops; check every dialog in the packaged app.
+3. Both engines reject an absolute path that goes through a symlinked parent of the workspace (for example `/var` → `/private/var`, `/tmp` → `/private/tmp`), while the same file under its real path works. Agents often pass such paths. Resolve the path's parent folders the same way as the root, without following a symlink at the final component; record the difference from Python as an approved difference.
+4. Preview of fonts that rhwp has no width table for (for example Apple SD Gothic Neo, used by our own samples): rhwp gives each Latin letter half the font size and stretches the glyph to fit (`lengthAdjust="spacingAndGlyphs"`), so narrow letters look bold. Check a public document that uses 함초롬바탕/돋움 or 맑은 고딕 (rhwp has tables for these), then decide between measuring missing fonts in the renderer and reporting it upstream. Consider a missing-font warning that points to the free official fonts.
+5. Version: the CLI reports `0.1.0-alpha.1` (kept equal to Python for the differential), the app `0.2.0-alpha.1`. Align at cut-over and approve the difference.
+6. In-process preview cannot be stopped early; check with a large document whether a dropped preview delays the next command.
+7. Install guide: replace the manual Claude Desktop JSON step with the app's bundle button once G4 covers it; test the first open of a downloaded DMG on the cofounder's Mac.
+8. Cut-over: decide when to remove Electron, the Python engine and the Python packaging from the repository. Until then they stay as the differential oracle.
+9. Distribution: Developer ID signing and notarization need an Apple Developer account (user decision).
+
 ## Resume point
 
-Check `git log feat/rust`, `work/results/R*.json` and the job list (`codex-companion.mjs status`). Continue with the first package whose result file is missing or has `"done": false`. Never start a package before its dependencies are merged into `feat/rust`.
+Check `git log feat/rust`, `work/results/R*.json` and the follow-ups above. The packaged app is built by `HWP_WORKBENCH_CARGO_WRAPPER=<repo>/work/cargo/cargo-offline.sh npm run package:mac` (outputs in `dist-mac/`, refused if they exist) and checked natively with `npm run qa:native` during a quiet minute. Start each new worker worktree from the head of `feat/rust`.
