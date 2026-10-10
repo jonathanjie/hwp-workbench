@@ -113,6 +113,15 @@ R1–R9 are merged into `feat/rust`, with R9 split into R9a (Rust engine inside 
 8. Completed at C1 cut-over: removed Electron, the Python engine, their packaging and the differential runner. Frozen authored inputs and model/package snapshots remain as Rust regression evidence; new fixtures are built in Rust.
 9. Distribution: Developer ID signing and notarization need an Apple Developer account (user decision).
 
+### First real user form (2026-10-10)
+
+A real government form (HWPX, saved by 한글) could not be edited. Two causes, both fixed on `main`:
+
+- 한글's default script stub (`Scripts/headerScripts.js`, `Scripts/sourceScripts.js`) blocked the whole file. HWPX now exempts the exact stub by SHA-256, as HWP already did (`DEFAULT_SCRIPT_STUB`, info).
+- Nine text nodes contained `hp:fwSpace`, including the consent rows. Childless `fwSpace`, `nbSpace`, `tab`, `lineBreak` and `hyphen` are now editable placeholders (U+FDD0..U+FDEF) that save their original bytes; see `docs/plans/2026-10-10-inline-space-markers.md` and `docs/AGENT-INTERFACE.md`.
+
+Result on a local copy (the form itself is private and is not in the repository): 570/570 text nodes editable; a consent box ticked and saved in place with a backup; all 14 fixed-width markers byte-identical; only the edited section part changed.
+
 ## Resume point
 
-Check `git log feat/rust`, `work/results/R*.json` and the follow-ups above. The packaged app is built by `HWP_WORKBENCH_CARGO_WRAPPER=<repo>/work/cargo/cargo-offline.sh npm run package:mac` (outputs in `dist-mac/`, refused if they exist) and checked natively with `npm run qa:native` during a quiet minute. Start each new worker worktree from the head of `feat/rust`.
+Work on `main`; start each worker worktree from its head. Check `git log`, the follow-ups above and `docs/TESTING.md` for the gates. `npm run package:mac` builds the app and DMG in `dist-mac/` (refused if they exist). Check the packaged app natively with `npm run qa:native` during a quiet minute, and open at least one HWP and one HWPX file saved by 한글 before a release.
