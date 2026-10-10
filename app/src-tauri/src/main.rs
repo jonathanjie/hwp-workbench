@@ -470,7 +470,7 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
             let host = Arc::new(NativeHost {
                 app: app.handle().clone(),
             });
-            let engine = Arc::new(app_core::engine::PythonEngine::new(source_root.clone()));
+            let engine = app_core::engine::desktop_engine(source_root.clone());
             let backend = Arc::new(Backend::new(
                 engine,
                 host.clone(),

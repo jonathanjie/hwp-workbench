@@ -400,7 +400,13 @@ fn run() -> Result<()> {
     }
     Ok(())
 }
+fn worker_requested(argument: Option<&std::ffi::OsStr>) -> bool {
+    argument.is_some_and(|argument| argument == "__rhwp-worker")
+}
 fn main() {
+    if worker_requested(std::env::args_os().nth(1).as_deref()) {
+        std::process::exit(app_core::engine::worker_main());
+    }
     if let Err(error) = run() {
         eprintln!("{error}");
         std::process::exit(1);
@@ -408,3 +414,17 @@ fn main() {
 }
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod worker_dispatch_tests {
+    use super::*;
+    use std::ffi::OsStr;
+
+    #[test]
+    fn hidden_worker_is_dispatched_before_host_arguments() {
+        assert!(worker_requested(Some(OsStr::new("__rhwp-worker"))));
+        assert!(!worker_requested(None));
+        assert!(!worker_requested(Some(OsStr::new("checkout"))));
+        assert!(!worker_requested(Some(OsStr::new("__rhwp-worker-other"))));
+    }
+}

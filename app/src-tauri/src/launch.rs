@@ -9,9 +9,15 @@ pub(crate) enum LaunchMode {
 }
 
 pub(crate) fn launch_mode(argv0: &Path, args: &[OsString]) -> LaunchMode {
-    if args.first().is_some_and(|argument| argument == "__rhwp-worker") {
+    if args
+        .first()
+        .is_some_and(|argument| argument == "__rhwp-worker")
+    {
         LaunchMode::Worker
-    } else if argv0.file_name().is_some_and(|name| name == "hwp-workbench") {
+    } else if argv0
+        .file_name()
+        .is_some_and(|name| name == "hwp-workbench")
+    {
         LaunchMode::Cli
     } else {
         LaunchMode::Desktop

@@ -48,8 +48,11 @@ fn test_build_archive_manifest_no_overwrite_and_packaged_startup() {
     assert_eq!(bytes, fs::read(&binary).unwrap());
     drop(member);
     assert!(archive.by_name("icon.png").unwrap().size() > 0);
-    let tools: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/mcp_tools.json")).unwrap()).unwrap();
+    let tools: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/mcp_tools.json"))
+            .unwrap(),
+    )
+    .unwrap();
     let listed = tools
         .as_array()
         .unwrap()
@@ -132,7 +135,7 @@ fn unreadable_or_symlinked_binary_does_not_create_output() {
     assert!(!output.exists());
     let destination = scratch.path().join("existing");
     fs::write(&destination, b"keep").unwrap();
-    std::os::unix::fs::symlink(&destination, &output.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(&destination, output.parent().unwrap()).unwrap();
     assert!(mcpb::build(&binary, &output).is_err());
     assert_eq!(fs::read(destination).unwrap(), b"keep");
 }

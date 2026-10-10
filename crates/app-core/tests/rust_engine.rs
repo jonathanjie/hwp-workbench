@@ -283,6 +283,15 @@ fn request_limits_names_actions_and_complete_outcome_are_validated() {
     ] {
         assert!(outcome(engine.as_ref(), root, NAME, accepted, declined).is_err());
     }
+    let excessive = json!((0..1001)
+        .map(|index| format!("node-{index}"))
+        .collect::<Vec<_>>());
+    assert_eq!(
+        outcome(engine.as_ref(), root, NAME, excessive, json!([]))
+            .unwrap_err()
+            .message,
+        "Outcome must contain the complete proposal once."
+    );
     outcome(
         engine.as_ref(),
         root,

@@ -113,3 +113,80 @@ fn built_app_binary_answers_one_worker_request_before_tauri_starts() {
     assert!(reply["pageCount"].as_u64().unwrap() >= 1);
     assert!(!reply["fullText"].as_str().unwrap().is_empty());
 }
+
+#[test]
+fn bundled_cli_uses_resource_skills_and_prints_the_packaged_launcher() {
+    let scratch = tempfile::tempdir_in(std::env::temp_dir().canonicalize().unwrap()).unwrap();
+    let contents = scratch.path().join("HWP Workbench.app/Contents");
+    let executable = contents.join("MacOS/HWP Workbench");
+    let launcher = contents.join("Resources/bin/hwp-workbench");
+    let skills = contents.join("Resources/app/skills/hwp-workbench");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::create_dir_all(launcher.parent().unwrap()).unwrap();
+    fs::create_dir_all(skills.join("references")).unwrap();
+    // A hard link keeps this headless layout test small. current_exe resolves
+    // the bundle entry, while argv[0] remains the CLI symlink basename.
+    fs::hard_link(app(), &executable).unwrap();
+    std::os::unix::fs::symlink("../../MacOS/HWP Workbench", &launcher).unwrap();
+    fs::write(
+        skills.join("SKILL.md"),
+        "Bundled skill: {{HWP_WORKBENCH}}\n",
+    )
+    .unwrap();
+    fs::write(
+        skills.join("references/patch-format.md"),
+        "Bundled reference: {{HWP_WORKBENCH}}\n",
+    )
+    .unwrap();
+    let documents = scratch.path().join("documents");
+    let skill_home = scratch.path().join("skill-home");
+    fs::create_dir(&documents).unwrap();
+    fs::create_dir(&skill_home).unwrap();
+    let mut command = Command::new(&launcher);
+    command
+        .args(["mcp-config", "--client", "json", "--root"])
+        .arg(&documents)
+        .env("PATH", "");
+    let output = run(command, b"");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let config: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        config["mcpServers"]["hwp-workbench"]["command"],
+        json!(launcher)
+    );
+    assert_eq!(
+        config["mcpServers"]["hwp-workbench"]["args"],
+        json!(["mcp", "--root", documents])
+    );
+    let mut command = Command::new(&launcher);
+    command
+        .args(["skill", "install", "--target", "codex"])
+        .env("HWP_WORKBENCH_SKILL_HOME", &skill_home)
+        .env("PATH", "");
+    let output = run(command, b"");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let installed: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(installed["codex"]["installed"], true);
+    assert_eq!(installed["claude"]["installed"], false);
+    let folder = skill_home.join(".codex/skills/hwp-workbench");
+    let skill = fs::read_to_string(folder.join("SKILL.md")).unwrap();
+    assert!(
+        skill.starts_with(&format!("Bundled skill: {}\n", launcher.display())),
+        "Expected the bundled skill template and launcher {}",
+        launcher.display()
+    );
+    assert!(skill.contains("<!-- installed by hwp-workbench 0.1.0-alpha.1 -->"));
+    assert_eq!(
+        fs::read_to_string(folder.join("references/patch-format.md")).unwrap(),
+        format!("Bundled reference: {}\n", launcher.display())
+    );
+    assert!(!skill_home.join(".claude").exists());
+}

@@ -1,8 +1,17 @@
 //! In-process desktop adapter for the shared native service.
-use crate::{engine::{Engine, ToolAction}, Error, Result};
+use crate::{
+    engine::{Engine, ToolAction},
+    Error, Result,
+};
 use hwp_core::{errors::WorkbenchError, workspace::Workspace};
 use serde_json::{json, Value};
-use std::{path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicBool, Ordering}}};
+use std::{
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 // Match the desktop IPC budgets, including preview responses with image bytes.
 const MAX_REQUEST: usize = 4 * 1024 * 1024;
@@ -39,13 +48,27 @@ fn with_cancellation<T>(cancel: &AtomicBool, call: impl FnOnce() -> Result<T>) -
 }
 impl Engine for RustEngine {
     fn call(&self, root: &Path, method: &str, args: Value) -> Result<Value> {
-        check_size(&json!({"method":method,"args":args}), MAX_REQUEST, "Request too large")?;
+        check_size(
+            &json!({"method":method,"args":args}),
+            MAX_REQUEST,
+            "Request too large",
+        )?;
         let result = hwp_workbench::service::invoke(root, method, &args).map_err(service_error)?;
-        let limit = if method == "preview" { MAX_PREVIEW_OUTPUT } else { MAX_OUTPUT };
+        let limit = if method == "preview" {
+            MAX_PREVIEW_OUTPUT
+        } else {
+            MAX_OUTPUT
+        };
         check_size(&result, limit, "Response too large")?;
         Ok(result)
     }
-    fn call_cancelled(&self, root: &Path, method: &str, args: Value, cancel: Arc<AtomicBool>) -> Result<Value> {
+    fn call_cancelled(
+        &self,
+        root: &Path,
+        method: &str,
+        args: Value,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<Value> {
         with_cancellation(&cancel, || self.call(root, method, args))
     }
     fn agent_link(&self, root: &Path, name: &str, action: &str, args: Value) -> Result<Value> {
@@ -66,27 +89,31 @@ impl Engine for RustEngine {
     fn tool(&self, action: ToolAction) -> Result<String> {
         match action {
             ToolAction::Status => {
-                let value = hwp_workbench::skill_install::run("status", "all", false).map_err(service_error)?;
+                let value = hwp_workbench::skill_install::run("status", "all", false)
+                    .map_err(service_error)?;
                 Ok(format!("{}\n", serde_json::to_string_pretty(&value)?))
             }
             ToolAction::Install { target } => {
                 if !matches!(target.as_str(), "claude" | "codex") {
                     return Err(Error::new("Invalid skill target"));
                 }
-                let value = hwp_workbench::skill_install::run("install", &target, false).map_err(service_error)?;
+                let value = hwp_workbench::skill_install::run("install", &target, false)
+                    .map_err(service_error)?;
                 Ok(format!("{}\n", serde_json::to_string_pretty(&value)?))
             }
             ToolAction::McpConfig { client, root } => {
                 if !matches!(client.as_str(), "claude-code" | "codex") {
                     return Err(Error::new("Invalid MCP client"));
                 }
-                let text = hwp_workbench::mcp_config::setup(&client, root).map_err(service_error)?;
+                let text =
+                    hwp_workbench::mcp_config::setup(&client, root).map_err(service_error)?;
                 Ok(format!("{text}\n"))
             }
             ToolAction::BuildBundle => {
                 let output = self.source_root.join("dist/hwp-workbench.mcpb");
-                hwp_workbench::mcpb::build(&std::env::current_exe()?, &output).map_err(service_error)?;
-                Ok(format!("{}\n",output.display()))
+                hwp_workbench::mcpb::build(&std::env::current_exe()?, &output)
+                    .map_err(service_error)?;
+                Ok(format!("{}\n", output.display()))
             }
         }
     }
@@ -96,11 +123,15 @@ mod tests {
     use super::*;
     #[test]
     fn cancellation_after_a_completed_call_drops_both_results_and_errors() {
-        for fail in [false,true] {
+        for fail in [false, true] {
             let cancel = AtomicBool::new(false);
             let result = with_cancellation(&cancel, || {
-                cancel.store(true,Ordering::SeqCst);
-                if fail { Err(Error::new("Read failed")) } else { Ok(json!(true)) }
+                cancel.store(true, Ordering::SeqCst);
+                if fail {
+                    Err(Error::new("Read failed"))
+                } else {
+                    Ok(json!(true))
+                }
             });
             assert_eq!(result.unwrap_err().message, "Preview dropped");
         }
