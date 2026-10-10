@@ -1,4 +1,4 @@
-import {nativeLength, nativeSlice} from './native-text.js';
+import {nativeLength, nativeSlice, readerText} from './native-text.js';
 
 export function sectionIndex(node) {
   if (Number.isInteger(node.anchor?.section)) {
@@ -35,7 +35,7 @@ export function paragraphBounds(runs) {
   });
 }
 
-function nodeParagraphs(nodes) {
+function nodeParagraphs(nodes, texts) {
   const groups = new Map();
   for (const node of nodes) {
     const section = sectionIndex(node);
@@ -45,13 +45,14 @@ function nodeParagraphs(nodes) {
     }
     const group = groups.get(key);
     group.nodes.push(node);
-    group.text += node.text;
+    group.text += texts.get(node);
   }
   return [...groups.values()];
 }
 
 export function mapTextRuns(runs, nodes, documentRuns = runs) {
-  const paragraphs = nodeParagraphs(nodes);
+  const texts = new Map(nodes.map(node => [node, readerText(node)]));
+  const paragraphs = nodeParagraphs(nodes, texts);
   const assignments = new Map();
   const positions = new Map();
   // Table paraIdx values are local to a cell; page-run order is the common
@@ -84,8 +85,8 @@ export function mapTextRuns(runs, nodes, documentRuns = runs) {
     const anchored = nodes.filter(node => (run.text || node.text === '') && node.anchor?.section === run.secIdx && node.anchor.paragraph === paragraphIndex &&
       node.anchor.inCell === inCell &&
       Number.isInteger(node.anchor.charOffset) && run.charStart >= node.anchor.charOffset &&
-      run.charStart + nativeLength(run.text) <= node.anchor.charOffset + nativeLength(node.text) &&
-      nativeSlice(node.text, run.charStart - node.anchor.charOffset, nativeLength(run.text)) === run.text);
+      run.charStart + nativeLength(run.text) <= node.anchor.charOffset + nativeLength(texts.get(node)) &&
+      nativeSlice(texts.get(node), run.charStart - node.anchor.charOffset, nativeLength(run.text)) === run.text);
     if (anchored.length) {
       return {run, node: anchored.length === 1 ? anchored[0] : null};
     }
@@ -95,12 +96,12 @@ export function mapTextRuns(runs, nodes, documentRuns = runs) {
     let offset = 0;
     const candidates = [];
     for (const node of paragraph?.nodes || []) {
-      if (!Number.isInteger(node.anchor?.charOffset) && node.text.includes(run.text)) {
+      if (!Number.isInteger(node.anchor?.charOffset) && texts.get(node).includes(run.text)) {
         candidates.push({node, offset});
       }
-      offset += nativeLength(node.text);
+      offset += nativeLength(texts.get(node));
     }
-    const exact = candidates.filter(candidate => nativeSlice(candidate.node.text, run.charStart - candidate.offset, nativeLength(run.text)) === run.text);
+    const exact = candidates.filter(candidate => nativeSlice(texts.get(candidate.node), run.charStart - candidate.offset, nativeLength(run.text)) === run.text);
     const node = exact.length === 1 ? exact[0].node : candidates.length === 1 ? candidates[0].node : null;
     return {run, node};
   });

@@ -2,6 +2,12 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {matchBounds} from '../search-layout.js';
 
+test('search glyph positions project kept and paired markers from semantic text', () => {
+  const node = {id: 'marked', text: 'A\ufdd0\ufdd1한글', inlineMarkers: {'\ufdd0': '\u2007', '\ufdd1': ''}, anchor: {charOffset: 0}};
+  const run = {text: 'A\u2007한글', charStart: 0, x: 10, y: 20, h: 12, charX: [0, 5, 7, 17, 27]};
+  assert.deepEqual(matchBounds(run, node, {node, text: node.text, start: 3, end: 5}), {x: 17, y: 20, w: 20, h: 12});
+});
+
 test('find marks use native character positions across split runs and Unicode offsets', () => {
   const node = {id: 'n', text: 'A😀BC', anchor: {charOffset: 4}};
   const run = {text: '😀BC', charStart: 5, x: 20, y: 30, h: 12, charX: [0, 15, 23, 32]};

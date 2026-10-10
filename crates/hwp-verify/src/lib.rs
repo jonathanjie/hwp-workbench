@@ -157,6 +157,12 @@ fn check_observed<'a>(
         .get("fullText")
         .and_then(Value::as_str)
         .unwrap_or("");
+    let mut nested_texts = Vec::new();
+    if let Some(texts) = observed.get("nestedTexts") {
+        for text in texts.as_array().ok_or_else(malformed)? {
+            nested_texts.push(text.as_str().ok_or_else(malformed)?);
+        }
+    }
     let version = observed
         .get("version")
         .and_then(Value::as_str)
@@ -179,6 +185,11 @@ fn check_observed<'a>(
             "paragraphs"
         } else if full_text.contains(text.as_str()) {
             "fullText"
+        } else if nested_texts
+            .iter()
+            .any(|paragraph| paragraph.contains(text.as_str()))
+        {
+            "nestedParagraphs"
         } else {
             missing.push(node_id);
             "missing"
@@ -196,3 +207,17 @@ fn check_observed<'a>(
 
 #[cfg(test)]
 mod process_tests;
+
+#[cfg(test)]
+mod nested_text_tests {
+    use super::*;
+
+    #[test]
+    fn native_nested_text_can_confirm_a_marker_edit() {
+        let observed = json!({"version":"0.8.7","pageCount":1,"sections":[],"fullText":"export omitted nested paragraph","nestedTexts":["■\u{2007}동의함"]});
+        let edits = [("node".to_owned(), "■\u{2007}동의함".to_owned())];
+        let checked = check_observed(&observed, edits.iter().map(|(id, text)| (id, text))).unwrap();
+        assert_eq!(checked["editedTextsFound"], true);
+        assert_eq!(checked["editMethods"]["node"], "nestedParagraphs");
+    }
+}

@@ -184,19 +184,18 @@ fn test_foreign_zip_rejected() {
     );
 }
 #[test]
-fn test_xml_nested_element_locked() {
+fn test_xml_inline_line_break_editable() {
     let bytes = purpose_fixtures(
         "test_engine.EngineTests.test_xml_nested_element_locked",
         "fixtures.make_hwpx",
     )
     .remove(0);
     let mut document = document(&bytes);
-    assert!(!document.nodes[0].editable);
+    assert!(document.nodes[0].editable);
+    assert!(document.nodes[0].text.contains('\u{fdd0}'));
     let edit = patch(&document, &document.nodes[0], "edited");
-    assert_eq!(
-        document.patch(&edit).unwrap_err().code,
-        "UNSUPPORTED_ELEMENT"
-    );
+    document.patch(&edit).unwrap();
+    assert_eq!(reopened(&document).nodes[0].text, "edited");
 }
 #[test]
 fn test_alternate_namespace_prefix() {

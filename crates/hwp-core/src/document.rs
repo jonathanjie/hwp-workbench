@@ -72,7 +72,25 @@ struct TextToken {
     plain: bool,
     self_closing: bool,
     qname: String,
+    marker_text: Option<String>,
+    markers: Vec<InlineMarker>,
 }
+
+#[derive(Clone)]
+struct InlineMarker {
+    placeholder: char,
+    start: usize,
+    end: usize,
+    reader_text: &'static str,
+}
+
+fn is_inline_placeholder(character: char) -> bool {
+    matches!(character as u32, 0xfdd0..=0xfdef)
+}
+
+// XML 1.0 permits these noncharacters. Literal occurrences lock the node.
+const FIRST_INLINE_PLACEHOLDER: u32 = 0xfdd0;
+const MAX_INLINE_MARKERS: usize = 32;
 /// Maximum text length in Unicode scalars per patch value.
 pub const MAX_TEXT: usize = 200_000;
 /// Maximum number of operations in a complete patch.
@@ -142,7 +160,9 @@ impl Document {
                 .references
                 .insert(format!("s{section}:t{count}"), node.id.clone());
             *count += 1;
-            if document.block_save {
+            if document.block_save
+                || (format == "hwp" && node.text.chars().any(is_inline_placeholder))
+            {
                 node.editable = false;
             }
         }
@@ -169,9 +189,16 @@ impl Document {
     pub fn inspect(&self) -> Value {
         let nodes: Vec<Value> = self.nodes.iter().map(|node| {
             // Struct field order is the Python dataclass order.
-            serde_json::json!({"id":node.id,"text":self.current_text(node),"part":node.part,"role":node.role,
+            let mut value = serde_json::json!({"id":node.id,"text":self.current_text(node),"part":node.part,"role":node.role,
                 "editable":node.editable,"paragraph":node.paragraph,"style":node.style,"anchor":node.anchor,
-                "paragraphRecordIndex":node.paragraph_record_index,"textStart":node.text_start,"textEnd":node.text_end})
+                "paragraphRecordIndex":node.paragraph_record_index,"textStart":node.text_start,"textEnd":node.text_end});
+            if let Some(Position::Hwpx(token)) = self.positions.get(&node.id) {
+                if !token.markers.is_empty() {
+                    let markers: BTreeMap<String, &str> = token.markers.iter().map(|marker| (marker.placeholder.to_string(), marker.reader_text)).collect();
+                    value["inlineMarkers"] = serde_json::json!(markers);
+                }
+            }
+            value
         }).collect();
         let parts: Vec<Value> = self.part_order.iter().filter_map(|name| {
             self.parts.get(name).map(|payload| serde_json::json!({"name":name,"size":payload.len(),"sha256":sha(payload)}))
@@ -303,6 +330,14 @@ impl Document {
                     "Text must be a string of at most 200,000 characters.",
                 )
             })?;
+            match self.positions.get(&id) {
+                Some(Position::Hwpx(token)) => token.validate_markers(text)?,
+                _ => require(
+                    !text.chars().any(is_inline_placeholder),
+                    "INLINE_MARKER",
+                    "This node has no original inline markers. Read the current node text again.",
+                )?,
+            }
             if self.format == "hwp" {
                 let section = self.hwp_sections.get(&node.part).ok_or_else(|| WorkbenchError::new("UNSUPPORTED_ELEMENT", "Text has no complete paragraph header. Re-inspect a supported HWP 5 paragraph."))?;
                 let position = match self.positions.get(&id) {
@@ -408,15 +443,45 @@ impl Document {
                 )?;
             }
         } else {
+            for (part, expected) in &changed {
+                require(
+                    check.part(part) == Some(expected.as_slice()),
+                    "VERIFY_FAILED",
+                    "Edited XML bytes differ on reopen.",
+                )?;
+            }
             for (id, text) in &self.edits {
                 require(
-                    check.node(id).is_some_and(|node| &node.text == text),
+                    check.node(id).is_some_and(|node| {
+                        check.reader_text(id, &node.text) == self.reader_text(id, text)
+                    }),
                     "VERIFY_FAILED",
                     &format!("Edit was not preserved on reopen: {id}"),
                 )?;
             }
         }
         Ok(result)
+    }
+
+    /// Project source-revision placeholders onto rhwp's Unicode text axis.
+    /// Reopened documents assign new placeholders after deletions or moves.
+    pub fn reader_text(&self, id: &str, text: &str) -> String {
+        let Some(Position::Hwpx(token)) = self.positions.get(id) else {
+            return text.to_owned();
+        };
+        let mut result = String::new();
+        for character in text.chars() {
+            if let Some(marker) = token
+                .markers
+                .iter()
+                .find(|marker| marker.placeholder == character)
+            {
+                result.push_str(marker.reader_text);
+            } else {
+                result.push(character);
+            }
+        }
+        result
     }
 
     fn warn(&mut self, code: &str, severity: &str, message: &str) {
@@ -428,6 +493,23 @@ impl Document {
             self.warnings
                 .push(serde_json::json!({"code":code,"severity":severity,"message":message}));
         }
+    }
+}
+
+impl TextToken {
+    fn validate_markers(&self, text: &str) -> Result<()> {
+        let mut seen = HashSet::new();
+        for character in text
+            .chars()
+            .filter(|character| is_inline_placeholder(*character))
+        {
+            require(
+                self.markers.iter().any(|marker| marker.placeholder == character) && seen.insert(character),
+                "INLINE_MARKER",
+                "Keep or delete original inline placeholders. Do not invent or duplicate a marker; read the current node text again.",
+            )?;
+        }
+        Ok(())
     }
 }
 

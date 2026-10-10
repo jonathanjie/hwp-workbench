@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import {previewNodes, changedRanges} from '../preview.js';
 import {mapTextRuns} from '../hit-map.js';
 
+test('preview shifts native anchors by visible marker width, including deletion', () => {
+  const nodes = [
+    {id: 'a', text: 'A\ufdd0B', inlineMarkers: {'\ufdd0': ''}, paragraph: 1, anchor: {section: 0, paragraph: 0, charOffset: 0}},
+    {id: 'b', text: 'tail', paragraph: 1, anchor: {section: 0, paragraph: 0, charOffset: 2}}
+  ];
+  assert.equal(previewNodes(nodes, {a: 'AB'})[1].anchor.charOffset, 2);
+});
+
 test('preview uses current text and shifts later native anchors in the same paragraph', () => {
   const nodes = [
     {id: 'a', text: 'old', paragraph: 1, anchor: {section: 0, paragraph: 0, charOffset: 0, inCell: false}},

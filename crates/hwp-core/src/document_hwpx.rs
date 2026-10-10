@@ -1,5 +1,8 @@
 //! Namespace-aware HWPX reads and surgical edits in the original XML bytes.
-use super::{sha, Document, Position, TextNode, TextToken, HP};
+use super::{
+    is_inline_placeholder, sha, Document, InlineMarker, Position, TextNode, TextToken,
+    FIRST_INLINE_PLACEHOLDER, HP, MAX_INLINE_MARKERS,
+};
 use crate::errors::{require, Result, WorkbenchError, MAX_EXPANDED, MAX_NODES, MAX_PART};
 use crate::package_io::ZipPackage;
 use crate::xml_io::{xml_tree, Element, TokenKind, TokenReader};
@@ -148,7 +151,7 @@ impl Document {
             let payload = self
                 .part(part)
                 .ok_or_else(|| WorkbenchError::new("NOT_HWPX", "Missing body section."))?;
-            let tokens = text_tokens(payload, part)?;
+            let tokens = text_tokens(payload, part, root)?;
             let text_count = root.iter().filter(|element| is_hp(element, "t")).count();
             require(
                 text_count == tokens.len(),
@@ -191,10 +194,28 @@ impl Document {
                     ))
                 }
             };
-            let escaped = value
-                .replace('&', "&amp;")
-                .replace('<', "&lt;")
-                .replace('>', "&gt;");
+            token.validate_markers(value)?;
+            let mut escaped = Vec::new();
+            for character in value.chars() {
+                if let Some(marker) = token
+                    .markers
+                    .iter()
+                    .find(|marker| marker.placeholder == character)
+                {
+                    escaped.extend_from_slice(source.get(marker.start..marker.end).ok_or_else(
+                        || WorkbenchError::new("VERIFY_FAILED", "Invalid inline marker position."),
+                    )?);
+                } else {
+                    match character {
+                        '&' => escaped.extend_from_slice(b"&amp;"),
+                        '<' => escaped.extend_from_slice(b"&lt;"),
+                        '>' => escaped.extend_from_slice(b"&gt;"),
+                        _ => {
+                            escaped.extend_from_slice(character.encode_utf8(&mut [0; 4]).as_bytes())
+                        }
+                    }
+                }
+            }
             if token.self_closing {
                 let opening = source.get(token.start..token.inner_start).ok_or_else(|| {
                     WorkbenchError::new("VERIFY_FAILED", "Invalid XML text position.")
@@ -206,10 +227,12 @@ impl Document {
                     .get(..cut)
                     .ok_or_else(|| WorkbenchError::new("VERIFY_FAILED", "Invalid XML empty tag."))?
                     .to_vec();
-                replacement.extend_from_slice(format!(">{escaped}</{}>", token.qname).as_bytes());
+                replacement.push(b'>');
+                replacement.extend_from_slice(&escaped);
+                replacement.extend_from_slice(format!("</{}>", token.qname).as_bytes());
                 replacements.push((token.start, token.end, replacement));
             } else {
-                replacements.push((token.inner_start, token.inner_end, escaped.into_bytes()));
+                replacements.push((token.inner_start, token.inner_end, escaped));
             }
         }
         replacements.sort_by(|a, b| (b.0, b.1, &b.2).cmp(&(a.0, a.1, &a.2)));
@@ -289,10 +312,11 @@ fn is_hp(element: &Element, name: &str) -> bool {
     element.name.namespace.as_deref() == Some(HP) && element.name.local == name
 }
 
-fn text_tokens(payload: &[u8], part: &str) -> Result<Vec<TextToken>> {
+fn text_tokens(payload: &[u8], part: &str, root: &Element) -> Result<Vec<TextToken>> {
     let mut reader = TokenReader::new(payload)?;
     let mut tokens: Vec<TextToken> = vec![];
     let mut active: Vec<usize> = vec![];
+    let mut ranges = BTreeMap::new();
     while let Some(event) = reader.next_token()? {
         match event.kind {
             TokenKind::Start {
@@ -301,10 +325,13 @@ fn text_tokens(payload: &[u8], part: &str) -> Result<Vec<TextToken>> {
                 element_index,
                 ..
             } => {
-                for index in &active {
-                    if let Some(token) = tokens.get_mut(*index) {
-                        token.plain = false;
-                    }
+                if name.namespace.as_deref() == Some(HP)
+                    && matches!(
+                        name.local.as_str(),
+                        "fwSpace" | "nbSpace" | "tab" | "lineBreak" | "hyphen"
+                    )
+                {
+                    ranges.insert(element_index, (event.start, event.end));
                 }
                 if name.namespace.as_deref() == Some(HP) && name.local == "t" {
                     let index = tokens.len();
@@ -318,15 +345,24 @@ fn text_tokens(payload: &[u8], part: &str) -> Result<Vec<TextToken>> {
                         plain: true,
                         self_closing,
                         qname: name.qualified,
+                        marker_text: None,
+                        markers: vec![],
                     });
                     if !self_closing {
                         active.push(index);
                     }
                 }
             }
-            TokenKind::End { name, .. }
-                if name.namespace.as_deref() == Some(HP) && name.local == "t" =>
-            {
+            TokenKind::End {
+                name,
+                element_index,
+            } => {
+                if let Some(range) = ranges.get_mut(&element_index) {
+                    range.1 = event.end;
+                }
+                if name.namespace.as_deref() != Some(HP) || name.local != "t" {
+                    continue;
+                }
                 let index = active
                     .pop()
                     .ok_or_else(|| WorkbenchError::new("BAD_XML", "Unmatched XML text end tag."))?;
@@ -342,7 +378,76 @@ fn text_tokens(payload: &[u8], part: &str) -> Result<Vec<TextToken>> {
             _ => {}
         }
     }
+    let elements: BTreeMap<usize, &Element> = root
+        .iter()
+        .filter(|element| is_hp(element, "t"))
+        .map(|element| (element.element_index, element))
+        .collect();
+    for token in &mut tokens {
+        let element = elements
+            .get(&token.element_index)
+            .ok_or_else(|| WorkbenchError::new("BAD_XML", "Missing XML text element."))?;
+        // Noncharacters are reserved only as source-revision marker identities.
+        // A literal collision, unknown child or nonempty marker stays locked.
+        token.plain = element.children.len() <= MAX_INLINE_MARKERS
+            && !element
+                .text
+                .as_deref()
+                .unwrap_or("")
+                .chars()
+                .any(is_inline_placeholder)
+            && !element.children.iter().flat_map(Element::iter).any(|item| {
+                item.text
+                    .iter()
+                    .chain(item.tail.iter())
+                    .any(|text| text.chars().any(is_inline_placeholder))
+            })
+            && element.children.iter().all(|child| {
+                inline_marker_text(child).is_some()
+                    && child.children.is_empty()
+                    && child.text.as_deref().unwrap_or("").is_empty()
+            });
+        if !token.plain {
+            continue;
+        }
+        let mut text = element.text.clone().unwrap_or_default();
+        for (index, child) in element.children.iter().enumerate() {
+            // There are 32 reserved noncharacters in this contiguous BMP range.
+            let placeholder = char::from_u32(FIRST_INLINE_PLACEHOLDER + index as u32)
+                .ok_or_else(|| WorkbenchError::new("LIMIT", "Too many inline markers."))?;
+            let (start, end) = *ranges.get(&child.element_index).ok_or_else(|| {
+                WorkbenchError::new("BAD_XML", "Missing inline marker byte range.")
+            })?;
+            token.markers.push(InlineMarker {
+                placeholder,
+                start,
+                end,
+                reader_text: if child.self_closing {
+                    inline_marker_text(child).unwrap_or("")
+                } else {
+                    ""
+                },
+            });
+            text.push(placeholder);
+            text.push_str(child.tail.as_deref().unwrap_or(""));
+        }
+        token.marker_text = Some(text);
+    }
     Ok(tokens)
+}
+
+fn inline_marker_text(element: &Element) -> Option<&'static str> {
+    if element.name.namespace.as_deref() != Some(HP) {
+        return None;
+    }
+    match element.name.local.as_str() {
+        "fwSpace" => Some("\u{2007}"),
+        "nbSpace" => Some("\u{a0}"),
+        "tab" => Some("\t"),
+        "lineBreak" => Some("\n"),
+        "hyphen" => Some("\u{ad}"),
+        _ => None,
+    }
 }
 
 struct ScanContext<'a> {
@@ -414,7 +519,10 @@ fn scan(element: &Element, context: &mut ScanContext<'_>, inherited_style: &Valu
             .insert(element.element_index, context.document.nodes.len());
         context.document.nodes.push(TextNode {
             id: token.id.clone(),
-            text: hwpx_text(element),
+            text: token
+                .marker_text
+                .clone()
+                .unwrap_or_else(|| hwpx_text(element)),
             part: context.part.to_owned(),
             role: role.to_owned(),
             editable,
@@ -522,10 +630,15 @@ fn visit_anchor(
     let top_level = top_level && !(element.element_index != owner && is_hp(element, "p"));
     let in_cell = in_cell || is_hp(element, "tc");
     if let Some(index) = indexes.get(&element.element_index) {
+        let reader_length = document
+            .nodes
+            .get(*index)
+            .map(|node| document.reader_text(&node.id, &node.text).chars().count())
+            .unwrap_or(0);
         if let Some(node) = document.nodes.get_mut(*index) {
             node.anchor = json!({"section":section,"paragraph":paragraph,"charOffset":if top_level {json!(*offset)} else {Value::Null},"inCell":in_cell});
             if top_level {
-                *offset += node.text.chars().count();
+                *offset += reader_length;
             } else if node.role == "body" {
                 node.role = "text-box".to_owned();
             }

@@ -1,11 +1,20 @@
+export function isInlineMarker(character) {
+  const code = character.codePointAt(0);
+  return code >= 0xfdd0 && code <= 0xfdef;
+}
+
 export function textError(text, original, lengthChangingText) {
   if ([...text].length > 200000) {
     return 'tooLong';
   }
+  const markers = new Set([...original].filter(isInlineMarker));
   for (const character of text) {
     const code = character.codePointAt(0);
     if (code < 32 || (code >= 0xd800 && code <= 0xdfff) || code === 0xfffe || code === 0xffff) {
       return 'controls';
+    }
+    if (isInlineMarker(character) && !markers.delete(character)) {
+      return 'inlineMarker';
     }
   }
   if (!lengthChangingText && text.length !== original.length) {

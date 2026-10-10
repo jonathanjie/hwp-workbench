@@ -5,6 +5,20 @@ import {mapTextRuns, paragraphBounds} from '../hit-map.js';
 const run = (text, paraIdx, charStart = 0, secIdx = 0) => ({text, paraIdx, charStart, secIdx, x: 10, y: 20, w: 40, h: 12});
 const node = (id, text, part = 'Contents/section0.xml', anchor) => ({id, text, part, editable: true, anchor});
 
+test('native marker glyphs map back to editable body and consent-cell nodes', () => {
+  for (const inCell of [false, true]) {
+    const marked = {...node('consent', '□\ufdd0동의함', undefined, {section: 0, paragraph: 0, charOffset: inCell ? null : 0, inCell}),
+      inlineMarkers: {'\ufdd0': '\u2007'}, paragraph: 1};
+    const glyphRun = {...run('□\u2007동의함', 0), inCell};
+    assert.equal(mapTextRuns([glyphRun], [marked])[0].node, marked);
+  }
+});
+
+test('paired empty markers do not advance native hit ranges', () => {
+  const marked = {...node('paired', 'A\ufdd0B', undefined, {section: 0, paragraph: 0, charOffset: 0, inCell: false}), inlineMarkers: {'\ufdd0': ''}};
+  assert.equal(mapTextRuns([run('AB', 0)], [marked])[0].node, marked);
+});
+
 test('anchor maps a partial run to its native text span and excludes other sections', () => {
   const nodes = [node('wrong', 'repeat', 'Contents/section1.xml'), node('right', 'repeat tail', undefined, {section: 0, paragraph: 2, charOffset: 2, inCell: false})];
   assert.equal(mapTextRuns([run('repeat', 2, 2)], nodes)[0].node.id, 'right');

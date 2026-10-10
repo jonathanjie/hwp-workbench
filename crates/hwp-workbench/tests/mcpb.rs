@@ -83,7 +83,7 @@ fn app_identifier_matches_tauri_and_version_mismatch_is_explicit() {
         // R9c open issue: keep the existing versions; fail on any new mismatch.
         assert_eq!(
             (app_version, server_version),
-            ("0.2.0-alpha.1", "0.1.0-alpha.1")
+            ("0.2.0-alpha.2", "0.1.0-alpha.1")
         );
     }
 }

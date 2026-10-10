@@ -1,4 +1,4 @@
-import {nativeLength} from './native-text.js';
+import {nativeLength, readerText} from './native-text.js';
 import {wordDiffSegments} from './changes.js';
 
 export function previewNodes(nodes, edits) {
@@ -7,7 +7,7 @@ export function previewNodes(nodes, edits) {
     if (Number.isInteger(anchor?.charOffset)) {
       const shift = nodes.filter(previous => previous.anchor?.section === anchor.section &&
         previous.paragraph === node.paragraph && Number.isInteger(previous.anchor.charOffset) && previous.anchor.charOffset < anchor.charOffset)
-        .reduce((total, previous) => total + nativeLength(edits[previous.id] ?? previous.text) - nativeLength(previous.text), 0);
+        .reduce((total, previous) => total + nativeLength(readerText(previous, edits[previous.id] ?? previous.text)) - nativeLength(readerText(previous)), 0);
       anchor = {...anchor, charOffset: anchor.charOffset + shift};
     }
     return {...node, anchor, text: edits[node.id] ?? node.text};

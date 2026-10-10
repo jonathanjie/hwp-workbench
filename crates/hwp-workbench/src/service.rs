@@ -84,10 +84,15 @@ trait OperationBackend {
 struct NativeBackend;
 impl OperationBackend for NativeBackend {
     fn independent_check(&self, bytes: &[u8], document: &Document) -> Value {
+        let reader_edits: Vec<_> = document
+            .edits
+            .iter()
+            .map(|(id, text)| (id.clone(), document.reader_text(id, text)))
+            .collect();
         match worker_command() {
             Ok(worker) => hwp_verify::check_output(
                 bytes,
-                document.edits.iter().map(|(id, text)| (id, text)),
+                reader_edits.iter().map(|(id, text)| (id, text)),
                 &worker,
             ),
             Err(error) => json!({"engine":"rhwp 0.8.7","opened":false,"error":error.as_json()}),

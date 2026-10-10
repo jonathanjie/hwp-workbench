@@ -4,6 +4,7 @@ use std::io::{self, Read, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use base64::prelude::*;
+use rhwp::model::{control::Control, paragraph::Paragraph};
 use rhwp::DocumentCore;
 use serde_json::{json, Value};
 
@@ -205,10 +206,67 @@ fn probe_document(document: &DocumentCore) -> Result<Value, Error> {
     if !full_text.is_string() {
         return Err(bad_request("Unicode export must decode to text."));
     }
-    let mut result = json!({"engine": "rhwp", "version": RHWP_VERSION, "pageCount": document.page_count(), "sections": sections, "fullText": full_text});
+    let nested_texts = collect_nested_texts(document)?;
+    let mut result = json!({"engine": "rhwp", "version": RHWP_VERSION, "pageCount": document.page_count(), "sections": sections, "fullText": full_text, "nestedTexts":nested_texts});
     if truncated {
         if let Some(object) = result.as_object_mut() {
             object.insert("truncated".into(), Value::Bool(true));
+        }
+    }
+    Ok(result)
+}
+
+/// Read native paragraph text directly: the Unicode export can omit nested
+/// lists. Keep each paragraph separate so matches cannot cross list boundaries.
+fn collect_nested_texts(document: &DocumentCore) -> Result<Vec<&str>, Error> {
+    let mut pending: Vec<(&Paragraph, bool)> = document
+        .document()
+        .sections
+        .iter()
+        .flat_map(|section| {
+            section
+                .paragraphs
+                .iter()
+                .map(|paragraph| (paragraph, false))
+        })
+        .collect();
+    let mut result = Vec::new();
+    let mut count = 0;
+    while let Some((paragraph, nested)) = pending.pop() {
+        count += 1;
+        if count > MAX_PARAGRAPHS {
+            return Err(Error::new(
+                "LIMIT",
+                "Native paragraph probe exceeds the paragraph limit.",
+            ));
+        }
+        if nested {
+            result.push(paragraph.text.as_str());
+        }
+        for control in &paragraph.controls {
+            let paragraphs: &[Paragraph] = match control {
+                Control::Table(table) => {
+                    pending.extend(table.cells.iter().flat_map(|cell| {
+                        cell.paragraphs.iter().map(|paragraph| (paragraph, true))
+                    }));
+                    table
+                        .caption
+                        .as_ref()
+                        .map(|caption| caption.paragraphs.as_slice())
+                        .unwrap_or(&[])
+                }
+                Control::Shape(shape) => shape
+                    .drawing()
+                    .and_then(|drawing| drawing.text_box.as_ref())
+                    .map(|text_box| text_box.paragraphs.as_slice())
+                    .unwrap_or(&[]),
+                Control::Header(header) => &header.paragraphs,
+                Control::Footer(footer) => &footer.paragraphs,
+                Control::Footnote(note) => &note.paragraphs,
+                Control::Endnote(note) => &note.paragraphs,
+                _ => &[],
+            };
+            pending.extend(paragraphs.iter().map(|paragraph| (paragraph, true)));
         }
     }
     Ok(result)
@@ -223,6 +281,14 @@ mod tests {
             "../../../fixtures/generated/review-form.hwpx"
         ))
         .unwrap()
+    }
+
+    #[test]
+    fn probe_includes_native_nested_paragraph_text() {
+        let probe = probe_document(&document()).unwrap();
+        assert!(probe["nestedTexts"]
+            .as_array()
+            .is_some_and(|texts| texts.iter().any(|text| text == "마리나체인")));
     }
 
     #[test]

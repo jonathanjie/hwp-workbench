@@ -1,5 +1,5 @@
 import {t, roleLabel} from './i18n.js';
-import {textError} from './edit-model.js';
+import {textError, isInlineMarker} from './edit-model.js';
 
 function element(tag, className, text) {
   const result = document.createElement(tag);
@@ -8,6 +8,12 @@ function element(tag, className, text) {
     result.textContent = text;
   }
   return result;
+}
+
+function markText(target, text) {
+  // Group ordinary text so a long paragraph does not create one DOM node per character.
+  target.replaceChildren(...text.split(/([\ufdd0-\ufdef])/u).filter(Boolean).map(part =>
+    isInlineMarker(part) ? element('span', 'inline-marker', part) : document.createTextNode(part)));
 }
 
 export class ProofSlip {
@@ -38,12 +44,20 @@ export class ProofSlip {
     this.closeButton.onclick = () => this.close();
     header.append(this.crumbs, this.closeButton);
     const original = element('div', 'was', node.text || t('empty'));
+    markText(original, node.text || t('empty'));
     this.editor = element('textarea', 'now');
     this.editor.id = 'textEdit';
     this.editor.rows = 1;
     this.editor.value = value;
     this.editor.spellcheck = false;
     this.editor.disabled = !node.editable;
+    // A mirror marks native placeholders without changing textarea text,
+    // selection offsets or composition events. It uses the same font metrics.
+    const editorWrap = element('div', 'slip-editor');
+    this.markerMirror = element('div', 'marker-mirror');
+    this.markerMirror.setAttribute('aria-hidden', 'true');
+    editorWrap.append(this.editor, this.markerMirror);
+    this.editor.onscroll = () => this.syncMarkerScroll();
     this.error = element('div', 'edit-error');
     this.error.setAttribute('role', 'alert');
     const footer = element('footer', '');
@@ -59,7 +73,7 @@ export class ProofSlip {
     this.stageButton.id = 'applyText';
     this.stageButton.onclick = () => this.stage();
     footer.append(this.counter, this.revertButton, this.stageButton);
-    this.slip.append(header, original, this.editor, this.error, footer);
+    this.slip.append(header, original, editorWrap, this.error, footer);
     this.host.append(this.slip);
     this.editor.oninput = () => this.update();
     this.stageAfterComposition = false;
@@ -136,10 +150,17 @@ export class ProofSlip {
     }
     this.editor.style.height = 'auto';
     this.editor.style.height = `${Math.min(220, this.editor.scrollHeight)}px`;
+    markText(this.markerMirror, this.editor.value);
+    this.syncMarkerScroll();
     const error = textError(this.editor.value, this.node.text, this.lengthChangingText);
     this.error.textContent = !this.node.editable ? t('locked') : error ? t(error) : '';
     this.counter.textContent = !this.lengthChangingText ? t('sameLength', {a: this.editor.value.length, b: this.node.text.length}) : `${this.editor.value.length} / ${this.node.text.length}`;
     this.stageButton.disabled = !!error || !this.node.editable || !this.dirty;
+  }
+
+  syncMarkerScroll() {
+    this.markerMirror.scrollTop = this.editor.scrollTop;
+    this.markerMirror.scrollLeft = this.editor.scrollLeft;
   }
 
   relabel() {
@@ -170,6 +191,7 @@ export class ProofSlip {
     this.host.replaceChildren();
     this.slip = null;
     this.editor = null;
+    this.markerMirror = null;
     if (returnFocus) {
       const target = focus?.isConnected ? focus : this.host.parentElement;
       target.focus({preventScroll: true});

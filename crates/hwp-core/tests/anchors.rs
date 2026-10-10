@@ -109,7 +109,7 @@ fn test_hwpx_inline_controls_and_runs_match_direct_ranges() {
         document
             .nodes
             .iter()
-            .map(|node| node.text.as_str())
+            .map(|node| document.reader_text(&node.id, &node.text))
             .collect::<String>()
     );
 }
@@ -122,7 +122,7 @@ fn test_paired_hwpx_controls_match_rhwp_offsets() {
     .remove(0);
     let document = document(&bytes);
     assert_eq!(document.nodes[1].anchor["charOffset"], 1);
-    assert_eq!(document.nodes[1].text, "BC");
+    assert_eq!(document.nodes[1].text, "B\u{fdd0}C");
     assert_body_ranges(&bytes);
 }
 #[test]
