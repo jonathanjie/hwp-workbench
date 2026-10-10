@@ -9,6 +9,9 @@ members = [
     "crates/app-testhost",
     "app/src-tauri",
 ]
+# The vendored rhwp library is a dependency, not a member: our lints and
+# tests do not apply to upstream code.
+exclude = ["third_party/rhwp"]
 
 [workspace.package]
 version = "0.2.0-alpha.1"
@@ -44,9 +47,12 @@ notify = "8.2"
 tiny_http = "0.12"
 tempfile = "3.27"
 
-# rhwp is not published on crates.io. Pin the exact v0.8.7 release commit,
-# the same version as the @rhwp/core WASM package the renderer uses.
-rhwp = { git = "https://github.com/edwardkim/rhwp.git", rev = "1a76570e833917d15817415a53c09ad61ab3203f", default-features = false }
+# rhwp is not published on crates.io, and its git repository is about 4 GB
+# with samples and fonts. third_party/rhwp is the library part of upstream
+# v0.8.7 (commit 1a76570e833917d15817415a53c09ad61ab3203f, MIT; see
+# third_party/rhwp/RHWP_REVISION), the same version as the @rhwp/core WASM
+# package the renderer uses.
+rhwp = { path = "third_party/rhwp", default-features = false }
 
 tauri = { version = "=2.11.6", features = [] }
 tauri-build = { version = "=2.6.3", features = [] }

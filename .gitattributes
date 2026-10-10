@@ -1,0 +1,2 @@
+# Upstream code vendored for offline, reproducible builds.
+third_party/** linguist-vendored

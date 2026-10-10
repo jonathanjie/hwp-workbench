@@ -1,199 +1,110 @@
 # HWP Workbench
 
-Private Korean/English document workbench, with a shared local engine, Electron desktop interface, CLI and stdio MCP server.
+A Korean/English HWP and HWPX document workbench for macOS. One Rust engine, built on the [rhwp](https://github.com/edwardkim/rhwp) library, runs the Tauri desktop app, a command-line tool and an MCP server for AI agents.
 
-**Version: 0.1.0-alpha.1 — developer source build, not a finished HWP editor.**
+**Version 0.2.0-alpha.1 — developer alpha, not a finished HWP editor.** Saved files have not yet been checked in Hancom 한글. Check every saved document in 한글 before you submit it officially.
 
-The product requirement remains full HWP/HWPX editing with close official-document fidelity. This first build proves a narrower preservation-oriented editing path. It is not suitable for unreviewed government submissions. In particular, it does not yet provide native pagination, general formatting tools, or unrestricted HWP editing.
+The product requirement remains full HWP/HWPX editing with close official-document fidelity. This build proves a narrower, preservation-first editing path: it changes existing text and keeps everything else in the file as it was.
 
-## What is implemented
+## What works
 
-| Capability | This build |
+| Area | This build |
 |---|---|
-| HWPX | Open, inspect, extract, edit existing plain text (including table-cell text), save a new HWPX copy. Text length may change. |
-| HWP | Open supported HWP 5.x containers, inspect/extract text, make length-changing text edits in existing plain text runs, save a new HWP copy. Hancom reflow is unverified. |
-| Conversion | Explicit, reported HWP/HWPX/DOCX export through HWPX. Direct Python DOCX mapping; native format export uses optional rhwp. DOC/ODT/RTF import requires optional LibreOffice. Lossy and unqualified for Hancom layout. |
-| Desktop | English/Korean UI; outline/search; selectable structured preview; text inspector; staged undo/redo; change review; local staged-patch recovery; native open/save-dialog wiring. |
-| Preservation | `apply` writes new files; explicit `save` verifies and replaces with a kept previous version; untouched payloads retained; changes bound to the source hash and expected text. |
-| Agents | Shared native read/search/edit/plan/apply operations, bounded proposals and session reports, plus an installable Claude Code/Codex skill. CLI and MCP use the same engine as the desktop. |
-| Packaging | Apple Silicon developer `.app` packaging script and private GitHub publishing script. Neither has been executed on a Mac in this build environment. |
+| Open | HWP 5.x and HWPX. Pages are drawn by rhwp; English/Korean interface; outline and search. |
+| Edit | Change existing text, including table-cell text, with real Korean input (2-Set 두벌식 tested with real key events). Staged changes, undo and redo, change review. |
+| Save | Save replaces the opened file only after native verification, atomically, and keeps the previous version in `<document folder>/.hwp-workbench/backups/`. It refuses a file that changed on disk. Also works on exFAT/FAT USB drives. |
+| Convert | Explicit HWP/HWPX/DOCX conversion with a loss report. Conversions never overwrite. |
+| Agents | The same engine as a CLI and an MCP server (13 tools); an installable Claude Code/Codex skill. |
+| Keys | 한글 2022 default shortcuts (checked against 한글's own map) or Mac shortcuts. |
 
-The GUI is a **structure preview**, not a faithful page renderer. HWP tables, images, shapes and page layout are not drawn. HWPX table structure and selected character styles are approximated; image/object payloads have placeholders. Keeping bytes does not guarantee unchanged visual layout.
+Not yet: new tables, images or general formatting; Hancom layout certification; notarized distribution.
 
-## Run on Apple Silicon macOS
+## Install the Mac app
 
-Prerequisites: **Node.js 22 or newer**, **Python 3.11 or newer**, and internet access for the initial Electron dependency installation. The Python engine itself has no third-party dependencies. The alpha does not bundle Python.
+Apple Silicon Mac, macOS 12 or later. Follow [docs/INSTALL-mac.md](docs/INSTALL-mac.md) (Korean, then English). The app is signed ad hoc, not notarized, so the first open needs **System Settings → Privacy & Security → Open Anyway**.
 
-From the extracted project directory:
+## Build from source
 
-```bash
-./scripts/bootstrap-mac.sh
-```
-
-The script checks prerequisites, generates the synthetic examples, runs core tests, installs the pinned Electron dependency, checks JavaScript syntax and starts the app. Subsequent launches:
+Prerequisites: Apple Silicon Mac, Xcode Command Line Tools (`xcode-select --install`), Rust 1.85 or newer ([rustup](https://rustup.rs)), Node.js 22 or newer.
 
 ```bash
-npm start
-```
-
-An alternate Python installation can be selected explicitly:
-
-```bash
-export HWP_WORKBENCH_PYTHON=/absolute/path/to/python3
-npm start
-```
-
-Click **Open synthetic example** for the demonstration. Select a text node in the page or outline, change its text in the inspector, click **Stage text edit**, then **Review changes**. Saving requires acknowledging compatibility risks and selecting a **new** filename. Existing destinations are refused, even when a platform dialog offers replacement.
-
-Typing is not committed until staged. Staged patches are written to Electron's per-user application-data directory, under `drafts/`. Those files may contain document text; they are not encrypted by this app. A draft is offered for recovery only when the source hash matches. Saving a copy retains the current original-document session and its staged changes; it does not silently switch the session to the new file.
-
-## Use the CLI without installing Electron
-
-Run from the project directory. Paths are constrained to the current directory unless `--root` is supplied. An output's parent directory must already exist.
-
-```bash
-./scripts/hwp-workbench capabilities
-./scripts/hwp-workbench inspect fixtures/generated/review-form.hwpx
-./scripts/hwp-workbench extract fixtures/generated/legacy-review.hwp --format text
-./scripts/hwp-workbench validate fixtures/generated/review-form.hwpx
-
-./scripts/hwp-workbench plan fixtures/generated/review-form.hwpx \
-  --patch examples/review.patch.json
-
-./scripts/hwp-workbench apply fixtures/generated/review-form.hwpx \
-  --patch examples/review.patch.json \
-  --output review-form-edited.hwpx \
-  --acknowledge-risks
-```
-
-Explicit conversion is separate from save. First inspect a dry-run report:
-
-```bash
-./scripts/hwp-workbench convert input.docx --to hwpx --root /approved/workspace
-./scripts/hwp-workbench convert input.hwpx --to docx --root /approved/workspace \
-  -o exported.docx --acknowledge-risks
-```
-
-Without **both** output and risk acknowledgement, conversion returns a report and writes no file. Existing outputs are refused. The report lists the route, engine loss reports, unsupported feature counts, and a comparison of readable paragraph text. A zero-loss rhwp report does not cover Python import losses or prove matching layout. Review the complete report and compare the new file in Hancom before official use. See `docs/COMPATIBILITY.md`.
-
-JSON is the default output. Errors are JSON on stderr with exit code 2. `validate` checks bounded parsing and container structure; it is **not** a full HWPX schema or Hancom-rendering validation. Re-running the final command with an existing output fails instead of replacing the file.
-
-The engine and CLI also support `hwp-workbench save PATH --patch FILE --acknowledge-risks [--backup-dir DIR]`. This verifies a same-format edit, keeps the original bytes in `<document folder>/.hwp-workbench/backups/` by default, and atomically replaces the source while keeping its mode. It retains ten previous versions and refuses changed, read-only or symlinked sources. `apply` and conversions still write new files; agents use new files or proposals by default. Desktop Save wiring comes later. See [the save contract](docs/AGENT-INTERFACE.md#save-in-place) for refusal codes and independent-check limits.
-
-A corresponding HWP example is in `examples/legacy.patch.json`:
-
-```bash
-./scripts/hwp-workbench apply fixtures/generated/legacy-review.hwp \
-  --patch examples/legacy.patch.json \
-  --output legacy-review-edited.hwp --acknowledge-risks
-```
-
-The bundled documents are self-authored, format-shaped parser fixtures. They contain deliberately opaque test data and are **not certified or intended as complete, submission-ready Hancom documents**. Successfully reopening them in this engine does not prove interoperability with Hancom.
-
-## Use from Claude Code, Codex or Claude Desktop
-
-Keep working in your own agent client. HWP Workbench is the visual review surface;
-there is no chat inside the editor.
-
-**Skill (Claude Code and Codex).** Install the native-edit recipes:
-
-```bash
-scripts/hwp-workbench skill install
-```
-
-This installs the marked skill for both agents. Use `--target claude` or `--target codex` to select one, and `--dry-run` to check destinations without writing. `skill status` shows installed versions and paths; `skill uninstall` removes only marked folders. Existing unmarked skills are preserved, and marked skills are backed up before replacement.
-
-The skill guides `read` → `search` → saved preview → review → `apply --patch preview.json` to a new native file, or `propose` for desktop review. `open RESULT --root DIRECTORY` requests visual review. Desktop Agent link review and open handoff require the desktop integration. Keep source hashes, exact expected text and honest warnings.
-
-**MCP one-liner (Claude Code or Codex).** Print the setup, then run the printed command in your terminal:
-
-```bash
-./scripts/hwp-workbench mcp-config --client claude-code --root /absolute/path/to/document-folder
-./scripts/hwp-workbench mcp-config --client codex --root /absolute/path/to/document-folder
-```
-
-Setup uses absolute paths and shell quoting. It only prints; it never runs either client or edits configuration. The root must exist; `/` and the whole home folder are refused. `--client json` prints a `mcpServers` block.
-
-**Claude Desktop bundle (macOS, Python 3.11+).** Build the local stdio server bundle:
-
-```bash
-python3 scripts/build-mcpb.py
-```
-
-Double-click `dist/hwp-workbench.mcpb` and choose an approved document folder. The required setting has no default. The builder refuses existing outputs. The orchestrator must add `mcpb/icon.png` from the design icon before distribution. Bundle startup is tested; Claude Desktop installation is unverified. See [the agent interface](docs/AGENT-INTERFACE.md) for the contract and limits.
-
-## Connect an agent through MCP
-
-Use a compatible client supporting the negotiated 2025-11-25, 2025-06-18 or 2025-03-26 profile. This server does not claim conformance to later MCP revisions. It has no HTTP endpoint and opens no network listener.
-
-Example client configuration, replacing both absolute paths:
-
-```json
-{
-  "mcpServers": {
-    "hwp-workbench": {
-      "command": "/absolute/path/hwp-workbench/scripts/hwp-workbench",
-      "args": ["mcp", "--root", "/absolute/path/approved-document-workspace"]
-    }
-  }
-}
-```
-
-Tools are `hwp_read`, `hwp_search`, `hwp_replace`, `hwp_fill`, `hwp_set`, `hwp_inspect`, `hwp_extract`, `hwp_validate`, `hwp_plan`, `hwp_apply`, `hwp_propose`, `hwp_session`, and `hwp_convert`. Start with inspect, use the returned source hash and node IDs to construct a patch, review plan output, then apply to a new filename. A node ID is scoped to its source revision; re-inspect after changing the file.
-
-Grant the smallest practical workspace. An agent host can transmit extracted content to its model provider even though this application does not upload documents. The `acknowledgeRisks` flag acknowledges a policy; it is not cryptographic evidence of human approval. See `docs/AGENT-INTERFACE.md` and `docs/SECURITY.md`.
-
-## Tests and public fixtures
-
-```bash
-python3 scripts/run-tests.py
-npm run check
-
-# Optional external checks; use a host where LibreOffice can run.
-HWP_WORKBENCH_LIBREOFFICE_TESTS=1 PYTHONPATH=engine:tests \
-  python3 -m unittest \
-  test_convert.ReverseMapperTests.test_libreoffice_independently_opens_output_docx \
-  test_convert.LibreOfficeSafetyTests.test_real_rtf_import_when_runtime_can_execute -v
-
-# Requires internet access; only downloads, never uploads document bytes.
-python3 scripts/fetch-public-fixtures.py
-python3 scripts/test-public-corpus.py
-```
-
-At handoff, **68 core/CLI/MCP tests passed** on Linux/Python 3.13.5. **15 renderer workflow checks passed** in Chromium with the real Python engine and a test-only IPC adapter. The optional renderer harness needs Playwright and Chromium: `python3 scripts/test-ui.py`.
-
-Real LibreOffice tests are opt-in. The normal suite skips them with a reason and runs mocked isolation/timeout tests. On this restricted macOS worker, LibreOffice aborted during application registration before document import; no PDF or legacy import success is claimed. Run the opt-in checks outside this worker.
-
-Public fixture metadata was located online for two legacy HWP examples and one HWPX report. Downloads failed here because the execution environment could not resolve external hosts. Consequently **no public binary corpus tests ran**. The manifest pins repository blobs and expected sizes, and the downloader records SHA-256 after verification. Missing samples never count as passing tests. Public document binaries are not redistributed or committed.
-
-Reports and screenshots are under `reports/`. On macOS arm64, the native Electron suite (`npm run test:electron`, 8 workflows) passes, and real 2-Set Korean IME typing was tested with OS key events (`reports/ime-macos.md`). GitHub Actions runs the Python and desktop checks on Ubuntu and macOS. Apple Silicon packaging/signing and Hancom reopen/layout comparisons have **not** been tested.
-
-## Private GitHub repository
-
-The connected GitHub account was identified as `jonathanjie`, but no repository was created or pushed from this environment. On your authenticated development machine:
-
-```bash
-./scripts/publish-private.sh jonathanjie/hwp-workbench
-```
-
-This requires the GitHub CLI (`gh`), authentication and a configured Git author. It creates a **new private** repository and refuses to modify an existing one. Review staged files before publication; ignore patterns are not a secret-scanning guarantee. Supply another `owner/repository` argument to target an organization instead.
-
-There is no npm lockfile in this handoff because dependency resolution could not complete here. The first connected `npm install` produces it. Review and commit the resulting lockfile before treating builds as reproducible.
-
-## Developer application package
-
-After installing dependencies on an Apple Silicon Mac:
-
-```bash
+git clone https://github.com/jonathanjie/hwp-workbench.git
+cd hwp-workbench
+npm install
 npm run package:mac
 ```
 
-Intended output: `dist/mac-arm64/HWP Workbench.app`. The script copies the locally installed Electron runtime and application source, then applies an ad-hoc signature. It does **not** produce a notarized release or bundle Python. It refuses an existing build destination. This is an untested developer packaging path; the handoff does not contain a working `.app` or `.dmg` binary.
+This builds the frontend and the release binary, then writes `dist-mac/HWP Workbench.app` and a DMG (about 26 MB and 12 MB). Existing outputs are refused; delete `dist-mac/` before a rebuild. The rhwp library is vendored in `third_party/rhwp`, so the build downloads only normal crates.io and npm packages.
 
-## Documents
+For development:
 
-`docs/TECHNICAL-PLAN.md` contains the implementation plan, engine evaluation, milestones and release gates. `docs/COMPATIBILITY.md` defines exactly what preservation means. `docs/AGENT-INTERFACE.md` documents the patch/CLI/MCP contract. `docs/SECURITY.md` describes implemented controls and remaining risks. `AGENTS.md` guides subsequent implementation work.
+```bash
+npm run build:frontend                  # renderer into app/dist
+cargo run -p hwp-workbench-app          # the desktop app
+cargo run -p hwp-workbench -- --help    # the CLI
+```
 
-The next acceptance gate is successful edit/save/reopen on real HWP/HWPX documents using Hancom as an independent reference, not more cosmetic UI features.
+## Command line
 
-Desktop update: the Proof shell uses rhwp 0.8.7 for page previews, with a structure fallback. The shared engine still edits and saves native copies. Staged edits are marked over the original preview; live preview is a later task. Run `npm run test:desktop` for module tests and `npm run test:electron` for native Electron checks. The old `scripts/test-ui.py` harness targets the previous UI. Hancom layout remains unverified.
+In the installed app the CLI is `/Applications/HWP Workbench.app/Contents/Resources/bin/hwp-workbench`. Add that folder to `PATH`, or use `cargo run -p hwp-workbench --` from a checkout. Paths must be inside `--root` (default: the current folder).
+
+```bash
+hwp-workbench read review-form.hwpx --format text
+hwp-workbench search review-form.hwpx --query "검토"
+hwp-workbench replace review-form.hwpx --find "검토 중" --replace-with "검토 완료" > preview.json
+hwp-workbench save review-form.hwpx --patch preview.json --acknowledge-risks
+hwp-workbench replace review-form.hwpx --find "검토 중" --replace-with "검토 완료" \
+  -o review-form-done.hwpx --acknowledge-risks
+hwp-workbench convert input.hwpx --to docx -o exported.docx --acknowledge-risks
+```
+
+`replace` without `-o` previews the change and writes nothing. `save` replaces the source after verification and keeps a backup; `apply`, `replace -o` and `convert` write new files and refuse existing ones. Output is JSON unless `--format text` is given; errors are JSON on stderr with exit code 2. See [docs/AGENT-INTERFACE.md](docs/AGENT-INTERFACE.md) for the patch format and every refusal code.
+
+## Use with Claude Code, Codex or Claude Desktop
+
+Keep working in your own agent client; the app is the visual review surface.
+
+```bash
+hwp-workbench skill install                                          # Claude Code and Codex skill
+hwp-workbench mcp-config --client claude-code --root /absolute/document-folder
+hwp-workbench mcp-config --client codex --root /absolute/document-folder
+```
+
+`mcp-config` only prints the command to run; it never edits client settings. `/` and the whole home folder are refused as roots. For Claude Desktop, the app's Agents panel builds `hwp-workbench-<version>.mcpb` in `~/Library/Application Support/io.github.jonathanjie.hwp-workbench/` (not yet verified in Claude Desktop).
+
+MCP tools: `hwp_read`, `hwp_search`, `hwp_replace`, `hwp_fill`, `hwp_set`, `hwp_inspect`, `hwp_extract`, `hwp_validate`, `hwp_plan`, `hwp_apply`, `hwp_propose`, `hwp_session`, `hwp_convert`. The server uses stdio only and opens no network listener. Grant the smallest practical folder: an agent host can send extracted text to its model provider, although this app uploads nothing.
+
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| `crates/hwp-core` | Errors, XML and ZIP I/O, CFB, HWP records, document model, safe workspace and save |
+| `crates/hwp-verify` | rhwp verification in a separate worker process |
+| `crates/hwp-convert` | DOCX/HWPX mappers and loss reports |
+| `crates/hwp-workbench` | Service, agent operations, CLI, MCP server, skill and bundle tools |
+| `crates/app-core` | Desktop backend shared by the Tauri app and the WebKit test host |
+| `app/src-tauri` | Tauri shell; the app binary is also the CLI (`Resources/bin/hwp-workbench`) |
+| `desktop/` | The renderer (HTML/CSS/JS) |
+| `third_party/rhwp` | Vendored rhwp 0.8.7 library (MIT) |
+| `engine/`, `desktop/main.cjs` | Python engine and Electron shell: the reference implementation for differential tests |
+
+## Tests
+
+```bash
+cargo test --workspace                       # Rust engine, app backend, CLI and MCP
+cargo clippy --workspace --all-targets -- -D warnings
+npm run check && npm run test:desktop        # renderer unit tests
+npm run test:webkit                          # 13 app workflows in WebKit against the Rust backend
+npm run test:packaging                       # packaging and licence notices
+python3 scripts/run-tests.py                 # Python reference engine
+python3 scripts/differential.py --candidate target/debug/hwp-workbench   # Rust against Python, 97 cases
+npm run qa:native                            # packaged app with real keys; nobody may type during the run
+```
+
+Results, gates and open follow-ups are in [docs/plans/2026-10-10-rust-tauri-rewrite.md](docs/plans/2026-10-10-rust-tauri-rewrite.md). Contributors and coding agents: read [AGENTS.md](AGENTS.md) and [tasks/lessons.md](tasks/lessons.md) first.
+
+The bundled sample documents in `fixtures/generated/` are self-authored test files, not real or certified government forms. Public sample documents are listed in `fixtures/public-manifest.json` and downloaded on demand; they are not redistributed.
+
+## Licence
+
+No open-source licence has been granted for this project's own code yet; all rights are reserved. Third-party components and their licences are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and the packaged app carries generated notices for every bundled dependency.

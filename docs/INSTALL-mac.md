@@ -4,8 +4,7 @@
 
 Apple Silicon Mac용 개발자 알파입니다. macOS 12 이상이 필요합니다.
 한컴의 저장 후 다시 열기와 문서 배치는 아직 검증되지 않았습니다.
-임시 설정으로 만든 패키지는 패키징 검사 전용입니다. 네이티브 엔진
-통합 전에는 독립 실행 앱으로 배포하지 마십시오.
+공문서를 제출하기 전에 저장한 파일을 한글에서 직접 확인하십시오.
 
 1. `HWP-Workbench-<버전>-arm64.dmg`를 열고 **HWP Workbench.app**을
    **Applications**로 끌어 놓습니다. 복사가 끝나면 DMG를 꺼냅니다.
@@ -48,8 +47,7 @@ CLI 경로는 `/Applications/HWP Workbench.app/Contents/Resources/bin/hwp-workbe
 
 This developer alpha needs an Apple Silicon Mac and macOS 12 or later.
 Hancom reopen and document layout checks remain unverified.
-Packages made with a temporary config are for packaging checks only.
-Do not distribute them as standalone apps before native engine integration.
+Check saved files in Hancom 한글 before you submit an official document.
 
 1. Open `HWP-Workbench-<version>-arm64.dmg`. Drag **HWP Workbench.app**
    to **Applications**, then eject the DMG.

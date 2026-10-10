@@ -42,3 +42,8 @@ outputs/mac-arm64/
 
 # Tauri macOS packages
 /dist-mac/
+
+# The vendored rhwp library compiles its own small blank templates and test
+# documents into itself; they are part of its source, not user documents.
+!third_party/rhwp/**/*.hwp
+!third_party/rhwp/**/*.hwpx
