@@ -271,7 +271,11 @@ body .capsule { left: calc(var(--rail-space) + (100vw - var(--rail-space) - var(
   white-space: pre-wrap; overflow-wrap: break-word; color: transparent;
   pointer-events: none;
 }
-.slip .inline-marker { box-shadow: inset 0 0 0 1px var(--ink-3); border-radius: 2px; }
+/* No font has a glyph for the placeholder noncharacters, so text shows a
+   hatched fallback box. Show an outlined space of the same width instead; in
+   the mirror, an opaque fill covers the textarea's fallback glyph. */
+.slip .inline-marker { color: transparent; box-shadow: inset 0 0 0 1px var(--ink-3); border-radius: 2px; }
+.slip .marker-mirror .inline-marker { background: var(--surface-solid); }
 /* The command island expands into the reference palette. */
 .palette { position: fixed; inset: 12px auto auto 50%; transform: translateX(-50%); margin: 0; width: 640px; max-height: calc(100vh - 48px); padding: 0; border: 0; border-radius: 22px; background: var(--island); color: var(--island-ink); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.06), 0 30px 80px -20px rgba(0,0,0,.55), 0 4px 14px rgba(0,0,0,.25); }
 .palette::backdrop { background: color-mix(in srgb, var(--desk) 35%, transparent); backdrop-filter: blur(1.5px); }
