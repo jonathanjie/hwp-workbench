@@ -19,7 +19,8 @@
     "test:differential": "python3 scripts/differential.py --candidate \"python3 -m hwp_workbench\"",
     "build:frontend": "node scripts/build-frontend.mjs",
     "package:mac:electron": "node scripts/package-mac.cjs",
-    "test:packaging": "node --test tests/packaging/*.test.mjs"
+    "test:packaging": "node --test tests/packaging/*.test.mjs",
+    "qa:native": "node scripts/qa/native-tauri.mjs"
   },
   "devDependencies": {
     "electron": "44.5.1",
