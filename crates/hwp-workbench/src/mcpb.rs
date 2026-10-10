@@ -4,12 +4,57 @@ use rustix::fs::{self, Mode, OFlags};
 use std::{
     fs::File,
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
 const MANIFEST: &str = include_str!("../mcpb/manifest.json");
 const ICON: &[u8] = include_bytes!("../mcpb/icon.png");
+
+/// Must match the Tauri bundle identifier; also names the per-user data folder.
+pub const APP_IDENTIFIER: &str = "io.github.jonathanjie.hwp-workbench";
+
+/// Resolve the current server version in an explicit application data folder.
+pub fn bundle_path_in(data_home: &Path) -> PathBuf {
+    data_home.join(format!("hwp-workbench-{}.mcpb", crate::service::VERSION))
+}
+
+/// Keep generated bundles outside the signed app. The override is the complete
+/// application data folder, so test processes can use a private temporary folder.
+pub fn bundle_path() -> Result<PathBuf> {
+    let data_home = match std::env::var_os("HWP_WORKBENCH_DATA_HOME") {
+        Some(directory) => PathBuf::from(directory),
+        None => default_data_home()?,
+    };
+    require(
+        data_home.is_absolute(),
+        "BAD_ROOT",
+        "Application data directory must be an absolute path.",
+    )?;
+    Ok(bundle_path_in(&data_home))
+}
+
+fn default_data_home() -> Result<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("APPDATA")
+            .map(|directory| PathBuf::from(directory).join(APP_IDENTIFIER))
+            .ok_or_else(|| {
+                WorkbenchError::new("BAD_ROOT", "Application data directory unavailable.")
+            })
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let home = crate::mcp_config::home()?;
+        #[cfg(target_os = "macos")]
+        let base = home.join("Library/Application Support");
+        #[cfg(not(target_os = "macos"))]
+        let base = std::env::var_os("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join(".local/share"));
+        Ok(base.join(APP_IDENTIFIER))
+    }
+}
 
 fn error(error: impl std::fmt::Display) -> WorkbenchError {
     WorkbenchError::new("WRITE_FAILED", error.to_string())

@@ -168,10 +168,6 @@ fn test_mcp_config_prints_exact_setup_for_each_client() {
     let documents = root.path().join("Document folder's name");
     std::fs::create_dir(&documents).unwrap();
     let launcher = Path::new(env!("CARGO_BIN_EXE_hwp-workbench"));
-    let project = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .unwrap();
     for (client, prefix) in [
         (
             "claude-code",
@@ -197,7 +193,9 @@ fn test_mcp_config_prints_exact_setup_for_each_client() {
     );
     assert_eq!(
         mcp_config::setup("claude-desktop", &documents).unwrap(),
-        project.join("dist/hwp-workbench.mcpb").to_string_lossy()
+        hwp_workbench::mcpb::bundle_path()
+            .unwrap()
+            .to_string_lossy()
     );
     assert_eq!(std::fs::read_dir(documents).unwrap().count(), 0);
 }

@@ -22,6 +22,11 @@ pub enum ToolAction {
 }
 
 pub trait Engine: Send + Sync {
+    /// Use one location for bundle status, creation and reveal. Hosts can supply
+    /// an isolated data folder without changing the process environment.
+    fn bundle_path(&self) -> Result<PathBuf> {
+        hwp_workbench::mcpb::bundle_path().map_err(|error| Error::coded(error.code, error.message))
+    }
     fn call(&self, root: &Path, method: &str, args: Value) -> Result<Value>;
     fn call_cancelled(
         &self,

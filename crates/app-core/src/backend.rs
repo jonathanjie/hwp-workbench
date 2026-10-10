@@ -496,7 +496,6 @@ impl Backend {
             }
             "agents_status" => tools::status(
                 self.engine.as_ref(),
-                &self.source_root,
                 self.current()
                     .ok()
                     .as_ref()
@@ -504,7 +503,6 @@ impl Backend {
             ),
             "agents_install_skill" => tools::install(
                 self.engine.as_ref(),
-                &self.source_root,
                 self.current()
                     .ok()
                     .as_ref()
@@ -522,10 +520,8 @@ impl Backend {
                 Ok(Value::String(text))
             }
             "agents_reveal_bundle" => {
-                self.shell.reveal(&tools::reveal_bundle(
-                    self.engine.as_ref(),
-                    &self.source_root,
-                )?)?;
+                self.shell
+                    .reveal(&tools::reveal_bundle(self.engine.as_ref())?)?;
                 Ok(Value::Bool(true))
             }
             _ => Err(Error::new("Unknown desktop command")),

@@ -126,7 +126,7 @@ pub fn setup(client: &str, root: impl AsRef<Path>) -> Result<String> {
     let mut arguments = match client {
         "claude-code" => vec!["claude","mcp","add","hwp-workbench","--scope","user","--"],
         "codex" => vec!["codex","mcp","add","hwp-workbench","--"],
-        "claude-desktop" => return Ok(paths.source_root.join("dist/hwp-workbench.mcpb").to_string_lossy().into_owned()),
+        "claude-desktop" => return Ok(crate::mcpb::bundle_path()?.to_string_lossy().into_owned()),
         _ => return serde_json::to_string_pretty(&json!({"mcpServers":{"hwp-workbench":{"command":command,"args":["mcp","--root",root]}}})).map_err(|error| WorkbenchError::new("REQUEST_FAILED",error.to_string())),
     };
     arguments.extend([&command, "mcp", "--root", &root]);

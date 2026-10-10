@@ -346,3 +346,77 @@ fn factory_calls_native_service_without_an_interpreter_or_source_checkout() {
         "Request too large"
     );
 }
+
+#[test]
+fn bundle_build_status_and_reveal_use_app_data_and_preserve_existing_versions() {
+    use app_core::{engine::RustEngine, tools};
+    let scratch = tempfile::tempdir().unwrap();
+    let source_root = scratch
+        .path()
+        .join("HWP Workbench.app/Contents/Resources/app");
+    fs::create_dir_all(source_root.join("dist")).unwrap();
+    let legacy = source_root.join("dist/hwp-workbench.mcpb");
+    fs::write(&legacy, b"old bundled server").unwrap();
+    let data_home = scratch.path().join("Application Support/workbench");
+    fs::create_dir_all(&data_home).unwrap();
+    let older_version = data_home.join("hwp-workbench-0.0.0.mcpb");
+    fs::write(&older_version, b"previous server version").unwrap();
+    let engine = RustEngine::with_data_home(data_home.clone());
+    let output = hwp_workbench::mcpb::bundle_path_in(&data_home);
+    assert_eq!(engine.bundle_path().unwrap(), output);
+    assert!(!output.starts_with(&source_root));
+    assert!(!output.starts_with(scratch.path().join("HWP Workbench.app")));
+    assert_eq!(
+        tools::status(&engine, None).unwrap()["claudeDesktop"]["bundleAvailable"],
+        false
+    );
+    assert_eq!(tools::reveal_bundle(&engine).unwrap(), output);
+    assert_eq!(
+        tools::status(&engine, None).unwrap()["claudeDesktop"]["bundleAvailable"],
+        true
+    );
+    let original = fs::read(&output).unwrap();
+    assert_eq!(tools::reveal_bundle(&engine).unwrap(), output);
+    assert!(engine.tool(ToolAction::BuildBundle).is_err());
+    assert_eq!(fs::read(&output).unwrap(), original);
+    assert_eq!(fs::read(&legacy).unwrap(), b"old bundled server");
+    assert_eq!(
+        fs::read(&older_version).unwrap(),
+        b"previous server version"
+    );
+}
+
+#[test]
+fn bundle_actions_refuse_symlinks_and_nonregular_files_without_changing_targets() {
+    use app_core::{engine::RustEngine, tools};
+    let scratch = tempfile::tempdir().unwrap();
+    let data_home = scratch.path().join("app-data");
+    fs::create_dir(&data_home).unwrap();
+    let engine = RustEngine::with_data_home(data_home.clone());
+    let output = engine.bundle_path().unwrap();
+    let target = scratch.path().join("keep");
+    fs::write(&target, b"keep this file").unwrap();
+    for destination in [&target, &scratch.path().join("missing")] {
+        std::os::unix::fs::symlink(destination, &output).unwrap();
+        assert_eq!(
+            tools::status(&engine, None).unwrap_err().message,
+            "Unsafe bundle path"
+        );
+        assert!(tools::reveal_bundle(&engine).is_err());
+        assert!(engine.tool(ToolAction::BuildBundle).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"keep this file");
+        fs::remove_file(&output).unwrap();
+    }
+    fs::create_dir(&output).unwrap();
+    assert!(tools::status(&engine, None).is_err());
+    assert!(tools::reveal_bundle(&engine).is_err());
+    assert!(engine.tool(ToolAction::BuildBundle).is_err());
+    fs::remove_dir(&output).unwrap();
+    fs::remove_dir(&data_home).unwrap();
+    let external = scratch.path().join("external");
+    fs::create_dir(&external).unwrap();
+    std::os::unix::fs::symlink(&external, &data_home).unwrap();
+    assert!(tools::reveal_bundle(&engine).is_err());
+    assert!(engine.tool(ToolAction::BuildBundle).is_err());
+    assert_eq!(fs::read_dir(external).unwrap().count(), 0);
+}

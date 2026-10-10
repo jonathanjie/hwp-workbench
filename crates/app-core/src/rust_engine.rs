@@ -4,8 +4,10 @@ use crate::{
     Error, Result,
 };
 use hwp_core::{errors::WorkbenchError, workspace::Workspace};
-use serde_json::{json, Value};
+use serde::Serialize;
+use serde_json::Value;
 use std::{
+    io::{self, Write},
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -20,21 +22,62 @@ const MAX_OUTPUT: usize = 32 * 1024 * 1024;
 const MAX_PREVIEW_OUTPUT: usize = 90 * 1024 * 1024;
 
 pub struct RustEngine {
-    source_root: PathBuf,
+    data_home: Option<PathBuf>,
 }
 impl RustEngine {
-    pub fn new(source_root: PathBuf) -> Self {
-        Self { source_root }
+    pub fn new(_source_root: PathBuf) -> Self {
+        Self { data_home: None }
+    }
+
+    /// Explicit application data folder for isolated hosts and tests.
+    pub fn with_data_home(data_home: PathBuf) -> Self {
+        Self {
+            data_home: Some(data_home),
+        }
     }
 }
 fn service_error(error: WorkbenchError) -> Error {
     Error::coded(error.code, error.message)
 }
-fn check_size(value: &Value, limit: usize, message: &str) -> Result<()> {
-    if serde_json::to_vec(value)?.len() > limit {
+
+/// Count serialized UTF-8 bytes without retaining a second copy of the value.
+struct SizeWriter {
+    bytes: usize,
+    limit: usize,
+    exceeded: bool,
+}
+impl Write for SizeWriter {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        // bytes never exceeds limit; subtraction also avoids addition overflow.
+        if buffer.len() > self.limit - self.bytes {
+            self.exceeded = true;
+            return Err(io::Error::other("JSON size limit exceeded"));
+        }
+        self.bytes += buffer.len();
+        Ok(buffer.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+fn check_size(value: &impl Serialize, limit: usize, message: &str) -> Result<()> {
+    let mut writer = SizeWriter {
+        bytes: 0,
+        limit,
+        exceeded: false,
+    };
+    let result = serde_json::to_writer(&mut writer, value);
+    if writer.exceeded {
         return Err(Error::new(message));
     }
+    result?;
     Ok(())
+}
+
+#[derive(Serialize)]
+struct DesktopRequest<'a> {
+    method: &'a str,
+    args: &'a Value,
 }
 fn with_cancellation<T>(cancel: &AtomicBool, call: impl FnOnce() -> Result<T>) -> Result<T> {
     if cancel.load(Ordering::SeqCst) {
@@ -47,9 +90,18 @@ fn with_cancellation<T>(cancel: &AtomicBool, call: impl FnOnce() -> Result<T>) -
     result
 }
 impl Engine for RustEngine {
+    fn bundle_path(&self) -> Result<PathBuf> {
+        match &self.data_home {
+            Some(directory) => Ok(hwp_workbench::mcpb::bundle_path_in(directory)),
+            None => hwp_workbench::mcpb::bundle_path().map_err(service_error),
+        }
+    }
     fn call(&self, root: &Path, method: &str, args: Value) -> Result<Value> {
         check_size(
-            &json!({"method":method,"args":args}),
+            &DesktopRequest {
+                method,
+                args: &args,
+            },
             MAX_REQUEST,
             "Request too large",
         )?;
@@ -110,7 +162,7 @@ impl Engine for RustEngine {
                 Ok(format!("{text}\n"))
             }
             ToolAction::BuildBundle => {
-                let output = self.source_root.join("dist/hwp-workbench.mcpb");
+                let output = self.bundle_path()?;
                 hwp_workbench::mcpb::build(&std::env::current_exe()?, &output)
                     .map_err(service_error)?;
                 Ok(format!("{}\n", output.display()))
@@ -121,6 +173,49 @@ impl Engine for RustEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::ser::{SerializeSeq, Serializer};
+    use serde_json::json;
+    use std::cell::Cell;
+
+    #[test]
+    fn size_check_accepts_the_limit_and_refuses_one_byte_over() {
+        for value in [
+            json!(null),
+            json!("한글\n\""),
+            json!({"args":[],"method":"inspect"}),
+        ] {
+            let length = serde_json::to_vec(&value).unwrap().len();
+            check_size(&value, length, "Response too large").unwrap();
+            assert_eq!(
+                check_size(&value, length - 1, "Response too large")
+                    .unwrap_err()
+                    .message,
+                "Response too large"
+            );
+        }
+    }
+
+    #[test]
+    fn size_check_stops_serializing_as_soon_as_the_limit_is_passed() {
+        struct CountedSequence<'a>(&'a Cell<usize>);
+        impl serde::Serialize for CountedSequence<'_> {
+            fn serialize<S: Serializer>(
+                &self,
+                serializer: S,
+            ) -> std::result::Result<S::Ok, S::Error> {
+                let mut sequence = serializer.serialize_seq(Some(100))?;
+                for _ in 0..100 {
+                    self.0.set(self.0.get() + 1);
+                    sequence.serialize_element(&0)?;
+                }
+                sequence.end()
+            }
+        }
+        let visited = Cell::new(0);
+        let error = check_size(&CountedSequence(&visited), 5, "Request too large").unwrap_err();
+        assert_eq!(error.message, "Request too large");
+        assert_eq!(visited.get(), 3, "Do not serialize the remaining elements");
+    }
     #[test]
     fn cancellation_after_a_completed_call_drops_both_results_and_errors() {
         for fail in [false, true] {

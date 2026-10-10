@@ -171,8 +171,12 @@ fn fixed_skill_actions_validate_targets_and_mcp_roots_come_from_main() {
     };
     struct FakeEngine {
         actions: Mutex<Vec<ToolAction>>,
+        data_home: PathBuf,
     }
     impl Engine for FakeEngine {
+        fn bundle_path(&self) -> Result<PathBuf, Error> {
+            Ok(hwp_workbench::mcpb::bundle_path_in(&self.data_home))
+        }
         fn call(&self, _: &Path, _: &str, _: Value) -> Result<Value, Error> {
             unreachable!()
         }
@@ -196,13 +200,14 @@ fn fixed_skill_actions_validate_targets_and_mcp_roots_come_from_main() {
     let scratch = tempfile::tempdir().unwrap();
     let engine = FakeEngine {
         actions: Mutex::default(),
+        data_home: scratch.path().join("app-data"),
     };
     let source = scratch.path();
-    let status = tools::status(&engine, source, None).unwrap();
+    let status = tools::status(&engine, None).unwrap();
     assert_eq!(status["hasDocument"], false);
     assert_eq!(status["claudeDesktop"]["bundleAvailable"], false);
-    assert!(tools::install(&engine, source, None, "other").is_err());
-    tools::install(&engine, source, None, "codex").unwrap();
+    assert!(tools::install(&engine, None, "other").is_err());
+    tools::install(&engine, None, "codex").unwrap();
     assert!(engine
         .actions
         .lock()

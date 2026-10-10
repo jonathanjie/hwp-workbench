@@ -4,6 +4,91 @@ use std::io::Read;
 use std::path::Path;
 
 #[test]
+fn desktop_config_uses_a_versioned_bundle_in_the_app_data_override() {
+    let scratch = tempfile::tempdir().unwrap();
+    let documents = scratch.path().join("documents");
+    fs::create_dir(&documents).unwrap();
+    let data_home = scratch.path().join("Application Support/workbench");
+    let binary = env!("CARGO_BIN_EXE_hwp-workbench");
+    let version = std::process::Command::new(binary)
+        .arg("--version")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert!(version.status.success());
+    let version = String::from_utf8(version.stdout).unwrap();
+    let result = std::process::Command::new(binary)
+        .args(["mcp-config", "--client", "claude-desktop", "--root"])
+        .arg(&documents)
+        .env("HWP_WORKBENCH_DATA_HOME", &data_home)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert!(result.status.success(), "{:?}", result.stderr);
+    assert_eq!(
+        String::from_utf8(result.stdout).unwrap().trim(),
+        data_home
+            .join(format!("hwp-workbench-{}.mcpb", version.trim()))
+            .to_str()
+            .unwrap()
+    );
+    assert!(!data_home.exists(), "Printing setup must not write files");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn default_bundle_path_is_outside_checkout_and_signed_app_resources() {
+    let scratch = tempfile::tempdir().unwrap();
+    let home = scratch.path().join("home");
+    let checkout = scratch.path().join("checkout");
+    let contents = scratch.path().join("HWP Workbench.app/Contents");
+    let resources = contents.join("Resources/app");
+    for directory in [&home, &checkout, &resources] {
+        fs::create_dir_all(directory).unwrap();
+    }
+    for source_root in [&checkout, &resources] {
+        let result = std::process::Command::new(env!("CARGO_BIN_EXE_hwp-workbench"))
+            .args(["mcp-config", "--client", "claude-desktop", "--root"])
+            .arg(source_root)
+            .current_dir(source_root)
+            .env("HOME", &home)
+            .env_remove("HWP_WORKBENCH_DATA_HOME")
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap();
+        assert!(result.status.success(), "{:?}", result.stderr);
+        let path = std::path::PathBuf::from(String::from_utf8(result.stdout).unwrap().trim());
+        assert_eq!(
+            path,
+            mcpb::bundle_path_in(
+                &home
+                    .join("Library/Application Support")
+                    .join(mcpb::APP_IDENTIFIER)
+            )
+        );
+        assert!(!path.starts_with(source_root));
+        assert!(!path.starts_with(contents.parent().unwrap()));
+        assert!(!path.exists());
+    }
+}
+
+#[test]
+fn app_identifier_matches_tauri_and_version_mismatch_is_explicit() {
+    let configuration: serde_json::Value =
+        serde_json::from_str(include_str!("../../../app/src-tauri/tauri.conf.json")).unwrap();
+    assert_eq!(configuration["identifier"], mcpb::APP_IDENTIFIER);
+    let app_version = configuration["version"].as_str().unwrap();
+    let server_version = hwp_workbench::service::VERSION;
+    if app_version != server_version {
+        // R9c open issue: keep the existing versions; fail on any new mismatch.
+        assert_eq!(
+            (app_version, server_version),
+            ("0.2.0-alpha.1", "0.1.0-alpha.1")
+        );
+    }
+}
+
+#[test]
 fn test_build_archive_manifest_no_overwrite_and_packaged_startup() {
     let scratch = tempfile::tempdir().unwrap();
     let binary = scratch.path().join("hwp-workbench");
