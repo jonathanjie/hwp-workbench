@@ -230,6 +230,54 @@ fn source_root() -> PathBuf {
         .canonicalize()
         .unwrap()
 }
+
+/// libtest executables do not dispatch __rhwp-worker. Exercise verified saves
+/// through the real Rust CLI; the other desktop calls use the in-process adapter.
+struct VerifiedTestEngine(app_core::engine::RustEngine);
+impl Engine for VerifiedTestEngine {
+    fn call(&self, root: &Path, method: &str, args: Value) -> Result<Value> {
+        if method != "save" {
+            return self.0.call(root, method, args);
+        }
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let executable = std::env::current_exe()?;
+        let profile = executable
+            .parent()
+            .and_then(Path::parent)
+            .ok_or_else(|| Error::new("Missing test binary directory"))?;
+        let mut child = Command::new(profile.join("hwp-workbench"))
+            .args(["rpc", "--root"])
+            .arg(root)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        child
+            .stdin
+            .take()
+            .ok_or_else(|| Error::new("Missing CLI stdin"))?
+            .write_all(&serde_json::to_vec(&json!({"method":method,"args":args}))?)?;
+        let output = child.wait_with_output()?;
+        if output.status.success() {
+            return Ok(serde_json::from_slice(&output.stdout)?);
+        }
+        let value: Value = serde_json::from_slice(&output.stderr)?;
+        let detail = value
+            .get("error")
+            .ok_or_else(|| Error::new("Missing CLI error"))?;
+        Err(Error::coded(
+            detail
+                .get("code")
+                .and_then(Value::as_str)
+                .unwrap_or("REQUEST_FAILED"),
+            detail
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("CLI failed"),
+        ))
+    }
+}
 fn real_setup() -> (tempfile::TempDir, Arc<Host>, Backend) {
     let (dir, host, _fake) = setup();
     std::fs::copy(
@@ -239,7 +287,9 @@ fn real_setup() -> (tempfile::TempDir, Arc<Host>, Backend) {
     .unwrap();
     *host.destination.lock().unwrap() = Some(dir.path().join("copy.hwpx"));
     let backend = Backend::new(
-        Arc::new(app_core::engine::PythonEngine::new(source_root())),
+        Arc::new(VerifiedTestEngine(app_core::engine::RustEngine::new(
+            source_root(),
+        ))),
         host.clone(),
         host.clone(),
         host.clone(),

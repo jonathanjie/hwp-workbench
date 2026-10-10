@@ -7,6 +7,7 @@ pub mod inbox;
 pub mod preview;
 pub mod queue;
 pub mod recent;
+mod rust_engine;
 pub mod tools;
 
 pub use engine::Engine;

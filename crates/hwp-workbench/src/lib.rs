@@ -6,5 +6,6 @@ pub mod convert_operation;
 pub mod desktop_open;
 pub mod mcp;
 pub mod mcp_config;
+pub mod mcpb;
 pub mod service;
 pub mod skill_install;

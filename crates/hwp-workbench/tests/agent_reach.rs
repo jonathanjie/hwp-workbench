@@ -167,11 +167,11 @@ fn test_mcp_config_prints_exact_setup_for_each_client() {
     let root = workspace();
     let documents = root.path().join("Document folder's name");
     std::fs::create_dir(&documents).unwrap();
+    let launcher = Path::new(env!("CARGO_BIN_EXE_hwp-workbench"));
     let project = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
         .unwrap();
-    let launcher = project.join("scripts/hwp-workbench");
     for (client, prefix) in [
         (
             "claude-code",

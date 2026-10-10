@@ -122,22 +122,14 @@ pub fn status(workspace: &Workspace) -> Value {
     Value::Object(result)
 }
 fn skill_source() -> Result<PathBuf> {
-    if let Ok(executable) = std::env::current_exe() {
-        if let Some(directory) = executable.parent() {
-            let bundled = directory.join("../Resources/skills");
-            for source in [bundled.join("hwp-workbench"), bundled] {
-                if source.join("SKILL.md").is_file() {
-                    return Ok(source);
-                }
-            }
-        }
-    }
-    Ok(crate::mcp_config::project().join("skills/hwp-workbench"))
+    Ok(crate::mcp_config::RuntimePaths::current()?
+        .source_root
+        .join("skills/hwp-workbench"))
 }
 fn content() -> Result<Vec<(String, Vec<u8>)>> {
     let source = skill_source()?;
-    let launcher = crate::mcp_config::project()
-        .join("scripts/hwp-workbench")
+    let launcher = crate::mcp_config::RuntimePaths::current()?
+        .command
         .to_string_lossy()
         .into_owned();
     let mut files = Vec::new();

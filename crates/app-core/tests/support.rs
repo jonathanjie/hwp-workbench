@@ -229,43 +229,6 @@ fn fixed_skill_actions_validate_targets_and_mcp_roots_come_from_main() {
 }
 
 #[test]
-fn python_engine_uses_fixed_rpc_arguments_and_preserves_error_codes() {
-    use app_core::engine::{Engine, PythonEngine};
-    use serde_json::json;
-    let source = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let scratch = tempfile::tempdir().unwrap();
-    let root = fs::canonicalize(scratch.path()).unwrap();
-    let engine = PythonEngine::new(source);
-    let error = engine
-        .call(&root, "inspect", json!({"path":"missing.hwpx"}))
-        .unwrap_err();
-    assert!(error.code.is_some());
-    assert!(!error.message.is_empty());
-    assert!(engine
-        .call(&root, "inspect", json!({"large":"x".repeat(4*1024*1024)}))
-        .unwrap_err()
-        .message
-        .contains("Request too large"));
-}
-
-#[test]
-fn cancelled_python_request_does_not_start_work() {
-    use app_core::engine::{Engine, PythonEngine};
-    use serde_json::json;
-    use std::sync::{atomic::AtomicBool, Arc};
-    let engine = PythonEngine::new(std::path::PathBuf::from("/missing"));
-    let error = engine
-        .call_cancelled(
-            std::path::Path::new("/missing"),
-            "preview",
-            json!({}),
-            Arc::new(AtomicBool::new(true)),
-        )
-        .unwrap_err();
-    assert_eq!(error.message, "Preview dropped");
-}
-
-#[test]
 fn write_new_preserves_existing_files_and_symlink_targets() {
     let scratch = tempfile::tempdir().unwrap();
     let file = scratch.path().join("patch.json");

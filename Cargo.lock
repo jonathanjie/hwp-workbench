@@ -125,6 +125,8 @@ dependencies = [
  "base64 0.23.1",
  "getrandom 0.4.3",
  "hex",
+ "hwp-core",
+ "hwp-workbench",
  "notify",
  "rustix",
  "serde",
@@ -2257,6 +2259,7 @@ dependencies = [
  "tempfile",
  "time",
  "unicode-normalization",
+ "zip",
 ]
 
 [[package]]
@@ -2264,6 +2267,7 @@ name = "hwp-workbench-app"
 version = "0.2.0-alpha.1"
 dependencies = [
  "app-core",
+ "hwp-workbench",
  "serde",
  "serde_json",
  "tauri",

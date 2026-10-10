@@ -423,13 +423,13 @@ fn watcher_events_trigger_confined_engine_read() {
     }
 }
 
-fn python_engine() -> crate::engine::PythonEngine {
+fn rust_engine() -> crate::engine::RustEngine {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .parent()
         .unwrap();
-    crate::engine::PythonEngine::new(source_root.to_path_buf())
+    crate::engine::RustEngine::new(source_root.to_path_buf())
 }
 
 fn proposal(hash: &str) -> Value {
@@ -444,7 +444,7 @@ fn proposal(hash: &str) -> Value {
 fn bounded_reader_distinguishes_stale_and_unreadable_proposals_outcomes_are_exclusive_and_complete()
 {
     use std::os::unix::fs::symlink;
-    let engine = python_engine();
+    let engine = rust_engine();
     let directory = TempDir::new().unwrap();
     let root = directory.path().canonicalize().unwrap();
     let hash = "a".repeat(64);
@@ -537,7 +537,7 @@ fn bounded_reader_distinguishes_stale_and_unreadable_proposals_outcomes_are_excl
 #[test]
 fn atomic_session_writer_refuses_symlink_destinations_and_proposal_reader_caps_at_200() {
     use std::os::unix::fs::symlink;
-    let engine = python_engine();
+    let engine = rust_engine();
     let directory = TempDir::new().unwrap();
     let root = directory.path().canonicalize().unwrap();
     let hash = "a".repeat(64);
@@ -590,7 +590,7 @@ fn atomic_session_writer_refuses_symlink_destinations_and_proposal_reader_caps_a
 
 #[test]
 fn outcome_rechecks_reviewed_patch_before_publication() {
-    let engine = python_engine();
+    let engine = rust_engine();
     let directory = TempDir::new().unwrap();
     let root = directory.path().canonicalize().unwrap();
     let hash = "a".repeat(64);
