@@ -139,8 +139,10 @@ name = "app-testhost"
 version = "0.2.0-alpha.1"
 dependencies = [
  "app-core",
+ "getrandom 0.4.3",
  "serde",
  "serde_json",
+ "tempfile",
  "tiny_http",
 ]
 

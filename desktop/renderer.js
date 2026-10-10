@@ -1061,6 +1061,15 @@ document.addEventListener('keydown', event => {
   }
 });
 window.addEventListener('resize', () => slip.position());
+// WebKit, unlike Chromium, does not focus a button when it is clicked, and its
+// mousedown handling clears focus. Focus the button in the click capture phase,
+// before its own handler, so the palette and sheets can return focus to it.
+document.addEventListener('click', event => {
+  const button = event.target.closest?.('button');
+  if (button && !button.disabled) {
+    button.focus({preventScroll: true});
+  }
+}, true);
 window.addEventListener('beforeunload', event => {
   if (hasUnsavedText()) {
     event.preventDefault();

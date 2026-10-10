@@ -47,6 +47,11 @@ pub trait Engine: Send + Sync {
     }
 }
 
+/// Select the engine shared by desktop shells. R9 changes this factory at cut-over.
+pub fn desktop_engine(source_root: PathBuf) -> Arc<dyn Engine> {
+    Arc::new(PythonEngine::new(source_root))
+}
+
 pub struct PythonEngine {
     source_root: PathBuf,
     python: Mutex<Option<PathBuf>>,
