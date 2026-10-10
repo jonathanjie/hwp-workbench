@@ -3,7 +3,11 @@ mod command_names {
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // A direct Cargo build does not run the Tauri CLI's beforeBuildCommand.
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    // Read the manifest folder when the script runs: Cargo can reuse a compiled
+    // build script from another checkout that shares the target folder.
+    let manifest =
+        std::env::var_os("CARGO_MANIFEST_DIR").ok_or("Cargo CARGO_MANIFEST_DIR missing")?;
+    let root = std::path::Path::new(&manifest).join("../..");
     let build = std::process::Command::new("node")
         .arg(root.join("scripts/build-frontend.mjs"))
         .current_dir(&root)
