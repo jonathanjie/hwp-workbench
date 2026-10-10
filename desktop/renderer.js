@@ -570,6 +570,10 @@ function renderReview() {
     group.append(...changeCards(model, revert, ids, 'remove'));
     return group;
   }));
+  // WebKit skips buttons in native Tab navigation without an explicit tabindex.
+  for (const button of $('reviewDialog').querySelectorAll('button')) {
+    button.tabIndex = 0;
+  }
   $('reviewSummary').textContent = t('reviewSummary', {n: Object.keys(model.edits).length, pages: pageView.entries.length || $('pages').children.length});
   $('reviewWarnings').replaceChildren(...compatibilityTags(documentData));
 }
@@ -1061,6 +1065,15 @@ document.addEventListener('keydown', event => {
   }
 });
 window.addEventListener('resize', () => slip.position());
+// WebKit, unlike Chromium, does not focus a button when it is clicked, and its
+// mousedown handling clears focus. Focus the button in the click capture phase,
+// before its own handler, so the palette and sheets can return focus to it.
+document.addEventListener('click', event => {
+  const button = event.target.closest?.('button');
+  if (button && !button.disabled) {
+    button.focus({preventScroll: true});
+  }
+}, true);
 window.addEventListener('beforeunload', event => {
   if (hasUnsavedText()) {
     event.preventDefault();
@@ -1118,3 +1131,5 @@ updateControls();
 renderRecent();
 
 agentsCard.refresh();
+// The Rust host waits for the renderer's handoff listener before delivering opens.
+call('handoffReady').catch(error => status('failed', {reason: errorReason(error)}, true));

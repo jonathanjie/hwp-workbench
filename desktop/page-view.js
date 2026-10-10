@@ -43,7 +43,11 @@ export class PageView {
     this.observer?.disconnect();
     this.resize.disconnect();
     if (this.idleRender) {
-      cancelIdleCallback(this.idleRender);
+      if (typeof requestIdleCallback === 'function') {
+        cancelIdleCallback(this.idleRender);
+      } else {
+        clearTimeout(this.idleRender);
+      }
       this.idleRender = null;
     }
   }
@@ -175,7 +179,7 @@ export class PageView {
   scheduleThumbnails() {
     // One synchronous rhwp render per idle turn caps concurrency at one.
     // Existing page URLs also serve the rail; no duplicate render is needed.
-    this.idleRender = requestIdleCallback(() => {
+    const renderNext = () => {
       this.idleRender = null;
       const index = this.entries.findIndex(entry => !entry.url);
       if (index === -1) {
@@ -187,7 +191,11 @@ export class PageView {
       } catch (error) {
         this.onFailure(error);
       }
-    }, {timeout: 500});
+    };
+    // WebKit has no requestIdleCallback; a timer keeps one page per event turn.
+    this.idleRender = typeof requestIdleCallback === 'function'
+      ? requestIdleCallback(renderNext, {timeout: 500})
+      : setTimeout(renderNext, 0);
   }
 
   render(index) {

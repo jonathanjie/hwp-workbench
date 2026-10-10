@@ -213,3 +213,9 @@
 - **Trigger:** The R9a and R9b worktrees were created from the WebKit branch's WIP commit, which predated the R2, R6 and R7 merges. R9a found only stubs and stopped; the orchestrator had to stop it, merge `feat/rust` and restart it.
 - **Rule:** Create each worker worktree from the head of the integration branch. When a worker also needs unmerged work from another branch, merge that branch into the integration branch first, or merge it into the new worktree before the worker starts. Before launching, run `git log --oneline <base>..<integration>`; it must be empty.
 - **Why:** A worker cannot merge branches itself, so a stale base costs a full restart.
+
+### Qualify renderer APIs and startup in WebKit
+- **Date:** 2026-10-10
+- **Trigger:** The WebKit control-mark test timed out after preview fell back to structure view; review Tab navigation skipped buttons; Rust file-open handoffs stayed queued.
+- **Rule:** Use a cancellable timer fallback when idle callbacks are unavailable. Give review buttons explicit tab stops. Send the initial handoff-ready signal after event listeners are installed, and wait for subscription registration before releasing queued opens. Preserve the browser assertions and test both engines.
+- **Why:** WebKit lacks idle callbacks and skips implicit button tab stops in its default keyboard mode. The Rust host requires a renderer readiness signal that Electron's load event previously supplied.

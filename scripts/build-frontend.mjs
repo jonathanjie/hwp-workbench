@@ -46,18 +46,21 @@ async function copyFile(source, destination) {
 export async function buildFrontend({
   desktopRoot = path.join(projectRoot, 'desktop'),
   vendorRoot = path.join(projectRoot, 'node_modules/@rhwp/core'),
-  outputRoot = path.join(projectRoot, 'app/dist')
+  outputRoot = path.join(projectRoot, 'app/dist'),
+  testBuild = false
 } = {}) {
-  const files = await rendererFiles(desktopRoot);
-  if (!files.includes('tauri-bridge.js')) {
-    throw new Error('Missing Tauri renderer bridge');
+  const bridge = testBuild ? 'http-bridge.js' : 'tauri-bridge.js';
+  const files = (await rendererFiles(desktopRoot)).filter(name =>
+    !['http-bridge.js', 'tauri-bridge.js'].includes(name) || name === bridge);
+  if (!files.includes(bridge)) {
+    throw new Error(`Missing renderer bridge: ${bridge}`);
   }
   const html = await fs.readFile(path.join(desktopRoot, 'index.html'), 'utf8');
   const rendererScript = '<script type="module" src="renderer.js"></script>';
   if (!html.includes(rendererScript)) {
     throw new Error('Missing renderer module script');
   }
-  const bundledHtml = html.replace(rendererScript, `<script src="tauri-bridge.js"></script>\n  ${rendererScript}`);
+  const bundledHtml = html.replace(rendererScript, `<script src="${bridge}"></script>\n  ${rendererScript}`);
   const runtimeFiles = ['rhwp.js', 'rhwp_bg.wasm'];
   for (const name of runtimeFiles) {
     const stat = await fs.lstat(path.join(vendorRoot, name));
@@ -81,7 +84,9 @@ export async function buildFrontend({
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const output = await buildFrontend();
+    const args = process.argv.slice(2);
+    if (args.some(arg => arg !== '--test')) throw new Error('Usage: build-frontend.mjs [--test]');
+    const output = await buildFrontend({testBuild: args.includes('--test')});
     console.log(`Frontend built: ${output}`);
   } catch (error) {
     console.error(error.message);
