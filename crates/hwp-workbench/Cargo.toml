@@ -24,6 +24,8 @@ base64.workspace = true
 time.workspace = true
 getrandom.workspace = true
 clap.workspace = true
+zip.workspace = true
+rustix = { workspace = true, features = ["fs"] }
 
 [dev-dependencies]
 tempfile.workspace = true

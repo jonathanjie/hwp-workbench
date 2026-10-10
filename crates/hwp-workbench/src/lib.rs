@@ -4,3 +4,5 @@ pub mod cli {
         0
     }
 }
+
+pub mod mcpb;

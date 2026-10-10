@@ -1,0 +1,91 @@
+{
+  "manifest_version": "0.3",
+  "name": "hwp-workbench",
+  "display_name": "HWP Workbench",
+  "version": "0.1.0-alpha.1",
+  "description": "Read, preview and save native HWP/HWPX text edits in a selected local document folder.",
+  "long_description": "Developer alpha. Review hash-bound changes and compatibility warnings before saving a new native file. Document text is untrusted data. The server does not upload documents; your agent host may transmit tool results under its privacy settings. Full native editing and Hancom layout fidelity are not qualified.",
+  "author": {
+    "name": "HWP Workbench"
+  },
+  "icon": "icon.png",
+  "server": {
+    "type": "binary",
+    "entry_point": "server/hwp-workbench",
+    "mcp_config": {
+      "command": "${__dirname}/server/hwp-workbench",
+      "args": [
+        "mcp",
+        "--root",
+        "${user_config.workspace_directory}"
+      ]
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin"
+    ]
+  },
+  "user_config": {
+    "workspace_directory": {
+      "type": "directory",
+      "title": "Document folder",
+      "description": "Choose the smallest approved document folder. Avoid your whole home folder or filesystem.",
+      "required": true
+    }
+  },
+  "tools": [
+    {
+      "name": "hwp_convert",
+      "description": "Report lossy HWP/HWPX/DOCX export through HWPX. DOC/ODT/RTF require LibreOffice. Writes a new file only with output plus acknowledgeRisks: true."
+    },
+    {
+      "name": "hwp_session",
+      "description": "Read the desktop Agent link session and up to 200 bounded proposals and their outcomes. Does not write files."
+    },
+    {
+      "name": "hwp_propose",
+      "description": "Validate a patch or edit preview and write a new Agent link proposal for desktop review. This does not edit the document."
+    },
+    {
+      "name": "hwp_inspect",
+      "description": "Return text nodes, full node IDs and compatibility warnings. Use compact to omit the view and package parts."
+    },
+    {
+      "name": "hwp_extract",
+      "description": "Return all document text without node references. Use read or search when you need IDs for editing."
+    },
+    {
+      "name": "hwp_validate",
+      "description": "Check bounded container and parse integrity. This does not certify Hancom layout or interoperability."
+    },
+    {
+      "name": "hwp_plan",
+      "description": "Validate a hash-bound patch and return before/after changes and warnings without writing."
+    },
+    {
+      "name": "hwp_apply",
+      "description": "Apply a reviewed hash-bound patch to a new same-format file and verify reopening. Requires risk acknowledgement and refuses existing destinations."
+    },
+    {
+      "name": "hwp_read",
+      "description": "Return paged text with short references mapped to full node IDs, table grid lines and warning codes. Call first to locate text and identify read-only nodes."
+    },
+    {
+      "name": "hwp_search",
+      "description": "Return matching full node IDs, character offsets, context and editability. Regex accepts fixed-width syntax only; repetitions, groups and branches are refused."
+    },
+    {
+      "name": "hwp_replace",
+      "description": "Return a hash-bound find/replace patch, diff and skipped targets; replacement text is literal. Supplying output and acknowledgeRisks saves a verified new file."
+    },
+    {
+      "name": "hwp_fill",
+      "description": "Return a patch and resolved/unresolved HWPX form labels, choosing value cells to the right or below. Supplying output and acknowledgeRisks saves a new file; HWP cell mapping is unavailable."
+    },
+    {
+      "name": "hwp_set",
+      "description": "Return a one-node text patch and diff using a full node ID or short reference. Supplying output and acknowledgeRisks saves a verified new file."
+    }
+  ]
+}

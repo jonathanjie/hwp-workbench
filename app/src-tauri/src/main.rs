@@ -12,6 +12,7 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
 #[cfg(test)]
 mod command_names;
+mod launch;
 #[cfg(test)]
 mod tests;
 
@@ -381,13 +382,13 @@ fn request_close<R: Runtime>(app: &tauri::AppHandle<R>) {
         }
     });
 }
-/// Folder that holds the engine sources: the bundle's `app` resource folder,
+/// Folder that holds runtime resources: the bundle's `app` resource folder,
 /// or the source checkout. An unbundled development binary has no resource
 /// folder (`resource_dir()` fails), so `resource_dir` is `None` there.
 fn engine_source_root(resource_dir: Option<PathBuf>) -> std::io::Result<PathBuf> {
     let bundled = resource_dir
         .map(|directory| directory.join("app"))
-        .filter(|directory| directory.join("engine/hwp_workbench").is_dir());
+        .filter(|directory| directory.join("skills/hwp-workbench/SKILL.md").is_file());
     match bundled {
         Some(directory) => Ok(directory),
         None => PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -561,6 +562,16 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 fn main() {
+    let mut arguments = std::env::args_os();
+    let argv0 = arguments.next().unwrap_or_default();
+    let args: Vec<_> = arguments.collect();
+    match launch::launch_mode(Path::new(&argv0), &args) {
+        launch::LaunchMode::Worker | launch::LaunchMode::Cli => {
+            // Shared CLI dispatch also handles the worker before any Tauri setup.
+            std::process::exit(hwp_workbench::cli::main());
+        }
+        launch::LaunchMode::Desktop => {}
+    }
     if let Err(error) = run() {
         eprintln!("HWP Workbench: {error}");
         std::process::exit(1);

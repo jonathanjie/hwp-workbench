@@ -19,6 +19,7 @@ tauri-build.workspace = true
 
 [dependencies]
 app-core.workspace = true
+hwp-workbench.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tauri.workspace = true
