@@ -1,4 +1,4 @@
-use hwp_core::xml_io::{utf8_xml_text, xml_tree, TokenKind, TokenReader, MAX_DEPTH};
+use hwp_core::xml_io::{utf8_xml_text, xml_tree, QualifiedName, TokenKind, TokenReader, MAX_DEPTH};
 
 #[test]
 fn test_utf16_entities_are_rejected_in_all_package_parts() {
@@ -172,4 +172,37 @@ fn reserved_namespace_references_and_many_bindings_match_python() {
             .as_deref(),
         Some("urn:&amp;")
     );
+}
+
+#[test]
+fn matches_expanded_agrees_with_expanded() {
+    let names = [
+        QualifiedName {
+            qualified: "a:x".into(),
+            local: "x".into(),
+            namespace: Some("urn:a".into()),
+        },
+        QualifiedName {
+            qualified: "x".into(),
+            local: "x".into(),
+            namespace: None,
+        },
+        QualifiedName {
+            qualified: "e:x".into(),
+            local: "x".into(),
+            namespace: Some(String::new()),
+        },
+    ];
+    let candidates = [
+        "{urn:a}x", "x", "{}x", "{urn:a}y", "{urn:a}", "{urn:ax", "urn:a}x", "{urn:b}x", "",
+    ];
+    for name in &names {
+        for candidate in candidates {
+            assert_eq!(
+                name.matches_expanded(candidate),
+                name.expanded() == candidate,
+                "{name:?} vs {candidate}"
+            );
+        }
+    }
 }

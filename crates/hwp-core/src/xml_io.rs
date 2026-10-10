@@ -25,6 +25,19 @@ impl QualifiedName {
             None => self.local.clone(),
         }
     }
+
+    /// Compare with an ElementTree expanded name without building one.
+    /// Attribute lookups run for every element, so they must not allocate.
+    pub fn matches_expanded(&self, expanded: &str) -> bool {
+        match &self.namespace {
+            Some(uri) => expanded
+                .strip_prefix('{')
+                .and_then(|rest| rest.strip_prefix(uri.as_str()))
+                .and_then(|rest| rest.strip_prefix('}'))
+                .is_some_and(|local| local == self.local),
+            None => expanded == self.local,
+        }
+    }
 }
 
 /// An ordered, namespace-resolved attribute and normalized value.
@@ -51,7 +64,7 @@ impl Element {
     pub fn get(&self, name: &str) -> Option<&str> {
         self.attributes
             .iter()
-            .find(|attribute| attribute.name.expanded() == name)
+            .find(|attribute| attribute.name.matches_expanded(name))
             .map(|attribute| attribute.value.as_str())
     }
     /// Visit this element and its descendants in document order.

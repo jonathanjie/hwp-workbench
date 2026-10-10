@@ -69,6 +69,10 @@ strip = true
 # full disk. Dependencies get light optimization so rhwp layout tests run fast.
 [profile.dev]
 debug = "line-tables-only"
+# Light optimization keeps the ported Python time budgets meaningful: they were
+# set for real programs, and unoptimized code ran the 24,000-run conversion
+# test in 10.8 s against its 8 s limit (3.6 s at opt-level 1).
+opt-level = 1
 
 [profile.dev.package."*"]
 debug = false
