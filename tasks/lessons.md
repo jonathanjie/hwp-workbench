@@ -207,3 +207,9 @@
 - **Trigger:** A background `codex exec ... "<prompt>"` worker ran for 6½ hours with 0.09 s of CPU time, no child processes and no session log. With a prompt argument, `codex exec` also reads a piped stdin to the end and appends it; the background shell never closed stdin, so the worker waited and did nothing.
 - **Rule:** Start background workers with `</dev/null`. When a worker gives no output for more than a few minutes, check its CPU time, child processes and newest session log before you wait longer.
 - **Why:** A worker that is waiting looks the same as a worker that is busy until you measure it.
+
+### Start worker worktrees from the integration branch head
+- **Date:** 2026-10-10
+- **Trigger:** The R9a and R9b worktrees were created from the WebKit branch's WIP commit, which predated the R2, R6 and R7 merges. R9a found only stubs and stopped; the orchestrator had to stop it, merge `feat/rust` and restart it.
+- **Rule:** Create each worker worktree from the head of the integration branch. When a worker also needs unmerged work from another branch, merge that branch into the integration branch first, or merge it into the new worktree before the worker starts. Before launching, run `git log --oneline <base>..<integration>`; it must be empty.
+- **Why:** A worker cannot merge branches itself, so a stale base costs a full restart.
