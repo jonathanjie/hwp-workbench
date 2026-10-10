@@ -219,3 +219,9 @@
 - **Trigger:** The WebKit control-mark test timed out after preview fell back to structure view; review Tab navigation skipped buttons; Rust file-open handoffs stayed queued.
 - **Rule:** Use a cancellable timer fallback when idle callbacks are unavailable. Give review buttons explicit tab stops. Send the initial handoff-ready signal after event listeners are installed, and wait for subscription registration before releasing queued opens. Preserve the browser assertions and test both engines.
 - **Why:** WebKit lacks idle callbacks and skips implicit button tab stops in its default keyboard mode. The Rust host requires a renderer readiness signal that Electron's load event previously supplied.
+
+### Test with files that 한글 itself saved
+- **Date:** 2026-10-10
+- **Trigger:** The first real user could not edit a normal government form. 한글 writes a default script pair (`Scripts/headerScripts.js`, `Scripts/sourceScripts.js`: document bindings and an empty `OnDocument_New`) into ordinary HWPX files, and the HWPX reader blocked every file with a `Scripts/` part. The HWP reader already exempted 한글's default stub; our self-authored fixtures had no scripts, so 527 tests and the differential runner all passed.
+- **Rule:** Before a release, open and edit at least one HWP and one HWPX file saved by 한글 (a public form will do), not only generated fixtures. When a safety check blocks editing, compare it with the equivalent check for the other format.
+- **Why:** Synthetic fixtures contain only what we thought of; real files carry the defaults of the program that wrote them.

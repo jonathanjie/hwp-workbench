@@ -76,6 +76,53 @@ class EngineTests(unittest.TestCase):
     def test_alternate_namespace_prefix(self):
         s=f'<q:p xmlns:q="{HP}"><q:run><q:t>hello</q:t></q:run></q:p>'
         d=Document(make_hwpx(section=s));d.patch(patch(d,text='수정'));r=Document(d.serialize(True));self.assertEqual(r.nodes[0].text,'수정');self.assertIn(b'<q:t>',r.parts['Contents/section0.xml'])
+    def hwpx_default_scripts(self):
+        # Hancom 한글 writes these exact UTF-16LE stubs into ordinary HWPX files.
+        return {
+            'Scripts/headerScripts.js': 'var Documents = XHwpDocuments;var Document = Documents.Active_XHwpDocument;'.encode('utf-16-le'),
+            'Scripts/sourceScripts.js': 'function OnDocument_New(){\r\n\t//todo :\r\n}'.encode('utf-16-le'),
+        }
+
+    def test_hwpx_default_scripts_editable_and_preserved(self):
+        scripts = self.hwpx_default_scripts()
+        document = Document(make_hwpx(scripts))
+        self.assertFalse(document.block_save)
+        self.assertTrue(document.nodes[0].editable)
+        warning = next(item for item in document.warnings if item['code'] == 'DEFAULT_SCRIPT_STUB')
+        self.assertEqual(warning['severity'], 'info')
+        self.assertNotIn('PROTECTED_OR_ACTIVE_CONTENT', [item['code'] for item in document.warnings])
+        document.patch(patch(document, text='마리나체인 검토 완'))
+        saved = Document(document.serialize(True))
+        self.assertEqual(saved.nodes[0].text, '마리나체인 검토 완')
+        for name, payload in scripts.items():
+            self.assertEqual(saved.parts[name], payload)
+
+    def test_hwpx_nondefault_scripts_block_editing(self):
+        def changed_stub(scripts):
+            scripts['Scripts/sourceScripts.js'] = 'function OnDocument_New(){ run(); }'.encode('utf-16-le')
+
+        def extra_script(scripts):
+            scripts['Scripts/macro.js'] = 'run();'.encode('utf-16-le')
+
+        def missing_stub(scripts):
+            del scripts['Scripts/sourceScripts.js']
+
+        for change in [changed_stub, extra_script, missing_stub]:
+            with self.subTest(change=change.__name__):
+                scripts = self.hwpx_default_scripts()
+                change(scripts)
+                document = Document(make_hwpx(scripts))
+                self.assertTrue(document.block_save)
+                self.assertFalse(document.nodes[0].editable)
+                self.expect_code('SAVE_BLOCKED', lambda: document.patch(patch(document)))
+                self.assertNotIn('DEFAULT_SCRIPT_STUB', [item['code'] for item in document.warnings])
+
+    def test_hwpx_default_scripts_do_not_hide_signatures(self):
+        parts = dict(self.hwpx_default_scripts(), **{'META-INF/signatures.xml': b'<signature/>'})
+        document = Document(make_hwpx(parts))
+        self.assertTrue(document.block_save)
+        self.expect_code('SAVE_BLOCKED', lambda: document.patch(patch(document)))
+
     def test_signature_blocks_editing(self):
         d=Document(make_hwpx({'META-INF/signatures.xml':b'<signature/>'}));self.assertTrue(d.block_save);self.expect_code('SAVE_BLOCKED',lambda:d.patch(patch(d)))
     def test_unknown_binary_is_retained(self):

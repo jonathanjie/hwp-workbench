@@ -8657,6 +8657,26 @@
     "purpose": "Exercise test_agent_link.ErgonomicsTests.test_alias_duplicate_and_stale_text_are_refused_atomically, test_agent_link.ErgonomicsTests.test_every_subcommand_and_argument_has_help, test_agent_link.ErgonomicsTests.test_fill_repeated_fields_and_json, test_agent_link.ErgonomicsTests.test_read_text_view_and_json_default, test_agent_link.ErgonomicsTests.test_search_positional_query_and_legacy_flag, test_agent_link.ErgonomicsTests.test_short_references_cli_mcp_and_patch_operations, test_agent_link.LinkSafetyRegressionTests.test_marked_skill_is_backed_up_before_replacement, test_agent_link.LinkSafetyRegressionTests.test_null_outcome_requires_review, test_agent_link.LinkSafetyRegressionTests.test_temporary_name_collision_preserves_existing_file, test_agent_link.ProposalTests.test_collision_refused_without_overwrite, test_agent_link.ProposalTests.test_complete_validation_before_creating_directories, test_agent_link.ProposalTests.test_confined_nested_path_and_symlink_directories, test_agent_link.ProposalTests.test_proposal_envelope_and_full_patch_cli_mcp, test_agent_link.ProposalTests.test_proposal_limits_and_short_reference_normalization, test_agent_link.SessionTests.test_absent_session_is_read_only_cli_mcp_parity, test_agent_link.SessionTests.test_accepted_declined_partial_outcomes_and_unreadable, test_agent_link.SessionTests.test_broken_oversized_symlink_and_nonregular_files_are_unreadable, test_agent_link.SessionTests.test_desktop_session_and_per_document_isolation, test_agent_link.SessionTests.test_document_name_prefix_does_not_include_another_document, test_agent_link.SessionTests.test_link_directory_symlink_is_refused, test_agent_link.SessionTests.test_outcome_binds_exact_proposal_bytes_and_node_partition, test_agent_link.SessionTests.test_reads_at_most_200_proposals_with_per_file_size_limit, test_agent_link.SkillInstallTests.test_install_status_uninstall_and_path_substitution, test_agent_link.SkillInstallTests.test_symlink_parent_folder_and_file_are_never_followed, test_agent_link.SkillInstallTests.test_target_and_dry_run_do_not_touch_other_folders, test_agent_link.SkillInstallTests.test_unmarked_folder_refused_and_preserved_on_uninstall, test_agent_link.SkillRecipesTests.test_skill_contract_and_three_recipes, test_agent_ops.AgentOperationTests.test_fill_normalises_fixture_labels_and_reports_hwp, test_agent_ops.AgentOperationTests.test_read_paging_and_reference_mapping, test_agent_ops.AgentOperationTests.test_replace_patch_is_pure_and_allows_hwp_length_change, test_agent_ops.AgentOperationTests.test_replace_surrogate_pairs_and_literal_regex_replacement, test_agent_ops.AgentOperationTests.test_search_offsets_case_context_and_limit, test_agent_ops.AgentOperationTests.test_set_text_patch_and_native_validation, test_agent_ops.AgentServiceTests.test_apply_through_replace_is_verified_and_never_overwrites, test_agent_ops.AgentServiceTests.test_empty_preview_cannot_write_and_output_stays_confined, test_agent_ops.AgentServiceTests.test_fill_and_set_apply_through_shared_publication, test_agent_ops.AgentServiceTests.test_replace_refuses_changed_source_before_publication, test_agent_ops.AgentServiceTests.test_service_agent_operations_and_compact_inspect, test_convert.ConversionSafetyTests.test_injected_rhwp_loss_is_preserved_in_report, test_corpus.CorpusTests.test_length_changing_checks_report_missing_parser, test_corpus.CorpusTests.test_length_changing_hwp_checks_save_reopen_and_render, test_corpus.CorpusTests.test_missing_node_is_skipped, test_corpus.GeneratedFixtureTests.test_authored_hwp_opens_and_renders_in_rhwp, test_engine.EngineTests.test_cfb_fat_cycles_rejected, test_engine.EngineTests.test_cfb_ministream_transition, test_engine.EngineTests.test_cfb_opaque_stream_resize, test_engine.EngineTests.test_cfb_truncated, test_engine.EngineTests.test_hwp_bad_compression_trailer_rejected, test_engine.EngineTests.test_hwp_compression_trailer_refreshed_after_edit, test_engine.EngineTests.test_hwp_default_scripts_editable_and_preserved, test_engine.EngineTests.test_hwp_equal_length_edit_reopen, test_engine.EngineTests.test_hwp_length_change_reopens, test_engine.EngineTests.test_hwp_nondefault_scripts_block_editing, test_engine.EngineTests.test_hwp_noop_byte_identical, test_engine.EngineTests.test_hwp_read_and_control_skip, test_engine.EngineTests.test_hwp_valid_compression_trailer_opens, test_hwp_records.EdgeCaseTests.test_control_code_insertions_are_refused_with_hint, test_hwp_records.EdgeCaseTests.test_length_changes_refresh_optional_compression_trailer, test_hwp_records.EdgeCaseTests.test_noop_patch_and_revert_are_byte_identical, test_hwp_records.EdgeCaseTests.test_text_to_empty_retains_terminator_and_all_streams, test_hwp_records.IndependentLengthTests.test_generated_hwp_variants_reopen_with_exact_paragraph_text, test_hwp_records.IndependentLengthTests.test_shape_boundary_and_two_run_edits_reopen_exactly, test_hwp_records.VariableLengthTests.test_generated_fixture_accepts_grow_and_shrink, test_mcp.MCPTests.test_new_tools_cli_mcp_service_parity, test_preview.PreviewTests.test_native_preview_verified_without_any_file_write, test_save.HwpIndependentSaveTests.test_apply_still_refuses_overwrite_and_does_not_gate_independent_check, test_save.HwpIndependentSaveTests.test_backup_verification_failure_after_backup_leaves_original, test_save.HwpIndependentSaveTests.test_empty_edit_remains_independently_unverified, test_save.HwpIndependentSaveTests.test_real_independent_reader_reopens_saved_output, test_save.HwpIndependentSaveTests.test_save_is_not_exposed_to_mcp, test_save.HwpIndependentSaveTests.test_save_refuses_read_only_document, test_save.HwpIndependentSaveTests.test_save_refuses_symlink_backup_folder, test_save.HwpIndependentSaveTests.test_save_refuses_symlink_document, test_save.HwpIndependentSaveTests.test_writer_cannot_change_native_format, test_save.HwpSaveCliTests.test_cli_save_accepts_preview_envelope_and_backup_directory, test_save.HwpSaveCliTests.test_cli_save_requires_risk_acknowledgement, test_save.HwpServiceSaveTests.test_backup_failure_leaves_original, test_save.HwpServiceSaveTests.test_changed_file_after_read_refuses_stale_patch, test_save.HwpServiceSaveTests.test_file_changed_during_verification_is_refused, test_save.HwpServiceSaveTests.test_hash_rechecked_after_backup, test_save.HwpServiceSaveTests.test_incomplete_patch_and_wrong_expected_text_refused, test_save.HwpServiceSaveTests.test_independent_reopen_or_missing_text_blocks_save, test_save.HwpServiceSaveTests.test_rename_failure_after_backup_leaves_original_and_keeps_backup, test_save.HwpServiceSaveTests.test_risk_acknowledgement_required, test_save.HwpServiceSaveTests.test_save_replaces_verified_native_bytes_and_keeps_previous_version, test_save.HwpServiceSaveTests.test_unavailable_independent_check_is_reported, test_save.HwpServiceSaveTests.test_verification_failure_before_backup_leaves_original, test_save.HwpServiceSaveTests.test_wrong_native_extension_refused, test_save.SaveSafetyTests.test_writer_cannot_change_native_format"
   },
   {
+    "name": "fixtures-make_hwpx-08d7bef8f0c02364.hwpx",
+    "builder": "fixtures.make_hwpx",
+    "parameters": {
+      "extra": {
+        "Scripts/headerScripts.js": {
+          "$bytesZlibBase64": "eNorY0hkKGJQYHBhyGdIZihlyGVIZchjKGEoBorZAnEEgwdDOUMBFnlrhjIceiE6MXXoMTgCRUoYMoE6UxnicZptzQAAKtIbzg=="
+        },
+        "Scripts/sourceScripts.js": {
+          "$bytesZlibBase64": "eNpLYyhlyGNIZihhyGTIB7IUGPyBpAuQnQyUyWVIBfJKGOIZ/ICscgYNBk2GagZeBi4GTgZ9ICwBqksBYgUGK7BoLQMATzIM+g=="
+        },
+        "META-INF/signatures.xml": {
+          "$bytesZlibBase64": "eNqzKc5Mz0ssKS1K1bcDAB4xBHw="
+        }
+      },
+      "section": null
+    },
+    "sha256": "8ee84be3b6a9d21000673208c2fff49df7e268cc090a81cb1634b158116437e1",
+    "purpose": "Exercise test_engine.EngineTests.test_hwpx_default_scripts_do_not_hide_signatures"
+  },
+  {
     "name": "fixtures-make_hwpx-09e4cc42b43c2311.hwpx",
     "builder": "fixtures.make_hwpx",
     "parameters": {
@@ -8891,6 +8911,23 @@
     "purpose": "Exercise test_agent_ops.AgentOperationTests.test_fill_below_ambiguous_and_multi_run_cells"
   },
   {
+    "name": "fixtures-make_hwpx-6b2bfc1daaaaec42.hwpx",
+    "builder": "fixtures.make_hwpx",
+    "parameters": {
+      "extra": {
+        "Scripts/headerScripts.js": {
+          "$bytesZlibBase64": "eNorY0hkKGJQYHBhyGdIZihlyGVIZchjKGEoBorZAnEEgwdDOUMBFnlrhjIceiE6MXXoMTgCRUoYMoE6UxnicZptzQAAKtIbzg=="
+        },
+        "Scripts/sourceScripts.js": {
+          "$bytesZlibBase64": "eNpLYyhlyGNIZihhyGTIB7IUGPyBpAuQnQyUyWVIBfJKGOIZ/ICscgYNBk2GagZeBi4GTgZ9ICwBqksBYgUGK7BoLQMATzIM+g=="
+        }
+      },
+      "section": null
+    },
+    "sha256": "9ccf7eb5a59d174de723c1908abb6954c526d1bdf519cead4c6ef2072dbd9b60",
+    "purpose": "Exercise test_engine.EngineTests.test_hwpx_default_scripts_editable_and_preserved"
+  },
+  {
     "name": "fixtures-make_hwpx-6e1519155b8e2192.hwpx",
     "builder": "fixtures.make_hwpx",
     "parameters": {
@@ -8961,6 +8998,20 @@
     },
     "sha256": "d7ea7b41cf2f8a7bf28a945ed7255f1700f09e2aacfeb0dfa204329870e3b8d1",
     "purpose": "Exercise test_package_safety.XmlEncodingTests.test_utf16_entities_are_rejected_in_all_package_parts"
+  },
+  {
+    "name": "fixtures-make_hwpx-98c9e7fdc495ecbc.hwpx",
+    "builder": "fixtures.make_hwpx",
+    "parameters": {
+      "extra": {
+        "Scripts/headerScripts.js": {
+          "$bytesZlibBase64": "eNorY0hkKGJQYHBhyGdIZihlyGVIZchjKGEoBorZAnEEgwdDOUMBFnlrhjIceiE6MXXoMTgCRUoYMoE6UxnicZptzQAAKtIbzg=="
+        }
+      },
+      "section": null
+    },
+    "sha256": "4c74cce94b166694ddbf0b4328c05a18b2104785b017d9ac3a9f0b6c0870ca50",
+    "purpose": "Exercise test_engine.EngineTests.test_hwpx_nondefault_scripts_block_editing"
   },
   {
     "name": "fixtures-make_hwpx-995581b2a07793cd.hwpx",
@@ -9089,6 +9140,23 @@
     },
     "sha256": "03c82a69793d787d64f7601da01b0d4a757303b69cd37d0cfad9e06684c5de0f",
     "purpose": "Exercise test_package_safety.XmlEncodingTests.test_utf16_entities_are_rejected_in_all_package_parts"
+  },
+  {
+    "name": "fixtures-make_hwpx-b3ad48f9a1565dd4.hwpx",
+    "builder": "fixtures.make_hwpx",
+    "parameters": {
+      "extra": {
+        "Scripts/headerScripts.js": {
+          "$bytesZlibBase64": "eNorY0hkKGJQYHBhyGdIZihlyGVIZchjKGEoBorZAnEEgwdDOUMBFnlrhjIceiE6MXXoMTgCRUoYMoE6UxnicZptzQAAKtIbzg=="
+        },
+        "Scripts/sourceScripts.js": {
+          "$bytesZlibBase64": "eNpLYyhlyGNIZihhyGTIB7IUGPyBpAuQnQyUyWVIBfJKGOIZ/ICscgYNBk2GaqCaIrAuEM8ayKtlAADeEwx2"
+        }
+      },
+      "section": null
+    },
+    "sha256": "3f960264e223c5e743baf348b134ef565abdd2006b3050234a9dd03cc9cf786e",
+    "purpose": "Exercise test_engine.EngineTests.test_hwpx_nondefault_scripts_block_editing"
   },
   {
     "name": "fixtures-make_hwpx-b3fd27938f0e79ef.hwpx",
@@ -9239,6 +9307,26 @@
     },
     "sha256": "0debe69f158ba61bb3561d587a4da86129fd5e6f6159f46555c6190eb39b2720",
     "purpose": "Exercise test_agent_ops.AgentOperationTests.test_search_context_is_short_for_long_literal_matches"
+  },
+  {
+    "name": "fixtures-make_hwpx-fdb124f5b91fea95.hwpx",
+    "builder": "fixtures.make_hwpx",
+    "parameters": {
+      "extra": {
+        "Scripts/headerScripts.js": {
+          "$bytesZlibBase64": "eNorY0hkKGJQYHBhyGdIZihlyGVIZchjKGEoBorZAnEEgwdDOUMBFnlrhjIceiE6MXXoMTgCRUoYMoE6UxnicZptzQAAKtIbzg=="
+        },
+        "Scripts/sourceScripts.js": {
+          "$bytesZlibBase64": "eNpLYyhlyGNIZihhyGTIB7IUGPyBpAuQnQyUyWVIBfJKGOIZ/ICscgYNBk2GagZeBi4GTgZ9ICwBqksBYgUGK7BoLQMATzIM+g=="
+        },
+        "Scripts/macro.js": {
+          "$bytesZlibBase64": "eNorYihlyGPQYNBksGYAAA9wAeI="
+        }
+      },
+      "section": null
+    },
+    "sha256": "9856df1bf92400962bec5cb6a258f30b74c6d2a4029d23b0c8cb8d2e9f149fbb",
+    "purpose": "Exercise test_engine.EngineTests.test_hwpx_nondefault_scripts_block_editing"
   },
   {
     "name": "fixtures-make_hwpx-fe10e90758e9f9e8.hwpx",

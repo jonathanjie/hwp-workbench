@@ -1,12 +1,46 @@
 //! Namespace-aware HWPX reads and surgical edits in the original XML bytes.
-use super::{Document, Position, TextNode, TextToken, HP};
+use super::{sha, Document, Position, TextNode, TextToken, HP};
 use crate::errors::{require, Result, WorkbenchError, MAX_EXPANDED, MAX_NODES, MAX_PART};
 use crate::package_io::ZipPackage;
 use crate::xml_io::{xml_tree, Element, TokenKind, TokenReader};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Hancom 한글 writes this script pair into ordinary HWPX files: UTF-16LE
+/// document bindings and an empty `OnDocument_New` callback with a `//todo`
+/// comment. Only this exact pair is retained without blocking edits.
+pub const DEFAULT_HWPX_SCRIPT_HASHES: &[(&str, &str)] = &[
+    (
+        "Scripts/headerScripts.js",
+        "d24eb743b49a913f449c0a4e9ee6e6a9465c890298c769145dba831e7b13b4b0",
+    ),
+    (
+        "Scripts/sourceScripts.js",
+        "6f558fdcd17d07a7d2f29478a6eb3d628c7e3c9c64f049dce4959426c17360d0",
+    ),
+];
+
 impl Document {
+    fn block_protected_hwpx(&mut self) {
+        self.block_save = true;
+        self.warn(
+            "PROTECTED_OR_ACTIVE_CONTENT",
+            "error",
+            "Signatures, encryption metadata or script content detected. Editing is blocked; these payloads are never executed.",
+        );
+    }
+
+    /// True only when the script parts are exactly the known default pair, byte for byte.
+    fn is_default_hwpx_script_stub(&self, script_names: &[String]) -> bool {
+        script_names.len() == DEFAULT_HWPX_SCRIPT_HASHES.len()
+            && DEFAULT_HWPX_SCRIPT_HASHES.iter().all(|(name, digest)| {
+                script_names.iter().any(|candidate| candidate == name)
+                    && self
+                        .part(name)
+                        .is_some_and(|payload| sha(payload) == *digest)
+            })
+    }
+
     pub(super) fn read_hwpx(&mut self) -> Result<()> {
         let mut archive = ZipPackage::new(&self.original)?;
         let names: Vec<String> = archive.names().map(str::to_owned).collect();
@@ -44,6 +78,7 @@ impl Document {
             "No body sections found.",
         )?;
         let mut trees = BTreeMap::new();
+        let mut script_names: Vec<String> = Vec::new();
         for name in self.part_order.clone() {
             let payload = self
                 .part(&name)
@@ -55,10 +90,11 @@ impl Document {
                 trees.insert(name.clone(), xml_tree(payload)?);
             }
             let lower = name.to_lowercase();
-            if [
+            if lower.contains("scripts/") {
+                script_names.push(name.clone());
+            } else if [
                 "signature",
                 "_xmlsignatures",
-                "scripts/",
                 "vbascript",
                 "drm/",
                 "encrypt",
@@ -66,8 +102,18 @@ impl Document {
             .iter()
             .any(|marker| lower.contains(marker))
             {
-                self.block_save = true;
-                self.warn("PROTECTED_OR_ACTIVE_CONTENT", "error", "Signatures, encryption metadata or script content detected. Editing is blocked; these payloads are never executed.");
+                self.block_protected_hwpx();
+            }
+        }
+        if !script_names.is_empty() {
+            if self.is_default_hwpx_script_stub(&script_names) {
+                self.warn(
+                    "DEFAULT_SCRIPT_STUB",
+                    "info",
+                    "Exact known Hancom default script stub retained byte-identically; never executed.",
+                );
+            } else {
+                self.block_protected_hwpx();
             }
         }
         let header = trees.get("Contents/header.xml").ok_or_else(|| {

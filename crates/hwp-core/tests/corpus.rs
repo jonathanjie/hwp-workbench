@@ -134,7 +134,11 @@ const ORACLE_CLASSIFICATION: &str = r#"{
     "tests/data/fixtures-cfb_from_streams-93775cdb8ed6afd3.hwp",
     "tests/data/fixtures-cfb_from_streams-ce585a6a9a4b67dd.hwp",
     "tests/data/fixtures-make_hwp-16cbeb21ba91e881.hwp",
-    "tests/data/fixtures-make_hwpx-b3fd27938f0e79ef.hwpx"
+    "tests/data/fixtures-make_hwpx-08d7bef8f0c02364.hwpx",
+    "tests/data/fixtures-make_hwpx-98c9e7fdc495ecbc.hwpx",
+    "tests/data/fixtures-make_hwpx-b3ad48f9a1565dd4.hwpx",
+    "tests/data/fixtures-make_hwpx-b3fd27938f0e79ef.hwpx",
+    "tests/data/fixtures-make_hwpx-fdb124f5b91fea95.hwpx"
   ],
   "empty": [
     "tests/data/fixtures-cfb_from_streams-86e99c060643cf4d.hwp",

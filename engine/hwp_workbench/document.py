@@ -26,6 +26,12 @@ DEFAULT_SCRIPT_HASHES = {
     'Scripts/DefaultJScript': 'e1f35ff38336598f79448c84b41bcb508d53a552808454a76ee12691cb2c97e4',
     'Scripts/JScriptVersion': '7c9fa136d4413fa6173637e883b6998d32e1d675f88cddff9dcbcf331820f4b8',
 }
+# Hancom 한글 also writes a default script pair into ordinary HWPX files: UTF-16LE
+# document bindings and an empty OnDocument_New callback with a //todo comment.
+DEFAULT_HWPX_SCRIPT_HASHES = {
+    'Scripts/headerScripts.js': 'd24eb743b49a913f449c0a4e9ee6e6a9465c890298c769145dba831e7b13b4b0',
+    'Scripts/sourceScripts.js': '6f558fdcd17d07a7d2f29478a6eb3d628c7e3c9c64f049dce4959426c17360d0',
+}
 
 def sha(data: bytes) -> str: return hashlib.sha256(data).hexdigest()
 def local(tag: str) -> str: return tag.rsplit('}',1)[-1]
@@ -83,6 +89,10 @@ class Document:
         if self.block_save:
             for n in self.nodes: n.editable=False
 
+    def _block_protected_hwpx(self):
+        self.block_save=True
+        self.warn('PROTECTED_OR_ACTIVE_CONTENT','error','Signatures, encryption metadata or script content detected. Editing is blocked; these payloads are never executed.')
+
     def warn(self, code, severity, message, **details):
         if not any(w['code']==code for w in self.warnings):
             self.warnings.append(dict(code=code,severity=severity,message=message,**details))
@@ -115,12 +125,21 @@ class Document:
         section_names=sorted((n for n in self.parts if re.fullmatch(r'Contents/section\d+\.xml',n)),key=lambda n:int(re.search(r'(\d+)\.xml$',n)[1]))
         require(bool(section_names),'NOT_HWPX','No body sections found.')
         trees={}
+        scripts={}
         for name,payload in self.parts.items():
             if name.endswith(('.xml', '.hpf', '.rels')):
                 trees[name]=self._xml(payload)
-            if any(s in name.lower() for s in ('signature','_xmlsignatures','scripts/','vbascript','drm/','encrypt')):
-                self.block_save=True
-                self.warn('PROTECTED_OR_ACTIVE_CONTENT','error','Signatures, encryption metadata or script content detected. Editing is blocked; these payloads are never executed.')
+            if 'scripts/' in name.lower():
+                scripts[name]=payload
+            elif any(s in name.lower() for s in ('signature','_xmlsignatures','vbascript','drm/','encrypt')):
+                self._block_protected_hwpx()
+        if scripts:
+            known_stub = set(scripts) == set(DEFAULT_HWPX_SCRIPT_HASHES) and all(
+                sha(scripts[name]) == digest for name, digest in DEFAULT_HWPX_SCRIPT_HASHES.items())
+            if known_stub:
+                self.warn('DEFAULT_SCRIPT_STUB', 'info', 'Exact known Hancom default script stub retained byte-identically; never executed.')
+            else:
+                self._block_protected_hwpx()
         head=trees['Contents/header.xml']
         styles={}
         for e in head.iter():

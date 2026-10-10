@@ -414,6 +414,62 @@ fn test_hwp_nondefault_scripts_block_editing() {
     }
 }
 #[test]
+fn test_hwpx_default_scripts_editable_and_preserved() {
+    let fixtures = purpose_fixtures(
+        "test_engine.EngineTests.test_hwpx_default_scripts_editable_and_preserved",
+        "fixtures.make_hwpx",
+    );
+    assert!(!fixtures.is_empty());
+    for bytes in fixtures {
+        let mut document = document(&bytes);
+        assert!(document.nodes[0].editable);
+        assert_eq!(document.inspect()["capabilities"]["saveAs"], true);
+        let codes = warning_codes(&document);
+        assert!(codes.iter().any(|code| code == "DEFAULT_SCRIPT_STUB"));
+        assert!(!codes
+            .iter()
+            .any(|code| code == "PROTECTED_OR_ACTIVE_CONTENT"));
+        edit_first(&mut document, "마리나체인 검토 완");
+        let result = reopened(&document);
+        assert_eq!(result.nodes[0].text, "마리나체인 검토 완");
+        for name in ["Scripts/headerScripts.js", "Scripts/sourceScripts.js"] {
+            assert_eq!(document.part(name), result.part(name));
+        }
+    }
+}
+#[test]
+fn test_hwpx_nondefault_scripts_block_editing() {
+    let fixtures = purpose_fixtures(
+        "test_engine.EngineTests.test_hwpx_nondefault_scripts_block_editing",
+        "fixtures.make_hwpx",
+    );
+    assert_eq!(fixtures.len(), 3);
+    for bytes in fixtures {
+        let mut document = document(&bytes);
+        assert_eq!(document.inspect()["capabilities"]["saveAs"], false);
+        assert!(!document.nodes[0].editable);
+        let edit = patch(&document, &document.nodes[0], "edited");
+        assert_eq!(document.patch(&edit).unwrap_err().code, "SAVE_BLOCKED");
+        assert!(!warning_codes(&document)
+            .iter()
+            .any(|code| code == "DEFAULT_SCRIPT_STUB"));
+    }
+}
+#[test]
+fn test_hwpx_default_scripts_do_not_hide_signatures() {
+    let fixtures = purpose_fixtures(
+        "test_engine.EngineTests.test_hwpx_default_scripts_do_not_hide_signatures",
+        "fixtures.make_hwpx",
+    );
+    assert!(!fixtures.is_empty());
+    for bytes in fixtures {
+        let mut document = document(&bytes);
+        assert_eq!(document.inspect()["capabilities"]["saveAs"], false);
+        let edit = patch(&document, &document.nodes[0], "edited");
+        assert_eq!(document.patch(&edit).unwrap_err().code, "SAVE_BLOCKED");
+    }
+}
+#[test]
 fn test_hwp_signature_blocked() {
     let bytes = fixture(
         "fixtures.make_hwp",
