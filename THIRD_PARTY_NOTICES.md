@@ -7,14 +7,12 @@ fixtures are examples, not qualified Hancom documents. Playwright is test-only.
 
 `scripts/third-party-notices.mjs` reads Cargo's normal runtime dependency
 closure, checks its licence allowlist, and generates notices for every bundled
-dependency. The package retains them under `Contents/Resources/notices/`.
+dependency. The package retains them in `Contents/Resources/THIRD_PARTY_NOTICES.txt`.
 Five unmodified Tauri dependencies use MPL-2.0: cssparser, cssparser-macros,
 dtoa-short, selectors and option-ext. Their exact source versions and licence
 texts are included in generated notices; source changes require separate review.
-The rhwp source and revision are in `third_party/rhwp`; upstream documentation
-is archived under `docs/plans/rhwp-0.8.7/mydocs/`, with compile-time include paths
-adjusted and one binding comment clarified. Executable library logic is unchanged; its compiled blank
-template is part of upstream library source. The renderer build copies only
+The unmodified rhwp source, documentation and revision are in `third_party/rhwp`.
+Its compiled blank template is part of upstream library source. The renderer build copies only
 its JavaScript/WASM runtime. This document is not a complete release SBOM.
 
 ## Historical pre-cut-over inventory
