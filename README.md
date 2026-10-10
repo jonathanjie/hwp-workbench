@@ -2,7 +2,7 @@
 
 A Korean/English HWP and HWPX document workbench for macOS. One Rust engine, built on the [rhwp](https://github.com/edwardkim/rhwp) library, runs the Tauri desktop app, a command-line tool and an MCP server for AI agents.
 
-**Version 0.2.0-alpha.1 — developer alpha, not a finished HWP editor.** Saved files have not yet been checked in Hancom 한글. Check every saved document in 한글 before you submit it officially.
+**Version 0.2.0-alpha.2 — developer alpha, not a finished HWP editor.** Saved files have not yet been checked in Hancom 한글. Check every saved document in 한글 before you submit it officially.
 
 The product requirement remains full HWP/HWPX editing with close official-document fidelity. This build proves a narrower, preservation-first editing path: it changes existing text and keeps everything else in the file as it was.
 

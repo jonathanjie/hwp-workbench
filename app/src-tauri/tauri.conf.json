@@ -1,6 +1,6 @@
 {
   "productName": "HWP Workbench",
-  "version": "0.2.0-alpha.1",
+  "version": "0.2.0-alpha.2",
   "identifier": "io.github.jonathanjie.hwp-workbench",
   "build": {
     "frontendDist": "../dist",

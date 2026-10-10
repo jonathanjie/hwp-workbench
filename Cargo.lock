@@ -120,7 +120,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "app-core"
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.2"
 dependencies = [
  "base64 0.23.1",
  "getrandom 0.4.3",
@@ -138,7 +138,7 @@ dependencies = [
 
 [[package]]
 name = "app-testhost"
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.2"
 dependencies = [
  "app-core",
  "getrandom 0.4.3",
@@ -2192,7 +2192,7 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "hwp-convert"
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.2"
 dependencies = [
  "base64 0.23.1",
  "hex",
@@ -2211,7 +2211,7 @@ dependencies = [
 
 [[package]]
 name = "hwp-core"
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.2"
 dependencies = [
  "base64 0.23.1",
  "flate2",
@@ -2230,7 +2230,7 @@ dependencies = [
 
 [[package]]
 name = "hwp-verify"
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.2"
 dependencies = [
  "base64 0.23.1",
  "rhwp",
@@ -2242,7 +2242,7 @@ dependencies = [
 
 [[package]]
 name = "hwp-workbench"
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.2"
 dependencies = [
  "base64 0.23.1",
  "clap",
@@ -2264,7 +2264,7 @@ dependencies = [
 
 [[package]]
 name = "hwp-workbench-app"
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.2"
 dependencies = [
  "app-core",
  "hwp-workbench",
