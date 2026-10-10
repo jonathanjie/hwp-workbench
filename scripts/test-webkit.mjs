@@ -280,6 +280,33 @@ const workflows = {
     await window.keyboard.press('Escape');
     await shortcut('z');
     await window.waitForFunction(() => document.querySelectorAll('#changes .change').length === 0);
+    // Existing Rust fixture: the line-break element is editable as a reserved
+    // marker. Test real WebKit caret movement without replacing textarea text.
+    await openFile(path.join(root, 'tests/data/fixtures-make_hwpx-f92a949cb17d61c8.hwpx'));
+    await window.locator('.text-hit[data-node-id]:not([data-node-id=""]), .text-node').first().click();
+    const marked = window.locator('#textEdit');
+    assert.equal(await marked.inputValue(), 'before\ufdd0after');
+    assert.equal(await window.locator('.marker-mirror .inline-marker').count(), 1);
+    await fs.mkdir(path.join(root, 'work/qa/webkit'), {recursive: true});
+    await window.locator('.slip').screenshot({path: path.join(root, 'work/qa/webkit/inline-marker-slip.png')});
+    await marked.evaluate(editor => editor.setSelectionRange(6, 6));
+    await window.keyboard.press('ArrowRight');
+    assert.equal(await marked.evaluate(editor => editor.selectionStart), 7);
+    await window.keyboard.press('ArrowLeft');
+    assert.equal(await marked.evaluate(editor => editor.selectionStart), 6);
+    await marked.evaluate(editor => {
+      editor.dispatchEvent(new CompositionEvent('compositionstart', {bubbles: true}));
+      editor.setRangeText('한글', editor.selectionStart, editor.selectionEnd, 'end');
+      editor.dispatchEvent(new InputEvent('input', {data: '한글', inputType: 'insertCompositionText', isComposing: true, bubbles: true}));
+      editor.dispatchEvent(new CompositionEvent('compositionend', {data: '한글', bubbles: true}));
+    });
+    assert.equal(await marked.inputValue(), 'before한글\ufdd0after');
+    await window.keyboard.press('ArrowRight');
+    await window.keyboard.press('Backspace');
+    assert.equal(await marked.inputValue(), 'before한글after');
+    assert.equal(await window.locator('.marker-mirror .inline-marker').count(), 0);
+    await window.locator('#applyText').click();
+    assert.equal(await window.locator('#changes .change').count(), 1);
   },
   'palette': async () => {
     await sample();

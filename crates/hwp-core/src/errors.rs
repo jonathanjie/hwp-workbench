@@ -56,6 +56,7 @@ pub fn recovery(code: &str) -> Recovery {
  "REGEX_LIMIT" => ("Use a regex pattern of at most 256 characters, or use literal search.", true),
  "REGEX_UNSUPPORTED" => ("Use literals, character classes, escapes, dots and anchors only, or use literal search.", true),
  "CONTROL_TEXT" => ("Use plain text without tabs, newlines, native controls or invalid Unicode characters.", true),
+ "INLINE_MARKER" => ("Read the current node again. Keep or delete its original placeholders; do not add or duplicate them.", true),
  "BAD_PATH" => ("Supply a nonempty regular-file path inside the configured workspace.", true),
  "BAD_ROOT" => ("Choose an existing document subfolder as the workspace root, such as ~/Documents/HWP.", true),
  "OPEN_FORMAT" => ("Choose an existing regular .hwp or .hwpx file inside the approved workspace.", true),

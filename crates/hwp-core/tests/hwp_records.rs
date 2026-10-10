@@ -319,6 +319,43 @@ fn document_with_paragraph(text: &str, shapes: &[(u32, u32)]) -> hwp_core::docum
     hwp_core::document::Document::new(cfb.rewrite(&changes).unwrap(), "test.hwp").unwrap()
 }
 
+#[test]
+fn binary_space_controls_split_runs_and_remain_byte_identical() {
+    // HWP 5 codes 30 and 31 are one-unit non-breaking and fixed-width spaces.
+    let mut document = document_with_paragraph("앞\u{1e}중\u{1f}뒤", &[(0, 10)]);
+    assert_eq!(
+        document
+            .nodes
+            .iter()
+            .map(|node| node.text.as_str())
+            .collect::<Vec<_>>(),
+        ["앞", "중", "뒤"]
+    );
+    assert_eq!(
+        document
+            .nodes
+            .iter()
+            .map(|node| node.anchor["charOffset"].as_u64())
+            .collect::<Vec<_>>(),
+        [Some(0), Some(2), Some(4)]
+    );
+    set_text(&mut document, 1, "한글");
+    let saved = saved_document(&document);
+    let payload = &saved.hwp_sections["BodyText/Section0"].records[1].data;
+    assert_eq!(payload, &utf16("앞\u{1e}한글\u{1f}뒤\r"));
+}
+
+#[test]
+fn binary_text_cannot_invent_an_inline_placeholder() {
+    let mut document = document_with_paragraph("plain", &[(0, 10)]);
+    let node = &document.nodes[0];
+    let patch = serde_json::json!({"schemaVersion":1,"baseSha256":document.hash,"operations":[{"op":"set_text","nodeId":node.id,"expectedText":node.text,"text":"\u{fdd0}"}]});
+    assert_eq!(document.patch(&patch).unwrap_err().code, "INLINE_MARKER");
+    assert!(document.edits.is_empty());
+    let collision = document_with_paragraph("literal\u{fdd0}", &[(0, 10)]);
+    assert!(!collision.nodes[0].editable);
+}
+
 fn set_text(document: &mut hwp_core::document::Document, index: usize, text: &str) {
     let node = &document.nodes[index];
     let patch = serde_json::json!({"schemaVersion":1,"baseSha256":document.hash,"operations":[{"op":"set_text","nodeId":node.id,"expectedText":node.text,"text":text}]});

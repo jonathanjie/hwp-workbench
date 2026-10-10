@@ -225,6 +225,7 @@
 - **Trigger:** The first real user could not edit a normal government form. 한글 writes a default script pair (`Scripts/headerScripts.js`, `Scripts/sourceScripts.js`: document bindings and an empty `OnDocument_New`) into ordinary HWPX files, and the HWPX reader blocked every file with a `Scripts/` part. The HWP reader already exempted 한글's default stub; our self-authored fixtures had no scripts, so 527 tests and the differential runner all passed.
 - **Rule:** Before a release, open and edit at least one HWP and one HWPX file saved by 한글 (a public form will do), not only generated fixtures. When a safety check blocks editing, compare it with the equivalent check for the other format.
 - **Why:** Synthetic fixtures contain only what we thought of; real files carry the defaults of the program that wrote them.
+- **Follow-up (C2, 2026-10-10):** Childless inline spaces also made real consent rows read-only. Keep each native marker's bytes and a source-revision placeholder; test deletion of the first of two differently attributed markers. Compare placeholders through a reader projection, including conversion checks and anchors. rhwp Unicode export can omit nested lists even when its native cell paragraphs contain the exact text; check those native paragraphs before reporting missing text. Keep private document assertions boolean with summary-only failures: assertion dumps can copy the entire XML into a local log.
 
 ### Freeze source before counting baseline tests
 - **Date:** 2026-10-10

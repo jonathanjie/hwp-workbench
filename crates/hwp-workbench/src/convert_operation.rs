@@ -116,7 +116,7 @@ pub fn native_texts(payload: &[u8]) -> Result<Vec<String>> {
         grouped
             .entry((&node.part, node.paragraph))
             .or_default()
-            .push_str(&node.text);
+            .push_str(&document.reader_text(&node.id, &node.text));
         parts.insert(node.part.as_str());
     }
     let mut parts: Vec<_> = parts.into_iter().collect();

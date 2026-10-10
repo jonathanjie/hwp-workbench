@@ -144,15 +144,16 @@ pub fn assert_body_ranges(bytes: &[u8]) {
     let document = document(bytes);
     for node in &document.nodes {
         if let Some(offset) = node.anchor["charOffset"].as_u64() {
+            let reader_text = document.reader_text(&node.id, &node.text);
             let actual = native
                 .get_text_range_native(
                     node.anchor["section"].as_u64().unwrap() as usize,
                     node.anchor["paragraph"].as_u64().unwrap() as usize,
                     offset as usize,
-                    node.text.chars().count(),
+                    reader_text.chars().count(),
                 )
                 .unwrap();
-            assert_eq!(actual, node.text, "Anchor range differs: {}", node.id);
+            assert_eq!(actual, reader_text, "Anchor range differs: {}", node.id);
         }
     }
 }

@@ -1,4 +1,11 @@
 // Native layout offsets count Unicode scalars. DOM text ranges count UTF-16.
+export function readerText(node, text = node.text) {
+  if (!node.inlineMarkers) {
+    return text;
+  }
+  return text.replace(/[\ufdd0-\ufdef]/gu, marker => node.inlineMarkers[marker] ?? marker);
+}
+
 export function nativeLength(text) {
   return [...text].length;
 }

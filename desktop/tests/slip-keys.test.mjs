@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {ProofSlip} from '../slip.js';
+import {textError} from '../edit-model.js';
+
+test('marker validation keeps original markers and refuses invented or duplicate markers', () => {
+  assert.equal(textError('한\ufdd1글', '\ufdd0\ufdd1', true), null);
+  assert.equal(textError('한\ufdd2글', '\ufdd0\ufdd1', true), 'inlineMarker');
+  assert.equal(textError('\ufdd0\ufdd0', '\ufdd0', true), 'inlineMarker');
+});
 function key(modifiers) {
   let prevented = false;
   return {key: 'Enter', code: 'Enter', ...modifiers, preventDefault: () => { prevented = true; },
@@ -32,13 +39,15 @@ function editorSlip(t) {
   });
   t.mock.method(globalThis, 'clearTimeout', id => timers.delete(id));
   const makeElement = () => ({
-    append() {}, setAttribute() {}, focus() {}, replaceChildren() {},
+    children: [], style: {}, scrollHeight: 54,
+    append(...children) { this.children.push(...children); }, setAttribute() {}, focus() {},
+    replaceChildren(...children) { this.children = children; },
     addEventListener(name, callback) { this[name] = callback; },
     dispatch(name) { this[name]?.(); },
     parentElement: {focus() {}}
   });
   const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
-  globalThis.document = {createElement: makeElement};
+  globalThis.document = {createElement: makeElement, createTextNode: text => ({textContent: text})};
   t.after(() => {
     if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
     else delete globalThis.document;
@@ -107,4 +116,25 @@ test('closing or reopening a slip cancels pending composition staging', t => {
   slip.editor.value = 'other edit';
   flush();
   assert.deepEqual(staged, []);
+});
+
+test('marker display preserves textarea value and Korean composition beside markers', t => {
+  const {slip, staged, flush} = editorSlip(t);
+  const original = '앞\ufdd0뒤';
+  slip.open({id: 'one', text: original, editable: true}, original, 'hwpx', {}, true);
+  ProofSlip.prototype.update.call(slip);
+  assert.equal(slip.editor.value, original);
+  assert.equal(slip.markerMirror.children.filter(child => child.className === 'inline-marker').length, 1);
+  slip.editor.selectionStart = 2;
+  slip.editor.selectionEnd = 2;
+  slip.editor.dispatch('compositionstart');
+  slip.keydown(key({metaKey: true, isComposing: true, keyCode: 229}));
+  assert.deepEqual(staged, []);
+  slip.editor.value = '앞\ufdd0한글뒤';
+  slip.editor.dispatch('compositionend');
+  ProofSlip.prototype.update.call(slip);
+  assert.equal(slip.editor.selectionStart, 2);
+  assert.equal(slip.editor.selectionEnd, 2);
+  flush();
+  assert.deepEqual(staged, ['앞\ufdd0한글뒤']);
 });
