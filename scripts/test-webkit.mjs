@@ -424,8 +424,7 @@ const workflows = {
   },
   'themes-shortcuts': async () => {
     await sample();
-
-
+    let nativePage;
     for (const theme of ['Dark', 'Light']) {
       await command(`Theme ${theme}`);
       assert.equal(await window.evaluate(() => document.documentElement.dataset.theme), theme.toLowerCase());
@@ -434,6 +433,17 @@ const workflows = {
       if (await window.locator('.page').count()) {
         assert.equal(await window.locator('.page').first().evaluate(page => getComputedStyle(page).backgroundColor), 'rgb(255, 255, 255)');
       }
+      const pageImage = await window.locator('#pages .page-image').first().evaluate(image => {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        canvas.getContext('2d').drawImage(image, 0, 0);
+        return canvas.toDataURL('image/png');
+      });
+      if (nativePage) {
+        assert.equal(pageImage === nativePage, true, 'Native document pixels must stay the same in both themes');
+      }
+      nativePage = pageImage;
     }
     await shortcut('/');
     assert.ok(await window.locator('#shortcutItems .shortcut').count() >= 15);
@@ -781,6 +791,16 @@ if (args.length === 1 && args[0] === '--list') {
         }
       }
       console.error(`Workflow failed: ${currentWorkflow ?? 'startup/screenshots'}\n${error.stack}`);
+      if (window && !window.isClosed()) {
+        console.error('Renderer state:', await window.evaluate(() => ({
+          status: document.getElementById('status')?.textContent,
+          structure: document.querySelectorAll('.structure-page').length,
+          pages: document.querySelectorAll('.page-image').length,
+          marks: document.querySelectorAll('.control-mark').length,
+          focus: document.activeElement?.id,
+          idleCallback: typeof requestIdleCallback
+        })).catch(() => null));
+      }
       console.error(`Page console:\n${pageConsole.join('\n')}\nPage errors:\n${errors.join('\n')}\nHost log:\n${hostLog.join('')}`);
       console.log(JSON.stringify({host: `${process.platform}/${process.arch}`, browser: 'WebKit', checks, skipped, notTested,
         failure: {workflow: currentWorkflow ?? 'startup/screenshots', message: error.message}}, null, 2));

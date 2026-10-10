@@ -189,3 +189,9 @@
 - **Trigger:** The first Tauri window captured as an empty dark frame in five attempts. The page had loaded and sent IPC calls; the screen was locked, and earlier a leftover Electron test window covered it. WebKit does not paint views that are not visible.
 - **Rule:** Before native visual QA, check `CGSessionCopyCurrentDictionary()` for a locked screen and list the windows in front. Use headless WebKit for visual checks while the user is away. Stop every test app you start, and confirm that it exited (`kill -0`); an unsaved-changes prompt can block a normal quit.
 - **Why:** Playwright's Electron screenshots render without the screen; native window captures do not.
+
+### Qualify renderer APIs and startup in WebKit
+- **Date:** 2026-10-10
+- **Trigger:** The WebKit control-mark test timed out after preview fell back to structure view; review Tab navigation skipped buttons; Rust file-open handoffs stayed queued.
+- **Rule:** Use a cancellable timer fallback when idle callbacks are unavailable. Give review buttons explicit tab stops. Send the initial handoff-ready signal after event listeners are installed, and wait for subscription registration before releasing queued opens. Preserve the browser assertions and test both engines.
+- **Why:** WebKit lacks idle callbacks and skips implicit button tab stops in its default keyboard mode. The Rust host requires a renderer readiness signal that Electron's load event previously supplied.

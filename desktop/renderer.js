@@ -570,6 +570,10 @@ function renderReview() {
     group.append(...changeCards(model, revert, ids, 'remove'));
     return group;
   }));
+  // WebKit skips buttons in native Tab navigation without an explicit tabindex.
+  for (const button of $('reviewDialog').querySelectorAll('button')) {
+    button.tabIndex = 0;
+  }
   $('reviewSummary').textContent = t('reviewSummary', {n: Object.keys(model.edits).length, pages: pageView.entries.length || $('pages').children.length});
   $('reviewWarnings').replaceChildren(...compatibilityTags(documentData));
 }
@@ -1127,3 +1131,5 @@ updateControls();
 renderRecent();
 
 agentsCard.refresh();
+// The Rust host waits for the renderer's handoff listener before delivering opens.
+call('handoffReady').catch(error => status('failed', {reason: errorReason(error)}, true));
