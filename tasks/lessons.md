@@ -201,3 +201,9 @@
 - **Trigger:** Save in place failed on exFAT in both engines: hard links are unsupported (errno 45), the exchange rename fails with `ENOTSUP` (45, not `EOPNOTSUPP` 102 on macOS), and the copy fallback then refused because exFAT invents a new inode number per lookup.
 - **Rule:** Try hard links and exchange first; on unsupported errors use verified exclusive copies and checked renames. Choose identity checks per volume (`fstatfs`): inodes where stable, else device, size, modification time and a descriptor-read SHA-256. Run the save probe on a mounted exFAT disk image (`hdiutil create -fs ExFAT`) as well as APFS; fault seams alone missed two of the three causes.
 - **Why:** USB drives shared with Windows are usually exFAT; documents opened from them must save.
+
+### Close stdin when you start Codex workers in the background
+- **Date:** 2026-10-10
+- **Trigger:** A background `codex exec ... "<prompt>"` worker ran for 6½ hours with 0.09 s of CPU time, no child processes and no session log. With a prompt argument, `codex exec` also reads a piped stdin to the end and appends it; the background shell never closed stdin, so the worker waited and did nothing.
+- **Rule:** Start background workers with `</dev/null`. When a worker gives no output for more than a few minutes, check its CPU time, child processes and newest session log before you wait longer.
+- **Why:** A worker that is waiting looks the same as a worker that is busy until you measure it.
