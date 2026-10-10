@@ -2200,10 +2200,12 @@ dependencies = [
  "hwp-verify",
  "quick-xml 0.42.0",
  "regex",
+ "rustix",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "tempfile",
+ "unicode-normalization",
  "zip",
 ]
 
@@ -2216,6 +2218,7 @@ dependencies = [
  "getrandom 0.4.3",
  "hex",
  "quick-xml 0.42.0",
+ "rhwp",
  "rustix",
  "serde",
  "serde_json",

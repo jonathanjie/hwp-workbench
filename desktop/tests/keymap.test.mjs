@@ -58,3 +58,13 @@ test('chord timers are called unbound, as browsers require', () => {
   assert.equal(press('KeyG', true), 'pending');
   assert.equal(press('KeyC'), 'controlMarks');
 });
+
+test('Windows scheme follows the 한글 2022 default map where we have the command', () => {
+  const keys = new Keymap({setTimer: () => 1, clearTimer: () => {}});
+  assert.equal(keys.match(event('F2', {ctrlKey: true})), 'replace');
+  assert.equal(keys.match(event('KeyG', {ctrlKey: true})), 'pending');
+  assert.equal(keys.match(event('KeyW')), 'fitWidth');
+  // Control+K starts 한글's Ctrl+K chords; only Command+K opens the palette.
+  assert.equal(keys.match(event('KeyK', {ctrlKey: true})), null);
+  assert.equal(keys.match(event('KeyK', {metaKey: true})), 'palette');
+});

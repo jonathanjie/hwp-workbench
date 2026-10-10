@@ -60,6 +60,8 @@ impl Drop for Fixture {
 }
 fn reset_hooks() {
     TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
+    TEST_INODE.with(|inode| inode.set(None));
+    TEST_STABLE_INODES.with(|stable| stable.set(None));
     TEST_RANDOM.with(|random| *random.borrow_mut() = None);
     TEST_TIMESTAMP.with(|timestamp| *timestamp.borrow_mut() = None);
 }
@@ -604,4 +606,781 @@ fn external_revision_between_rollback_check_and_exchange_is_kept() {
     });
     assert_eq!(f.replace().unwrap_err().code, "SOURCE_CHANGED");
     assert_eq!(fs::read(f.path()).unwrap(), b"external raced rollback");
+}
+
+#[test]
+fn unsupported_exchange_publication_uses_checked_rename() {
+    for code in ["ENOTSUP", "EOPNOTSUPP", "EINVAL"] {
+        let f = Fixture::new();
+        fail_once("publish", code);
+        assert_eq!(f.replace().unwrap(), sha256(b"edited bytes"));
+        assert_eq!(fs::read(f.path()).unwrap(), b"edited bytes");
+        assert_eq!(fs::metadata(f.path()).unwrap().mode() & 0o777, 0o640);
+        f.no_temporary();
+    }
+}
+
+#[test]
+fn unsupported_exchange_rollback_uses_checked_rename() {
+    for publication_fallback in [false, true] {
+        let f = Fixture::new();
+        hook(move |step| match step {
+            "publish" if publication_fallback => {
+                Err(WorkbenchError::new("ENOTSUP", "unsupported swap"))
+            }
+            "publication_sync" => Err(write_error("injected sync failure")),
+            "rollback_exchange" => Err(WorkbenchError::new("ENOTSUP", "unsupported swap")),
+            _ => Ok(()),
+        });
+        assert_eq!(f.replace().unwrap_err().code, "WRITE_FAILED");
+        f.original();
+    }
+}
+
+#[test]
+fn fallback_rechecks_source_and_rollback_ownership() {
+    for point in ["publish", "rollback_exchange"] {
+        let f = Fixture::new();
+        let path = f.path();
+        hook(move |step| {
+            if step == "publication_sync" && point == "rollback_exchange" {
+                return Err(write_error("injected sync failure"));
+            }
+            if step == point {
+                fs::write(&path, b"external revision").unwrap();
+                return Err(WorkbenchError::new("ENOTSUP", "unsupported swap"));
+            }
+            Ok(())
+        });
+        assert_eq!(f.replace().unwrap_err().code, "SOURCE_CHANGED");
+        assert_eq!(fs::read(f.path()).unwrap(), b"external revision");
+        f.no_temporary();
+    }
+}
+
+#[test]
+fn unsupported_exchange_restores_raced_rollback_revision() {
+    let f = Fixture::new();
+    let path = f.path();
+    hook(move |step| {
+        if step == "publication_sync" {
+            return Err(write_error("injected sync failure"));
+        }
+        if step == "rollback_exchange" {
+            fs::write(&path, b"external raced rollback").unwrap();
+        }
+        if step == "rollback_restore_exchange" {
+            return Err(WorkbenchError::new("ENOTSUP", "unsupported swap"));
+        }
+        Ok(())
+    });
+    assert_eq!(f.replace().unwrap_err().code, "SOURCE_CHANGED");
+    assert_eq!(fs::read(f.path()).unwrap(), b"external raced rollback");
+    f.no_temporary();
+}
+
+#[test]
+fn fallback_rollback_sync_failure_reports_existing_recovery() {
+    let f = Fixture::new();
+    hook(move |step| match step {
+        "publish" | "rollback_exchange" => Err(WorkbenchError::new("ENOTSUP", "unsupported swap")),
+        "publication_sync" | "fallback_rollback_sync" => Err(write_error("injected sync failure")),
+        _ => Ok(()),
+    });
+    let error = f.replace().unwrap_err();
+    assert_eq!(error.code, "WRITE_FAILED");
+    assert_eq!(fs::read(f.path()).unwrap(), b"original document bytes");
+    let location = error.message.split("recovery kept at ").last().unwrap();
+    assert_eq!(
+        fs::read(f.directory.path().join(location)).unwrap(),
+        b"original document bytes"
+    );
+}
+
+#[test]
+fn fallback_restore_sync_failure_reports_existing_recovery() {
+    let f = Fixture::new();
+    let path = f.path();
+    hook(move |step| {
+        if step == "publication_sync" || step == "fallback_restore_sync" {
+            return Err(write_error("injected sync failure"));
+        }
+        if step == "rollback_exchange" {
+            fs::write(&path, b"external raced rollback").unwrap();
+        }
+        if step == "rollback_restore_exchange" {
+            return Err(WorkbenchError::new("ENOTSUP", "unsupported swap"));
+        }
+        Ok(())
+    });
+    let error = f.replace().unwrap_err();
+    assert_eq!(error.code, "WRITE_FAILED");
+    assert_eq!(fs::read(f.path()).unwrap(), b"external raced rollback");
+    let location = error.message.split("recovery kept at ").last().unwrap();
+    assert_eq!(
+        fs::read(f.directory.path().join(location)).unwrap(),
+        b"external raced rollback"
+    );
+}
+
+#[test]
+fn rollback_refuses_nonregular_displaced_source_without_blocking() {
+    for kind in ["directory", "fifo"] {
+        let f = Fixture::new();
+        let original_inode = fs::metadata(f.path()).unwrap().ino();
+        let directory = f.directory.path().to_owned();
+        hook(move |step| {
+            if step == "publication_sync" {
+                return Err(write_error("injected sync failure"));
+            }
+            if step == "rollback" {
+                let captured = fs::read_dir(&directory)
+                    .unwrap()
+                    .map(|entry| entry.unwrap().path())
+                    .find(|path| fs::metadata(path).unwrap().ino() == original_inode)
+                    .unwrap();
+                fs::remove_file(&captured).unwrap();
+                if kind == "fifo" {
+                    assert!(std::process::Command::new("mkfifo")
+                        .arg(&captured)
+                        .status()
+                        .unwrap()
+                        .success());
+                } else {
+                    fs::create_dir(&captured).unwrap();
+                }
+            }
+            Ok(())
+        });
+        let error = f.replace().unwrap_err();
+        assert_eq!(error.code, "WRITE_FAILED");
+        assert!(error.message.starts_with("Only regular files are allowed."));
+        let location = error.message.split("recovery kept at ").last().unwrap();
+        assert_eq!(
+            fs::read(f.directory.path().join(location)).unwrap(),
+            b"original document bytes"
+        );
+    }
+}
+
+#[test]
+fn unsupported_link_backup_publication_keeps_original_and_verified_backup() {
+    let f = Fixture::new();
+    fail_once("new_link", "ENOTSUP");
+    let backup = f
+        .workspace
+        .backup_existing("form.hwpx", b"original document bytes", None)
+        .unwrap();
+    let backup = f.directory.path().join(backup);
+    assert_eq!(fs::read(&backup).unwrap(), b"original document bytes");
+    assert_eq!(fs::metadata(backup).unwrap().mode() & 0o777, 0o600);
+    assert_eq!(fs::read(f.path()).unwrap(), b"original document bytes");
+    f.no_temporary();
+    assert_eq!(f.replace().unwrap(), sha256(b"edited bytes"));
+}
+
+#[test]
+fn unsupported_link_write_new_uses_exclusive_copy() {
+    for code in ["ENOTSUP", "EOPNOTSUPP", "EPERM", "EMLINK"] {
+        let f = Fixture::new();
+        fail_once("new_link", code);
+        f.workspace
+            .write_new("new.hwpx", b"new document bytes")
+            .unwrap();
+        let output = f.directory.path().join("new.hwpx");
+        assert_eq!(fs::read(&output).unwrap(), b"new document bytes");
+        assert_eq!(fs::metadata(output).unwrap().mode() & 0o777, 0o600);
+        assert_eq!(fs::read(f.path()).unwrap(), b"original document bytes");
+        f.no_temporary();
+    }
+}
+
+#[test]
+fn unsupported_link_recovery_retention_keeps_external_revision() {
+    for code in ["ENOTSUP", "EOPNOTSUPP", "EPERM", "EMLINK"] {
+        let f = Fixture::new();
+        let path = f.path();
+        hook(move |step| match step {
+            "publish" => Err(WorkbenchError::new("ENOTSUP", "unsupported swap")),
+            "after_publish" => {
+                fs::write(&path, b"external revision").unwrap();
+                Ok(())
+            }
+            "retain_recovery" => Err(WorkbenchError::new(code, "unsupported link")),
+            _ => Ok(()),
+        });
+        let error = f.replace().unwrap_err();
+        assert_eq!(error.code, "SOURCE_CHANGED");
+        assert_eq!(fs::read(f.path()).unwrap(), b"external revision");
+        let location = error
+            .message
+            .strip_prefix("Document changed after publication; recovery kept at ")
+            .unwrap();
+        assert!(location.starts_with(".hwp-workbench/backups/form.hwpx.recovery-"));
+        let backup = f.directory.path().join(location);
+        assert_eq!(fs::read(&backup).unwrap(), b"original document bytes");
+        assert_eq!(fs::metadata(backup).unwrap().mode() & 0o777, 0o600);
+        f.no_temporary();
+    }
+}
+
+#[test]
+fn unsupported_link_copy_refuses_existing_files_and_symlinks() {
+    for symlinked in [false, true] {
+        let f = Fixture::new();
+        let output = f.directory.path().join("new.hwpx");
+        let target = f.path();
+        hook(move |step| {
+            if step == "new_link" {
+                if symlinked {
+                    symlink(&target, &output).unwrap();
+                } else {
+                    fs::write(&output, b"another writer").unwrap();
+                }
+                return Err(WorkbenchError::new("ENOTSUP", "unsupported link"));
+            }
+            Ok(())
+        });
+        assert_eq!(
+            f.workspace
+                .write_new("new.hwpx", b"new bytes")
+                .unwrap_err()
+                .code,
+            "OUTPUT_EXISTS"
+        );
+        let output = f.directory.path().join("new.hwpx");
+        if symlinked {
+            assert!(output.is_symlink());
+        } else {
+            assert_eq!(fs::read(output).unwrap(), b"another writer");
+        }
+        assert_eq!(fs::read(f.path()).unwrap(), b"original document bytes");
+        f.no_temporary();
+    }
+}
+
+#[test]
+fn unsupported_link_copy_failures_remove_only_created_output() {
+    for point in [
+        "copy_write",
+        "copy_file_sync",
+        "copy_readback",
+        "new_directory_sync",
+    ] {
+        let f = Fixture::new();
+        let output = f.directory.path().join("new.hwpx");
+        hook(move |step| match step {
+            "new_link" => Err(WorkbenchError::new("ENOTSUP", "unsupported link")),
+            step if step == point => {
+                if point == "copy_write" {
+                    fs::write(&output, b"partial copy").unwrap();
+                }
+                Err(write_error("injected copy failure"))
+            }
+            _ => Ok(()),
+        });
+        assert_eq!(
+            f.workspace
+                .write_new("new.hwpx", b"new bytes")
+                .unwrap_err()
+                .code,
+            "WRITE_FAILED"
+        );
+        f.original();
+    }
+}
+
+#[test]
+fn unsupported_link_copy_detects_corruption_before_success() {
+    let f = Fixture::new();
+    let output = f.directory.path().join("new.hwpx");
+    hook(move |step| match step {
+        "new_link" => Err(WorkbenchError::new("ENOTSUP", "unsupported link")),
+        "copy_readback" => {
+            fs::write(&output, b"corrupted copy").unwrap();
+            Ok(())
+        }
+        _ => Ok(()),
+    });
+    assert_eq!(
+        f.workspace
+            .write_new("new.hwpx", b"new bytes")
+            .unwrap_err()
+            .code,
+        "VERIFY_FAILED"
+    );
+    f.original();
+}
+
+#[test]
+fn unsupported_link_copy_cleanup_preserves_replaced_destination() {
+    for symlinked in [false, true] {
+        let f = Fixture::new();
+        let output = f.directory.path().join("new.hwpx");
+        let target = f.path();
+        hook(move |step| match step {
+            "new_link" => Err(WorkbenchError::new("ENOTSUP", "unsupported link")),
+            "copy_readback" => {
+                if symlinked {
+                    fs::remove_file(&output).unwrap();
+                    symlink(&target, &output).unwrap();
+                } else {
+                    let replacement = output.with_file_name("other.tmp");
+                    fs::write(&replacement, b"new bytes").unwrap();
+                    fs::rename(replacement, &output).unwrap();
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        });
+        assert!(f.workspace.write_new("new.hwpx", b"new bytes").is_err());
+        let output = f.directory.path().join("new.hwpx");
+        if symlinked {
+            assert!(output.is_symlink());
+        } else {
+            assert_eq!(fs::read(output).unwrap(), b"new bytes");
+        }
+        assert_eq!(fs::read(f.path()).unwrap(), b"original document bytes");
+        f.no_temporary();
+    }
+}
+
+#[test]
+fn unsupported_link_recovery_copy_failure_reports_intact_private_source() {
+    for point in ["copy_file_sync", "copy_readback", "retention_backup_sync"] {
+        let f = Fixture::new();
+        let path = f.path();
+        hook(move |step| match step {
+            "publish" => Err(WorkbenchError::new("ENOTSUP", "unsupported swap")),
+            "after_publish" => {
+                fs::write(&path, b"external revision").unwrap();
+                Ok(())
+            }
+            "retain_recovery" => Err(WorkbenchError::new("ENOTSUP", "unsupported link")),
+            step if step == point => Err(write_error("injected copy failure")),
+            _ => Ok(()),
+        });
+        let error = f.replace().unwrap_err();
+        assert_eq!(error.code, "SOURCE_CHANGED");
+        let location = error
+            .message
+            .strip_prefix("Document changed after publication; recovery kept at ")
+            .unwrap();
+        assert!(location.ends_with(".tmp"));
+        assert_eq!(
+            fs::read(f.directory.path().join(location)).unwrap(),
+            b"original document bytes"
+        );
+        assert_eq!(fs::read(f.path()).unwrap(), b"external revision");
+        assert_eq!(
+            fs::read_dir(f.directory.path().join(".hwp-workbench/backups"))
+                .unwrap()
+                .count(),
+            0
+        );
+    }
+}
+
+#[test]
+fn unsupported_link_recovery_cleanup_failure_reports_verified_backup() {
+    for point in ["retention_cleanup", "retention_source_sync"] {
+        let f = Fixture::new();
+        let path = f.path();
+        hook(move |step| match step {
+            "publish" => Err(WorkbenchError::new("ENOTSUP", "unsupported swap")),
+            "after_publish" => {
+                fs::write(&path, b"external revision").unwrap();
+                Ok(())
+            }
+            "retain_recovery" => Err(WorkbenchError::new("ENOTSUP", "unsupported link")),
+            step if step == point => Err(write_error("injected cleanup failure")),
+            _ => Ok(()),
+        });
+        let error = f.replace().unwrap_err();
+        assert_eq!(error.code, "SOURCE_CHANGED");
+        let location = error
+            .message
+            .strip_prefix("Document changed after publication; recovery kept at ")
+            .unwrap();
+        assert!(location.starts_with(".hwp-workbench/backups/"));
+        assert_eq!(
+            fs::read(f.directory.path().join(location)).unwrap(),
+            b"original document bytes"
+        );
+        assert_eq!(fs::read(f.path()).unwrap(), b"external revision");
+    }
+}
+
+#[test]
+fn unsupported_link_other_errors_fail_closed() {
+    for code in ["EACCES", "EIO", "ENOSPC", "EXDEV", "WRITE_FAILED"] {
+        let f = Fixture::new();
+        fail_once("new_link", code);
+        assert_eq!(
+            f.workspace
+                .write_new("new.hwpx", b"new bytes")
+                .unwrap_err()
+                .code,
+            code
+        );
+        f.original();
+    }
+}
+
+#[test]
+fn unsupported_link_retained_copy_is_independent_and_verified() {
+    let f = Fixture::new();
+    let (parent, _) = f.workspace.parent("form.hwpx", false).unwrap();
+    let parent = parent.unwrap();
+    let recovery = f
+        .workspace
+        .private_file(&parent, b"recovery bytes", 0o640)
+        .unwrap();
+    let original_inode = fs::metadata(f.directory.path().join(&recovery))
+        .unwrap()
+        .ino();
+    fail_once("retain_recovery", "ENOTSUP");
+    let backup = f
+        .workspace
+        .retain_recovery("form.hwpx", &parent, &recovery)
+        .unwrap();
+    let backup = f.directory.path().join(backup);
+    assert_eq!(fs::read(&backup).unwrap(), b"recovery bytes");
+    let info = fs::metadata(&backup).unwrap();
+    assert_ne!(info.ino(), original_inode);
+    assert_eq!(info.mode() & 0o777, 0o600);
+    f.no_temporary();
+}
+
+#[test]
+fn unsupported_link_retention_collision_keeps_both_existing_files() {
+    for symlinked in [false, true] {
+        let f = Fixture::new();
+        let (parent, _) = f.workspace.parent("form.hwpx", false).unwrap();
+        let parent = parent.unwrap();
+        let recovery = f
+            .workspace
+            .private_file(&parent, b"recovery bytes", 0o600)
+            .unwrap();
+        f.workspace
+            .ensure_directory(".hwp-workbench/backups")
+            .unwrap();
+        TEST_RANDOM.with(|r| *r.borrow_mut() = Some("abcdefabcdef".into()));
+        TEST_TIMESTAMP.with(|t| *t.borrow_mut() = Some("20260101T000000Z".into()));
+        let collision = f
+            .directory
+            .path()
+            .join(".hwp-workbench/backups/form.hwpx.recovery-20260101T000000Z-abcdefabcdef");
+        if symlinked {
+            symlink(f.path(), &collision).unwrap();
+        } else {
+            fs::write(&collision, b"another operation").unwrap();
+        }
+        fail_once("retain_recovery", "ENOTSUP");
+        assert_eq!(
+            f.workspace
+                .retain_recovery("form.hwpx", &parent, &recovery)
+                .unwrap_err()
+                .code,
+            "WRITE_FAILED"
+        );
+        assert_eq!(
+            fs::read(f.directory.path().join(recovery)).unwrap(),
+            b"recovery bytes"
+        );
+        if symlinked {
+            assert!(collision.is_symlink());
+        } else {
+            assert_eq!(fs::read(collision).unwrap(), b"another operation");
+        }
+        assert_eq!(fs::read(f.path()).unwrap(), b"original document bytes");
+    }
+}
+
+#[test]
+fn unsupported_link_retention_detects_corruption_and_keeps_source() {
+    let f = Fixture::new();
+    let (parent, _) = f.workspace.parent("form.hwpx", false).unwrap();
+    let parent = parent.unwrap();
+    let recovery = f
+        .workspace
+        .private_file(&parent, b"recovery bytes", 0o600)
+        .unwrap();
+    let directory = f.directory.path().join(".hwp-workbench/backups");
+    let backups = directory.clone();
+    hook(move |step| match step {
+        "retain_recovery" => Err(WorkbenchError::new("ENOTSUP", "unsupported link")),
+        "copy_readback" => {
+            let backup = fs::read_dir(&backups)
+                .unwrap()
+                .next()
+                .unwrap()
+                .unwrap()
+                .path();
+            fs::write(backup, b"corrupt recovery").unwrap();
+            Ok(())
+        }
+        _ => Ok(()),
+    });
+    assert_eq!(
+        f.workspace
+            .retain_recovery("form.hwpx", &parent, &recovery)
+            .unwrap_err()
+            .code,
+        "VERIFY_FAILED"
+    );
+    assert_eq!(
+        fs::read(f.directory.path().join(recovery)).unwrap(),
+        b"recovery bytes"
+    );
+    assert_eq!(fs::read_dir(directory).unwrap().count(), 0);
+}
+
+#[test]
+fn unsupported_link_retention_rechecks_source_before_cleanup() {
+    let f = Fixture::new();
+    let (parent, _) = f.workspace.parent("form.hwpx", false).unwrap();
+    let parent = parent.unwrap();
+    let recovery = f
+        .workspace
+        .private_file(&parent, b"recovery bytes", 0o600)
+        .unwrap();
+    let path = f.directory.path().join(&recovery);
+    let target = path.clone();
+    hook(move |step| match step {
+        "retain_recovery" => Err(WorkbenchError::new("ENOTSUP", "unsupported link")),
+        "retention_cleanup" => {
+            let other = target.with_file_name("other.tmp");
+            fs::write(&other, b"recovery bytes").unwrap();
+            fs::rename(other, &target).unwrap();
+            Ok(())
+        }
+        _ => Ok(()),
+    });
+    let error = f
+        .workspace
+        .retain_recovery("form.hwpx", &parent, &recovery)
+        .unwrap_err();
+    assert_eq!(error.code, "SOURCE_CHANGED");
+    let location = error.details.unwrap()["recoveryPath"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        fs::read(f.directory.path().join(location)).unwrap(),
+        b"recovery bytes"
+    );
+    assert_eq!(fs::read(path).unwrap(), b"recovery bytes");
+}
+
+#[test]
+fn supported_link_recovery_retains_same_inode() {
+    let f = Fixture::new();
+    let (parent, _) = f.workspace.parent("form.hwpx", false).unwrap();
+    let parent = parent.unwrap();
+    let recovery = f
+        .workspace
+        .private_file(&parent, b"recovery bytes", 0o600)
+        .unwrap();
+    let original_inode = fs::metadata(f.directory.path().join(&recovery))
+        .unwrap()
+        .ino();
+    let backup = f
+        .workspace
+        .retain_recovery("form.hwpx", &parent, &recovery)
+        .unwrap();
+    let backup = f.directory.path().join(backup);
+    assert_eq!(fs::metadata(&backup).unwrap().ino(), original_inode);
+    assert_eq!(fs::read(backup).unwrap(), b"recovery bytes");
+    f.no_temporary();
+}
+
+// Model descriptor/path inode values synthesized anew on each FAT/exFAT lookup.
+fn unstable_inodes() {
+    TEST_STABLE_INODES.with(|stable| stable.set(Some(false)));
+    TEST_INODE.with(|inode| inode.set(Some(1)));
+}
+
+#[test]
+fn unstable_inode_backup_and_write_new_verify_bytes() {
+    let f = Fixture::new();
+    unstable_inodes();
+    hook(|step| match step {
+        "new_link" => Err(WorkbenchError::new("ENOTSUP", "unsupported link")),
+        _ => Ok(()),
+    });
+    let backup = f
+        .workspace
+        .backup_existing("form.hwpx", b"original document bytes", None)
+        .unwrap();
+    assert_eq!(
+        f.workspace.read(&backup).unwrap(),
+        b"original document bytes"
+    );
+    f.workspace.write_new("new.hwpx", b"new bytes").unwrap();
+    assert_eq!(f.workspace.read("new.hwpx").unwrap(), b"new bytes");
+    assert_eq!(
+        f.workspace.read("form.hwpx").unwrap(),
+        b"original document bytes"
+    );
+    f.no_temporary();
+}
+
+#[test]
+fn unstable_inode_replace_and_rollback_keep_original() {
+    for fail in [false, true] {
+        let f = Fixture::new();
+        unstable_inodes();
+        hook(move |step| match step {
+            "publish" | "rollback_exchange" => {
+                Err(WorkbenchError::new("ENOTSUP", "unsupported exchange"))
+            }
+            "readback" if fail => Err(WorkbenchError::new(
+                "VERIFY_FAILED",
+                "injected readback failure",
+            )),
+            _ => Ok(()),
+        });
+        if fail {
+            assert_eq!(f.replace().unwrap_err().code, "VERIFY_FAILED");
+            f.original();
+        } else {
+            assert_eq!(f.replace().unwrap(), sha256(b"edited bytes"));
+            assert_eq!(fs::read(f.path()).unwrap(), b"edited bytes");
+            f.no_temporary();
+        }
+    }
+}
+
+#[test]
+fn unstable_inode_recovery_retention_keeps_external_revision() {
+    let f = Fixture::new();
+    unstable_inodes();
+    let path = f.path();
+    hook(move |step| match step {
+        "publish" | "retain_recovery" => Err(WorkbenchError::new(
+            "ENOTSUP",
+            "unsupported volume operation",
+        )),
+        "after_publish" => {
+            fs::write(&path, b"external revision").unwrap();
+            Ok(())
+        }
+        _ => Ok(()),
+    });
+    let error = f.replace().unwrap_err();
+    assert_eq!(error.code, "SOURCE_CHANGED");
+    assert_eq!(fs::read(f.path()).unwrap(), b"external revision");
+    let recovery = error
+        .message
+        .strip_prefix("Document changed after publication; recovery kept at ")
+        .unwrap();
+    assert!(recovery.starts_with(".hwp-workbench/backups/"));
+    assert_eq!(
+        f.workspace.read(recovery).unwrap(),
+        b"original document bytes"
+    );
+    f.no_temporary();
+}
+
+#[test]
+fn stable_volume_rejects_changing_inode_numbers() {
+    let f = Fixture::new();
+    TEST_STABLE_INODES.with(|stable| stable.set(Some(true)));
+    TEST_INODE.with(|inode| inode.set(Some(1)));
+    assert_eq!(f.replace().unwrap_err().code, "SOURCE_CHANGED");
+    f.original();
+}
+
+#[test]
+fn unstable_inode_identity_checks_revision_fields_and_hash() {
+    let f = Fixture::new();
+    unstable_inodes();
+    let mut file = File::open(f.path()).unwrap();
+    let (_, original) = read_identity(&mut file).unwrap();
+    file.rewind().unwrap();
+    let (_, again) = read_identity(&mut file).unwrap();
+    assert_ne!(original.inode, again.inode);
+    assert!(same_file(&original, &again));
+    // A same-size external edit can preserve mtime; descriptor-read bytes bind it.
+    fs::write(f.path(), b"external document bytes").unwrap();
+    file.set_times(std::fs::FileTimes::new().set_modified(original.info.modified().unwrap()))
+        .unwrap();
+    file.rewind().unwrap();
+    let (_, changed_bytes) = read_identity(&mut file).unwrap();
+    assert!(same_revision(&original.info, &changed_bytes.info));
+    assert_ne!(original.hash, changed_bytes.hash);
+    assert!(!same_file(&original, &changed_bytes));
+    fs::write(f.path(), b"original document bytes").unwrap();
+    let changed_time = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_000);
+    file.set_times(std::fs::FileTimes::new().set_modified(changed_time))
+        .unwrap();
+    file.rewind().unwrap();
+    let (_, changed) = read_identity(&mut file).unwrap();
+    assert_eq!(original.hash, changed.hash);
+    assert!(!same_file(&original, &changed));
+    fs::write(f.path(), b"shorter").unwrap();
+    file.rewind().unwrap();
+    let (_, shorter) = read_identity(&mut file).unwrap();
+    assert!(!same_file(&original, &shorter));
+}
+
+#[test]
+fn unstable_inode_copy_failure_cleans_owned_partial_file() {
+    let f = Fixture::new();
+    unstable_inodes();
+    let output = f.directory.path().join("new.hwpx");
+    hook(move |step| match step {
+        "new_link" => Err(WorkbenchError::new("ENOTSUP", "unsupported link")),
+        "copy_file_sync" => {
+            fs::write(&output, b"partial").unwrap();
+            Err(write_error("injected copy failure"))
+        }
+        _ => Ok(()),
+    });
+    assert_eq!(
+        f.workspace
+            .write_new("new.hwpx", b"new bytes")
+            .unwrap_err()
+            .code,
+        "WRITE_FAILED"
+    );
+    f.original();
+}
+
+#[test]
+fn unstable_inode_copy_cleanup_keeps_replaced_destination() {
+    let f = Fixture::new();
+    unstable_inodes();
+    let output = f.directory.path().join("new.hwpx");
+    hook(move |step| match step {
+        "new_link" => Err(WorkbenchError::new("ENOTSUP", "unsupported link")),
+        "copy_readback" => {
+            let replacement = output.with_file_name("external.tmp");
+            fs::write(&replacement, b"new bytes").unwrap();
+            // Use a distinct FAT-representable timestamp even on a fast test host.
+            File::open(&replacement)
+                .unwrap()
+                .set_times(std::fs::FileTimes::new().set_modified(
+                    std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_000),
+                ))
+                .unwrap();
+            fs::rename(replacement, &output).unwrap();
+            Ok(())
+        }
+        _ => Ok(()),
+    });
+    assert_eq!(
+        f.workspace
+            .write_new("new.hwpx", b"new bytes")
+            .unwrap_err()
+            .code,
+        "SOURCE_CHANGED"
+    );
+    assert_eq!(f.workspace.read("new.hwpx").unwrap(), b"new bytes");
+    assert_eq!(
+        f.workspace.read("form.hwpx").unwrap(),
+        b"original document bytes"
+    );
+    f.no_temporary();
 }

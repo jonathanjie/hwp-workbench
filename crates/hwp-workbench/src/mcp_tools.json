@@ -1,0 +1,731 @@
+[
+  {
+    "name": "hwp_convert",
+    "description": "Report lossy HWP/HWPX/DOCX export through HWPX. DOC/ODT/RTF require LibreOffice. Writes a new file only with output plus acknowledgeRisks: true.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string",
+          "enum": [
+            "hwp",
+            "hwpx",
+            "docx"
+          ]
+        },
+        "output": {
+          "type": "string"
+        },
+        "acknowledgeRisks": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_session",
+    "description": "Read the desktop Agent link session and up to 200 bounded proposals and their outcomes. Does not write files.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_propose",
+    "description": "Validate a patch or edit preview and write a new Agent link proposal for desktop review. This does not edit the document.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "patch": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "schemaVersion": {
+                  "const": 1
+                },
+                "baseSha256": {
+                  "type": "string"
+                },
+                "operations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "set_text"
+                      },
+                      "nodeId": {
+                        "type": "string"
+                      },
+                      "expectedText": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "nodeId",
+                      "expectedText",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "maxItems": 1000
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "baseSha256",
+                "operations"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "patch": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "const": 1
+                    },
+                    "baseSha256": {
+                      "type": "string"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "op": {
+                            "const": "set_text"
+                          },
+                          "nodeId": {
+                            "type": "string"
+                          },
+                          "expectedText": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "nodeId",
+                          "expectedText",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1,
+                      "maxItems": 1000
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "baseSha256",
+                    "operations"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "patch"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "title",
+        "patch"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_inspect",
+    "description": "Return text nodes, full node IDs and compatibility warnings. Use compact to omit the view and package parts.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "compact": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_extract",
+    "description": "Return all document text without node references. Use read or search when you need IDs for editing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_validate",
+    "description": "Check bounded container and parse integrity. This does not certify Hancom layout or interoperability.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_plan",
+    "description": "Validate a hash-bound patch and return before/after changes and warnings without writing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "patch": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "schemaVersion": {
+                  "const": 1
+                },
+                "baseSha256": {
+                  "type": "string"
+                },
+                "operations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "set_text"
+                      },
+                      "nodeId": {
+                        "type": "string"
+                      },
+                      "expectedText": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "nodeId",
+                      "expectedText",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "maxItems": 1000
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "baseSha256",
+                "operations"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "patch": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "const": 1
+                    },
+                    "baseSha256": {
+                      "type": "string"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "op": {
+                            "const": "set_text"
+                          },
+                          "nodeId": {
+                            "type": "string"
+                          },
+                          "expectedText": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "nodeId",
+                          "expectedText",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1,
+                      "maxItems": 1000
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "baseSha256",
+                    "operations"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "patch"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "patch"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_apply",
+    "description": "Apply a reviewed hash-bound patch to a new same-format file and verify reopening. Requires risk acknowledgement and refuses existing destinations.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "patch": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "schemaVersion": {
+                  "const": 1
+                },
+                "baseSha256": {
+                  "type": "string"
+                },
+                "operations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "set_text"
+                      },
+                      "nodeId": {
+                        "type": "string"
+                      },
+                      "expectedText": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "nodeId",
+                      "expectedText",
+                      "text"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "maxItems": 1000
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "baseSha256",
+                "operations"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "patch": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "const": 1
+                    },
+                    "baseSha256": {
+                      "type": "string"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "op": {
+                            "const": "set_text"
+                          },
+                          "nodeId": {
+                            "type": "string"
+                          },
+                          "expectedText": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "nodeId",
+                          "expectedText",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1,
+                      "maxItems": 1000
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "baseSha256",
+                    "operations"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "patch"
+              ]
+            }
+          ]
+        },
+        "output": {
+          "type": "string"
+        },
+        "acknowledgeRisks": {
+          "const": true
+        }
+      },
+      "required": [
+        "path",
+        "patch",
+        "output",
+        "acknowledgeRisks"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_read",
+    "description": "Return paged text with short references mapped to full node IDs, table grid lines and warning codes. Call first to locate text and identify read-only nodes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_search",
+    "description": "Return matching full node IDs, character offsets, context and editability. Regex accepts fixed-width syntax only; repetitions, groups and branches are refused.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "regex": {
+          "type": "boolean"
+        },
+        "caseSensitive": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200000
+        }
+      },
+      "required": [
+        "path",
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_replace",
+    "description": "Return a hash-bound find/replace patch, diff and skipped targets; replacement text is literal. Supplying output and acknowledgeRisks saves a verified new file.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "output": {
+          "type": "string"
+        },
+        "acknowledgeRisks": {
+          "type": "boolean"
+        },
+        "regex": {
+          "type": "boolean"
+        },
+        "caseSensitive": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "find": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200000
+        },
+        "replaceWith": {
+          "type": "string",
+          "maxLength": 200000
+        },
+        "nodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 1000
+        }
+      },
+      "required": [
+        "path",
+        "find",
+        "replaceWith"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_fill",
+    "description": "Return a patch and resolved/unresolved HWPX form labels, choosing value cells to the right or below. Supplying output and acknowledgeRisks saves a new file; HWP cell mapping is unavailable.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "output": {
+          "type": "string"
+        },
+        "acknowledgeRisks": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "object",
+          "maxProperties": 1000,
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 200000
+          }
+        }
+      },
+      "required": [
+        "path",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "hwp_set",
+    "description": "Return a one-node text patch and diff using a full node ID or short reference. Supplying output and acknowledgeRisks saves a verified new file.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "output": {
+          "type": "string"
+        },
+        "acknowledgeRisks": {
+          "type": "boolean"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 200000
+        }
+      },
+      "required": [
+        "path",
+        "nodeId",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  }
+]
