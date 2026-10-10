@@ -90,8 +90,7 @@ encoding is in the JSON. A DMG checksum can be checked with `shasum -a 256 -c`.
 
 `npm run package:mac -- --config /absolute/path/temporary.json` selects a config
 copy. Resource source paths still refer to `app/src-tauri/`, not the copy's
-folder. Python, Node modules, Electron and unexpected symlinks are refused.
-The legacy Electron builder is `npm run package:mac:electron`.
+folder. Script runtimes, Node modules, embedded frameworks and unexpected symlinks are refused.
 
 For a later Developer ID build, use
 `npm run package:mac -- --identity 'Developer ID Application: Name (TEAMID)'`.

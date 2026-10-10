@@ -44,7 +44,7 @@ fn patch_envelopes_and_scalar_helpers_match_the_oracle() {
 }
 
 #[test]
-fn schema_version_keeps_python_numeric_equality() {
+fn schema_version_keeps_contract_numeric_equality() {
     for version in [json!(true), json!(1.0)] {
         let mut doc = document(&hwpx());
         let mut change = patch(&doc, &doc.nodes[0], "changed");

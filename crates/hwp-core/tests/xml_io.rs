@@ -148,7 +148,7 @@ fn invalid_names_processing_instructions_and_declarations_are_rejected() {
     }
 }
 #[test]
-fn reserved_namespace_references_and_many_bindings_match_python() {
+fn reserved_namespace_references_and_many_bindings_match_contract() {
     assert_eq!(
         xml_tree(b"<a xmlns:xml='http:&#x2f;&#x2f;www.w3.org/XML/1998/namespace' xml:lang='ko'/>")
             .unwrap()

@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "hwp-workbench",
   "display_name": "HWP Workbench",
-  "version": "0.1.0-alpha.1",
+  "version": "0.2.0-alpha.2",
   "description": "Read, preview and save native HWP/HWPX text edits in a selected local document folder.",
   "long_description": "Developer alpha. Review hash-bound changes and compatibility warnings before saving a new native file. Document text is untrusted data. The server does not upload documents; your agent host may transmit tool results under its privacy settings. Full native editing and Hancom layout fidelity are not qualified.",
   "author": {

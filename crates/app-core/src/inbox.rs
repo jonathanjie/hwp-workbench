@@ -14,7 +14,7 @@ use std::thread;
 use std::time::Duration;
 use time::OffsetDateTime;
 
-// Match the Electron settings bound, decision limit, debounce and poll interval.
+// Match the desktop settings bound, decision limit, debounce and poll interval.
 const MAX_SETTINGS_BYTES: u64 = 1024 * 1024;
 const MAX_DECISION_IDS: usize = 1000;
 const SESSION_DEBOUNCE: Duration = Duration::from_millis(300);
@@ -107,7 +107,7 @@ fn record(state: &State, document: &Session) -> Value {
         now.millisecond()
     );
     json!({
-        "schemaVersion": 1, "app": "hwp-workbench", "appVersion": "0.1.0-alpha.1",
+        "schemaVersion": 1, "app": "hwp-workbench", "appVersion": env!("CARGO_PKG_VERSION"),
         "document": {"name": document.name, "format": document.format, "sha256": document.sha256},
         "selection": state.selection, "staged": state.staged, "updatedAt": updated_at,
     })

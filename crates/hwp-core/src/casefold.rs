@@ -1,4 +1,4 @@
-//! Unicode full case folding for Python-compatible CFB name uniqueness.
+//! Unicode full case folding for CFB name uniqueness.
 // Only mappings that differ from simple lowercase need explicit expansions.
 pub(crate) fn casefold(text: &str) -> String {
     let mut folded = String::new();

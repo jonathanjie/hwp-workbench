@@ -351,7 +351,7 @@ fn test_24000_distinct_single_character_runs_convert_in_seconds() {
     let started = rustix::time::clock_gettime(rustix::time::ClockId::ProcessCPUTime);
     let report = run(&workspace, json!({"path":"runs.docx","to":"hwpx"})).unwrap();
     let finished = rustix::time::clock_gettime(rustix::time::ClockId::ProcessCPUTime);
-    // Match the Python process_time budget; scheduling delays are not CPU work.
+    // Match the CPU-time budget; scheduling delays are not CPU work.
     let elapsed = (finished.tv_sec - started.tv_sec) as f64
         + (finished.tv_nsec - started.tv_nsec) as f64 / 1_000_000_000.0;
     assert_eq!(report["available"], true);
@@ -398,7 +398,7 @@ fn malformed_native_exports_fail_without_publishing() {
 }
 
 #[test]
-fn direct_mapper_packages_match_frozen_python_bytes_and_member_order() {
+fn direct_mapper_packages_match_frozen_contract_bytes_and_member_order() {
     let snapshot: Value = serde_json::from_str(include_str!("data/mapper-packages.json")).unwrap();
     let (folder, workspace) = setup();
     for case in snapshot["cases"].as_array().unwrap() {

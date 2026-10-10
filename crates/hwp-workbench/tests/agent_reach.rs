@@ -29,9 +29,10 @@ fn cli(root: &Path, args: Vec<&str>, input: &str) -> Value {
 }
 fn environment(root: &Path) -> DesktopEnvironment {
     let project = root.join("checkout");
-    std::fs::create_dir_all(project.join("desktop")).unwrap();
-    std::fs::write(project.join("package.json"), "{}").unwrap();
-    std::fs::write(project.join("desktop/main.cjs"), "// source").unwrap();
+    std::fs::create_dir_all(project.join("app/src-tauri")).unwrap();
+    std::fs::create_dir_all(project.join("app/dist")).unwrap();
+    std::fs::write(project.join("app/src-tauri/Cargo.toml"), "[package]").unwrap();
+    std::fs::write(project.join("app/dist/index.html"), "app").unwrap();
     let directories = vec![root.join("Applications"), root.join("User Applications")];
     for directory in &directories {
         std::fs::create_dir(directory).unwrap();
@@ -245,25 +246,24 @@ fn test_open_prefers_packaged_app_in_both_application_folders() {
     }
 }
 #[test]
-fn test_open_source_electron_is_detached_and_uses_absolute_paths() {
+fn test_open_source_app_is_detached_and_uses_absolute_paths() {
     let root = workspace();
     let environment = environment(root.path());
-    let electron = environment.project.join("node_modules/.bin/electron");
-    std::fs::create_dir_all(electron.parent().unwrap()).unwrap();
-    std::fs::write(&electron, "#!/bin/sh\n").unwrap();
-    std::fs::set_permissions(&electron, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let executable = environment.project.join("target/debug/hwp-workbench-app");
+    std::fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    std::fs::write(&executable, "#!/bin/sh\n").unwrap();
+    std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700)).unwrap();
     let result = desktop_open::open_document_with(
         root.path(),
         root.path().join("form.hwpx").to_str().unwrap(),
         &environment,
         |request| {
-            assert_eq!(request.program, electron);
+            assert_eq!(request.program, executable);
             assert!(request.detached);
             assert_eq!(request.cwd.as_ref(), Some(&environment.project));
             assert_eq!(
                 request.args,
                 vec![
-                    environment.project.to_string_lossy().into_owned(),
                     "--open".to_owned(),
                     root.path().join("form.hwpx").to_string_lossy().into_owned()
                 ]
@@ -272,7 +272,7 @@ fn test_open_source_electron_is_detached_and_uses_absolute_paths() {
         },
     )
     .unwrap();
-    assert_eq!(result, json!({"opened":true,"via":"electron"}));
+    assert_eq!(result, json!({"opened":true,"via":"source-app"}));
 }
 #[test]
 fn test_open_rejects_unsafe_paths_before_launch() {
@@ -339,7 +339,7 @@ fn test_install_status_uninstall_and_path_substitution() {
                 .join(format!(".{target}/skills/hwp-workbench/SKILL.md")),
         )
         .unwrap();
-        assert!(text.contains("<!-- installed by hwp-workbench 0.1.0-alpha.1 -->"));
+        assert!(text.contains("<!-- installed by hwp-workbench 0.2.0-alpha.2 -->"));
         assert!(!text.contains("{{HWP_WORKBENCH}}"));
     }
     skill_install::install(&workspace, "all", false).unwrap();
@@ -402,7 +402,7 @@ fn test_symlink_targets_and_marker_files_are_not_followed() {
     let marker = external.path().join("marker.md");
     std::fs::write(
         &marker,
-        "<!-- installed by hwp-workbench 0.1.0-alpha.1 -->\nExternal",
+        "<!-- installed by hwp-workbench 0.2.0-alpha.2 -->\nExternal",
     )
     .unwrap();
     symlink(&marker, folder.join("SKILL.md")).unwrap();
@@ -956,5 +956,5 @@ fn version_prints_only_the_oracle_version() {
         ),
         0
     );
-    assert_eq!(output, b"0.1.0-alpha.1\n");
+    assert_eq!(output, b"0.2.0-alpha.2\n");
 }

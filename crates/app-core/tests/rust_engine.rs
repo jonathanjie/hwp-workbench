@@ -325,7 +325,7 @@ fn cancelled_rust_request_does_not_start_work() {
 #[test]
 fn factory_calls_native_service_without_an_interpreter_or_source_checkout() {
     let scratch = tempfile::tempdir().unwrap();
-    let engine = desktop_engine(scratch.path().join("no-python-source"));
+    let engine = desktop_engine(scratch.path().join("no-source-checkout"));
     let result = engine
         .call(scratch.path(), "capabilities", json!({}))
         .unwrap();

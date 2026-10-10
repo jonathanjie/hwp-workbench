@@ -347,7 +347,7 @@ impl CompoundFile {
     pub fn original(&self) -> &[u8] {
         &self.original
     }
-    /// Iterate streams in the Python directory traversal order, not lexical order.
+    /// Iterate streams in native directory traversal order, not lexical order.
     pub fn ordered_streams(&self) -> impl Iterator<Item = (&str, &[u8])> {
         self.path_order.iter().filter_map(|path| {
             self.streams

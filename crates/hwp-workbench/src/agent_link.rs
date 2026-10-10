@@ -456,7 +456,7 @@ fn publish_session(workspace: &Workspace, name: &str, record: &Value) -> Result<
         "Invalid session.",
     )?;
     workspace.ensure_directory(".hwp-workbench/proposals")?;
-    let mut payload = crate::mcp::python_json(record).into_bytes();
+    let mut payload = crate::mcp::contract_json(record).into_bytes();
     payload.push(b'\n');
     require(
         payload.len() <= MAX_LINK_FILE,
@@ -527,7 +527,7 @@ fn publish_outcome(workspace: &Workspace, name: &str, args: &Value) -> Result<Va
         )?;
     }
     // Desktop publication checks list types first, then the complete partition.
-    // The 1000-ID cap belongs to stored-outcome validation, as in Python.
+    // Apply the 1000-ID cap when validating stored outcomes.
     let outcome_ids = |key| -> Option<Vec<&str>> {
         args.get(key)?
             .as_array()?
@@ -572,7 +572,7 @@ fn publish_outcome(workspace: &Workspace, name: &str, args: &Value) -> Result<Va
     let stem = filename
         .strip_suffix(".json")
         .ok_or_else(|| WorkbenchError::new("BAD_ARGUMENTS", "Invalid proposal file."))?;
-    let mut bytes = crate::mcp::python_json(&outcome).into_bytes();
+    let mut bytes = crate::mcp::contract_json(&outcome).into_bytes();
     bytes.push(b'\n');
     workspace.write_new(
         &format!(".hwp-workbench/proposals/{stem}.outcome.json"),

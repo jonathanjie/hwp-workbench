@@ -183,7 +183,7 @@ fn bundled_cli_uses_resource_skills_and_prints_the_packaged_launcher() {
         "Expected the bundled skill template and launcher {}",
         launcher.display()
     );
-    assert!(skill.contains("<!-- installed by hwp-workbench 0.1.0-alpha.1 -->"));
+    assert!(skill.contains("<!-- installed by hwp-workbench 0.2.0-alpha.2 -->"));
     assert_eq!(
         fs::read_to_string(folder.join("references/patch-format.md")).unwrap(),
         format!("Bundled reference: {}\n", launcher.display())

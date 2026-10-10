@@ -1,10 +1,10 @@
-//! Frozen Python model evidence for all conversion-fixture inputs, not self-round-trips.
+//! Frozen contract model evidence for all conversion-fixture inputs, not self-round-trips.
 use hwp_convert::{read_docx, read_hwpx};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 #[test]
-fn exported_fixtures_match_frozen_python_models_and_loss_counts() {
+fn exported_fixtures_match_frozen_contract_models_and_loss_counts() {
     let cases: Vec<Value> = serde_json::from_str(include_str!("data/oracle.json")).unwrap();
     let directory = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/data");
     for case in cases {

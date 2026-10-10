@@ -77,31 +77,27 @@ pub fn open_document_with(
             workspace_root: workspace.root().to_owned(),
         }
     } else {
-        let electron = environment.project.join("node_modules/.bin/electron");
-        let executable = electron
+        let executable = environment.project.join("target/debug/hwp-workbench-app");
+        let available = executable
             .metadata()
             .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0);
         require(
-            environment.project.join("package.json").is_file()
-                && environment.project.join("desktop/main.cjs").is_file()
-                && executable,
+            environment.project.join("app/src-tauri/Cargo.toml").is_file()
+                && environment.project.join("app/dist/index.html").is_file()
+                && available,
             "APP_UNAVAILABLE",
-            "HWP Workbench.app and a source checkout with installed Electron were not found.",
+            "HWP Workbench.app and a built source app were not found; run npm run build:frontend and cargo build -p hwp-workbench-app.",
         )?;
         LaunchRequest {
-            program: electron,
-            args: vec![
-                environment.project.to_string_lossy().into_owned(),
-                "--open".to_owned(),
-                document,
-            ],
+            program: executable,
+            args: vec!["--open".to_owned(), document],
             cwd: Some(environment.project.clone()),
             detached: true,
             workspace_root: workspace.root().to_owned(),
         }
     };
     launch(&request)?;
-    Ok(json!({"opened":true,"via":if packaged {"app"} else {"electron"}}))
+    Ok(json!({"opened":true,"via":if packaged {"app"} else {"source-app"}}))
 }
 fn launch(request: &LaunchRequest) -> Result<()> {
     let failed = |error: String| {
@@ -206,7 +202,7 @@ fn source_child_with(
     new_session: impl FnOnce() -> Result<()>,
     execute: impl FnOnce(&LaunchRequest) -> Result<()>,
 ) -> Result<()> {
-    // The child repeats path checks and chooses only this checkout's Electron.
+    // The child repeats path checks and chooses only this checkout's built Tauri app.
     let source_environment = DesktopEnvironment {
         macos: false,
         application_directories: vec![],
@@ -299,16 +295,17 @@ mod tests {
     use std::cell::RefCell;
 
     #[test]
-    fn source_child_creates_session_before_fixed_electron_exec() {
+    fn source_child_creates_session_before_fixed_app_exec() {
         let root = tempfile::tempdir_in(std::env::temp_dir().canonicalize().unwrap()).unwrap();
         let project = root.path().join("checkout");
-        let electron = project.join("node_modules/.bin/electron");
-        std::fs::create_dir_all(electron.parent().unwrap()).unwrap();
-        std::fs::create_dir(project.join("desktop")).unwrap();
-        std::fs::write(project.join("package.json"), "{}").unwrap();
-        std::fs::write(project.join("desktop/main.cjs"), "// test").unwrap();
-        std::fs::write(&electron, "#!/bin/sh\n").unwrap();
-        std::fs::set_permissions(&electron, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let executable = project.join("target/debug/hwp-workbench-app");
+        std::fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(project.join("app/src-tauri")).unwrap();
+        std::fs::create_dir_all(project.join("app/dist")).unwrap();
+        std::fs::write(project.join("app/src-tauri/Cargo.toml"), "[package]").unwrap();
+        std::fs::write(project.join("app/dist/index.html"), "app").unwrap();
+        std::fs::write(&executable, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700)).unwrap();
         std::fs::write(root.path().join("form.hwpx"), b"document").unwrap();
         let environment = DesktopEnvironment {
             macos: true,
@@ -326,11 +323,10 @@ mod tests {
             },
             |request| {
                 assert_eq!(*calls.borrow(), vec!["setsid"]);
-                assert_eq!(request.program, electron);
+                assert_eq!(request.program, executable);
                 assert_eq!(
                     request.args,
                     vec![
-                        project.to_string_lossy().into_owned(),
                         "--open".to_owned(),
                         root.path().join("form.hwpx").to_string_lossy().into_owned()
                     ]
@@ -412,7 +408,7 @@ mod tests {
                 path,
                 &environment,
                 || panic!("invalid child path must not create a session"),
-                |_| panic!("invalid child path must not execute Electron"),
+                |_| panic!("invalid child path must not execute the app"),
             )
             .is_err());
         }

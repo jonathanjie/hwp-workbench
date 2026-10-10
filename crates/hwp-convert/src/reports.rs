@@ -1,4 +1,4 @@
-//! Loss and readable-paragraph evidence, with the Python report contract.
+//! Loss reports and readable-paragraph evidence for the shared service.
 use crate::model::RichDocument;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ pub const MAX_TEXT_DIFF_DETAILS: usize = 1000;
 
 pub fn mapper_report(source: &str, target: &str, document: &RichDocument) -> Value {
     // Retain the engine label for compatibility with existing service clients.
-    json!({"engine":"Python direct mapper","from":source,"to":target,"unsupported":document.unsupported,"layoutCertified":false,"scope":"supported properties only; fonts, pagination and Hancom layout are unqualified"})
+    json!({"engine":"direct mapper","from":source,"to":target,"unsupported":document.unsupported,"layoutCertified":false,"scope":"supported properties only; fonts, pagination and Hancom layout are unqualified"})
 }
 /// A native object can appear in both source and pivot reports. Count it once.
 pub fn merge_unsupported(target: &mut Map<String, Value>, incoming: &Map<String, Value>) {

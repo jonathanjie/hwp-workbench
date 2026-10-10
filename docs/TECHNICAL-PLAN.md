@@ -1,10 +1,10 @@
 # HWP Workbench — technical implementation plan
 
-Version 0.1.0-alpha.1 · 9 October 2026 · Internal/private · Apple Silicon macOS first
+Version 0.2.0-alpha.2 · 10 October 2026 · Developer alpha · Apple Silicon macOS first
 
 ## 1. Product contract
 
-The required product is a Korean/English desktop word processor that can fully edit HWP and HWPX while closely preserving official-document formatting. It must expose the same document operations to human users and agents, support private GitHub development, and start validation with publicly obtainable documents. These requirements have not been relaxed to text extraction or an HWP-to-DOCX converter.
+The required product is a Korean/English desktop word processor that can fully edit HWP and HWPX while closely preserving official-document formatting. It must expose the same document operations to human users and agents, support source development in the public repository, and start validation with publicly obtainable documents. These requirements have not been relaxed to text extraction or an HWP-to-DOCX converter.
 
 The initial build is a narrower, working engineering foundation. It implements conservative text edits, source preservation, explicit compatibility warnings, reviewable patches and shared desktop/CLI/MCP operations. It does not yet meet the full editing or visual-fidelity requirement. “Implemented,” “tested,” and “required for release” are tracked separately throughout this plan.
 
@@ -19,26 +19,28 @@ A supported official document must open without repair warnings in the reference
 ### Current, delivered architecture
 
 ```text
-Electron window: Korean/English renderer
-             │ narrow, validated preload IPC
+Tauri WebKit window: Korean/English renderer
+             │ named, validated invoke commands
              ▼
-Electron main: native dialogs, granted paths, patch recovery
-             │ bounded JSON subprocess request; no shell
+app-core: native dialogs, granted paths, document session and drafts
+             │ shared in-process Rust service
              ▼
-Python preservation engine ── shared invoke() operation layer
+Rust preservation engine + vendored rhwp verifier/exporter
              ▲                              ▲
        headless CLI                    stdio MCP server
-             │                              │
              └──── explicitly allowed local workspace ────┘
 
-Source bytes → parsed text/structure + opaque parts → validated patch
-             → native same-format writer → self-reopen checks
-             → atomic creation of a new output file
+Source bytes → parsed text/structure + opaque parts → complete validated patch
+             → native same-format writer → self-reopen and rhwp checks
+             → exclusive new output, or verified atomic save with backup
 ```
 
-The alpha uses plain modular JavaScript/HTML/CSS for the Electron renderer and a standard-library Python engine. It does not contain React, ProseMirror, Rust, a vendored HWP library, or a hidden conversion service. This differs from the earlier proposed stack intentionally: the first executable deliverable is a small inspectable preservation path that can be tested without external dependencies. Network restrictions prevented installing or independently exercising the candidate Rust engines in this environment.
-
-The important durable boundary is the operation contract, not the first language choice. A future native engine can implement `inspect`, `plan`, `apply`, rendering and structural operations behind the same versioned boundary. The GUI must never become the only place document manipulation is possible.
+Rust is the canonical engine. The same operation contract serves CLI, MCP and
+desktop. The Tauri shell is thin; session, drafts, agent inbox and path checks
+live in `crates/app-core`. The app executable also runs CLI and MCP commands.
+The modular HTML/CSS/JavaScript renderer uses rhwp WASM for native page display
+and receives only named operations through `window.hwp`. It never owns native
+serialization. The independent native reader runs in a bounded worker process.
 
 ### Production representation
 
@@ -46,9 +48,9 @@ Maintain three related representations: original native payloads and provenance;
 
 Do not use HTML, Markdown or a generic rich-text editor's internal state as the authoritative save format. They can serve as display or editing adapters, but a native operation must carry each change back to HWP/HWPX. Saving an HTML reconstruction would erase information that the browser never represented. HWPX uses an XML-based package, whereas legacy HWP uses a binary structure; native adapters are necessary for both [S1].
 
-A Rust core with a native CLI and a WASM/native renderer remains the preferred production candidate after evaluation. React and a mature rich-text toolkit remain optional UI components; selection, IME, history and clipboard support must not require flattening the native document model.
+The Rust core, CLI and rhwp renderer are the delivered architecture. React and a mature rich-text toolkit remain optional UI components; selection, IME, history and clipboard support must not require flattening the native document model.
 
-### Candidate-engine evaluation, not a dependency commitment
+### Compatibility references and alternatives
 
 | Candidate | Evaluate for | Required evidence before adoption |
 |---|---|---|
@@ -57,20 +59,20 @@ A Rust core with a native CLI and a WASM/native renderer remains the preferred p
 | `muin-company/handoc` | HWPX-specific parsing/UI integration | Actual legacy-HWP writing coverage and whether its model preserves opaque native data |
 | Official Hancom HWP SDK | A licensed compatibility path/reference | Written confirmation of Apple Silicon/macOS capabilities, redistribution terms, offline behavior and cost before procurement |
 
-The hwp-cli project itself distinguishes lossless no-op behavior from edited synthesis and explicitly does not claim Hancom parity [S2]. rhwp documents a Rust/WASM HWP viewer/editor [S3]; HanDoc advertises HWPX tooling but is not independently qualified for our complete HWP-writing requirement [S4]. No third-party engine is bundled, and no commercial SDK has been licensed or integrated. Run all candidates through the same test protocol rather than comparing README feature counts.
+The hwp-cli project itself distinguishes lossless no-op behavior from edited synthesis and explicitly does not claim Hancom parity [S2]. rhwp documents a Rust/WASM HWP viewer/editor [S3]; HanDoc advertises HWPX tooling but is not independently qualified for our complete HWP-writing requirement [S4]. rhwp 0.8.7 is vendored and bundled under its MIT licence. No commercial SDK has been licensed or integrated. Compare alternatives on the same corpus; README feature counts do not establish compatibility.
 
 ## 3. Initial implementation and evidence
 
 | Area | Implemented now | Evidence and remaining boundary |
 |---|---|---|
 | HWPX reading/writing | Bounded ZIP/XML parsing; namespace-aware text addresses; surgical changes to existing plain text; original-format save-as | Variable-length text and table-cell edits exercised on synthetic fixtures; full XML schema and Hancom behavior unverified |
-| HWP reading/writing | CFB v3/v4 traversal, mini-streams, FAT/DIFAT; compressed/uncompressed HWP5 paragraph text; equal-UTF-16-length replacement | Synthetic extended-record, allocation-table and preservation tests pass; no general text-length changes or native layout |
-| Preservation | No-op exact byte return; unchanged payload retention; source-hash/expected-text checks; post-write self-reparse | Self-consistency only, not an independent reader or Hancom acceptance |
-| Desktop | Bilingual shell, outline search, text selection/inspector, staged history, patch export, review dialog, staged draft recovery and save-copy wiring | 8 native Electron workflows pass on macOS arm64; real 2-Set Korean IME tested with OS key events (`reports/ime-macos.md`); packaging and signing not run |
-| Agent interface | CLI plus five stdio MCP tools; explicit workspace; structured diffs/errors | Core tests include subprocess CLI/MCP; compatibility profile is explicitly versioned |
-| Distribution | Private repo script, macOS bootstrap, developer app packaging, core CI workflow | Provided as source; no remote repository, CI execution, notarization or Mac binary produced |
+| HWP reading/writing | CFB v3/v4, mini-streams, FAT/DIFAT; HWP5 records; variable-length edits inside existing plain-text runs | Authored preservation tests; native controls retained; Hancom reflow unverified |
+| Preservation | Exact no-op bytes; untouched payload retention; complete hash/expected-text validation; native self-reparse and rhwp checks | Independent text-presence evidence does not certify layout or Hancom acceptance |
+| Desktop | Tauri shell, bilingual renderer, staged history/review, native save with backup, save-copy and agent links | WebKit workflows exercise renderer/backend; native QA and Hancom remain separate gates |
+| Agent interface | CLI plus 13 stdio MCP tools; explicit workspace; structured diffs/errors | Core tests include subprocess CLI/MCP; compatibility profile is explicitly versioned |
+| Distribution | Rust/Tauri Mac package builder, generated dependency notices and one macOS arm64 CI job | Developer alpha; CI execution and signed/notarized release qualification require separate evidence |
 
-The delivered report records **68 passing core/CLI/MCP tests on Linux/Python 3.13.5**, with no skips or failures. The renderer report records **15 checks and no browser errors**. The renderer was loaded from local source into an in-memory Chromium page because browser navigation was restricted; its filesystem bridge calls the real engine. This validates renderer behavior, not Electron security configuration, native file loading or a packaged Mac application.
+Current check commands and evidence boundaries are in `docs/TESTING.md`. The rewrite plan records earlier gate evidence. Keep fresh reports under `outputs/` with host and platform information; do not carry forward a historical result as a new pass.
 
 The synthetic fixtures are deliberately controlled parser/rewriter test inputs. Some opaque contents are placeholders, not complete native objects. They do not establish that a Hancom installation accepts any generated document. Passing round trips with our own reader and writer is necessary, but circular as an interoperability proof.
 
@@ -78,15 +80,15 @@ The synthetic fixtures are deliberately controlled parser/rewriter test inputs. 
 
 HWPX changes replace only selected text spans inside the original XML bytes. Unchanged ZIP members keep their uncompressed bytes; member order and metadata are carried forward where supported. Edited archives are not promised to be byte-identical ZIP containers. Existing preview and line-layout caches remain unchanged and may be stale. This alpha does not calculate a new page layout or maintain every text-relative attribute following a length-changing edit; those are explicit release blockers.
 
-HWP changes currently require exactly the same UTF-16 code-unit length for each selected text segment. Native controls remain untouched. The writer rebuilds compound-file allocation structures while retaining stream payloads not affected by the edit, then verifies the stream inventory. Equal character count does not imply equal glyph width, so even allowed edits can visually differ until verified against Hancom.
+HWP changes allow different UTF-16 code-unit lengths within existing plain-text runs, with paragraph lengths, style starts, range tags and cached line starts updated. Native controls remain untouched. The writer rebuilds compound-file allocation structures while retaining stream payloads not affected by the edit, then verifies the stream inventory. Any allowed text edit can change glyph width and layout; Hancom reflow remains unverified.
 
-The original source is never overwritten. Every edit batch is validated completely before mutation; its source SHA-256 and expected node text must match. A new output is written privately and atomically published only if the destination does not already exist. Unsupported/protected cases fail closed where detected. The current feature detector is not exhaustive, so a general layout-unverified warning remains mandatory.
+The `apply` and conversion paths never overwrite. Explicit `save` verifies the complete native result, keeps a private previous version, refuses disk conflicts and atomically replaces the opened file. Every edit batch is validated completely before mutation; its source SHA-256 and expected node text must match. A new output is written privately and atomically published only if the destination does not already exist. Unsupported/protected cases fail closed where detected. The current feature detector is not exhaustive, so a general layout-unverified warning remains mandatory.
 
-Protected documents and active content are not executed. The conservative HWP policy marks documents with script storage read-only, even when the storage might merely be an inert template. This will reject editing in some otherwise ordinary real files. Improve classification using actual fixtures; never quietly remove script/signature streams to make tests pass.
+Protected documents and active content are not executed. Script storage makes a document read-only except for the exact hash-qualified inert Hancom default stub; even that stub remains byte-identical and is never executed. Improve classification using actual fixtures; never quietly remove script/signature streams to make tests pass.
 
 ## 5. Public corpus and the independent reference
 
-Three source fixtures were located and recorded with immutable Git blob IDs and expected sizes: pyhwp alignment and border/fill HWP samples, plus an hwp-cli HWPX report with tables. The local downloader verifies blob identity and size and records SHA-256. These sources are engineering fixtures, not yet a representative government-form corpus. Downloads failed because external hostnames could not be resolved from the execution container; **their binary tests did not run**. Reports preserve that failure instead of counting missing files as success.
+Three source fixtures were located and recorded with immutable Git blob IDs and expected sizes: pyhwp alignment and border/fill HWP samples, plus an hwp-cli HWPX report with tables. The local downloader verifies blob identity and size and records SHA-256. These sources are engineering fixtures, not yet a representative government-form corpus. The Node downloader never replaces existing files. Rust corpus tests use files when present and report missing files as skipped. No public-file result is inferred from authored samples.
 
 Next, expand to at least 40 initially selected documents spanning public Korean forms, reports, procurement applications and correspondence, together with feature-focused synthetic cases. This is a proposed test target, not an achieved count. Log source URL, retrieval date, allowed test use, checksum, format/version, fonts and feature inventory. Keep confidential user examples outside source control. Public availability is not treated as unrestricted redistribution permission.
 
@@ -98,7 +100,7 @@ Use separate results for binary preservation, native structural validity, indepe
 
 ### M0 — Delivered foundation
 
-Current source, CLI/MCP, conservative writers, renderer workflow, synthetic tests and setup scripts. Exit evidence is in `reports/`. This milestone does not authorize use for submissions.
+Current source, CLI/MCP, conservative writers, renderer workflow, authored tests, a Rust/Tauri package builder and CI. Historical gate evidence is in the rewrite plan. This milestone does not authorize use for submissions.
 
 ### M1 — Real-format and Mac qualification
 
@@ -128,17 +130,24 @@ Exit: supported GUI actions have deterministic agent tests; stale or ambiguous r
 
 ### M5 — Internal release qualification
 
-Bundle the selected native engine/runtime into an Apple Silicon `.app`; remove the external Python prerequisite when appropriate. Pin dependencies and review licenses, generate an SBOM, add native crash recovery and migration tests, and perform parser fuzzing/security review. Implement a macOS-specific least-privilege worker boundary rather than relying only on the Electron renderer sandbox.
+The Rust engine and rhwp are bundled in the Apple Silicon Tauri app. Qualify clean-machine installation and native behaviour. Pin dependencies and review licenses, generate an SBOM, add native crash recovery and migration tests, and perform parser fuzzing/security review. Implement a macOS-specific least-privilege worker boundary for the native engine and worker.
 
-Use an authorized Apple Developer identity for Developer ID signing and notarization, secure release secrets outside the repository, and exercise clean-machine installation. Publish only to the approved private repository/release channel. The current ad-hoc packaging script is a developer convenience, not this release process.
+Use an authorized Apple Developer identity for Developer ID signing and notarization, secure release secrets outside the repository, and exercise clean-machine installation. Publish source and release artifacts only within the approved scope; exclude credentials and user documents. The current ad-hoc packaging script is a developer convenience, not this release process.
 
 Exit: clean Apple Silicon install/start/edit/save/reopen tests; valid signing/notarization results; passing real-corpus gates; explicit support matrix; reproducible release artifacts; an internal user acceptance session. macOS packaging can progress in parallel, but release cannot bypass document-fidelity gates.
 
 ## 7. Security, privacy and operational design
 
-The delivered renderer has no Node integration, uses a narrow preload API and runs with context isolation and sandbox flags. It displays text through text nodes rather than executing source-document HTML. Permission requests, external navigation and network requests are denied by app wiring. These choices follow Electron's recommended separation of untrusted content and privileged APIs [S5], but that wiring has not yet been exercised in Electron here.
+The renderer receives named Tauri commands and has a restrictive content security
+policy. It displays document text through text nodes, with no source-document
+HTML execution, generic shell command or filesystem API. Native dialogs and
+backend grants authorize paths. External navigation and requests are restricted.
 
-The engine bounds input and expansion sizes, rejects DTD/entity declarations and unsafe archive paths, and does not execute scripts or embedded programs. Filesystem access is restricted by explicit workspace roots, directory descriptors and no-follow opens. Python workers are not OS-sandboxed in this alpha; parser validation and a desktop subprocess timeout are not a complete security boundary.
+The Rust engine bounds input and expansion sizes, rejects DTD/entity declarations
+and unsafe archive paths, and never executes document code. Workspace access
+uses directory descriptors and no-follow opens. Native engine code and its
+verification worker are not OS-sandboxed; input validation and worker timeout
+are not a complete process security boundary. See `docs/SECURITY.md`.
 
 CLI/MCP roots are chosen by the process owner. An MCP acknowledgement is not human consent enforcement; configure the agent host's permissions and avoid broad roots such as the whole home directory. Document content is untrusted data, including any text claiming to instruct an agent. The workbench itself does not upload documents, but an external agent/model host may transmit tool results under its own privacy settings.
 
@@ -146,9 +155,12 @@ Staged draft files can contain confidential text and are stored locally without 
 
 ## 8. Handoff and next decision
 
-The source package includes engine, desktop sources, CLI/MCP entrypoints, test fixtures, actual test reports, screenshots, sample patches, a public-fixture downloader, a private publishing script, macOS bootstrap/packaging scripts and CI configuration. No GitHub repository was created, no macOS build was executed, and no official-file visual match is claimed.
-
-No further product requirements are needed to start M1. The next engineering decision is the native engine choice, based on real-format and Hancom reference results. User sample documents, a licensed reference environment, an approved GitHub owner and signing access are inputs to later qualification, not reasons to replace the full requirement with a text-only product.
+The source package contains the canonical Rust engine, CLI/MCP, thin Tauri shell,
+renderer, frozen authored fixtures, a download-only public-fixture tool and
+Rust/Node CI. Cut-over is recorded in the rewrite plan. Real public-file and
+Hancom qualification, font metrics and signed/notarized distribution remain
+release gates. Native QA requires a quiet minute and separate authorization
+when GUI launch is prohibited. No official-file visual match is claimed.
 
 ## Sources consulted
 
@@ -160,10 +172,9 @@ No further product requirements are needed to start M1. The next engineering dec
 
 [S4] HanDoc project: https://github.com/muin-company/handoc
 
-[S5] Electron security guidance: https://www.electronjs.org/docs/latest/tutorial/security
 
 [S6] Hancom HWP SDK product information: https://www.hancom.com/product/sdk/hwpSdk
 
 [S7] Public fixture provenance and fixed blob IDs: `fixtures/public-manifest.json`; linked upstream repositories remain the sources of truth for fixture terms and history.
 
-[S8] Local execution evidence: `reports/test-results.json`, `reports/test-log.txt`, `reports/ui-test-results.json`, `reports/public-fixture-downloads.json`, `reports/public-corpus-results.json`.
+[S8] Current checks: `docs/TESTING.md`; historical gate results: `docs/plans/2026-10-10-rust-tauri-rewrite.md`.

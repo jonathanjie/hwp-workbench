@@ -10,7 +10,7 @@ const HWP_UNITS_PER_MM: f64 = 7200.0 / 25.4;
 /// Read a finite native numeric field; absent or unreadable fields stay unknown.
 pub fn number(value: Option<&str>, divisor: f64) -> Option<f64> {
     let value: String = value?.trim().chars().map(ascii_decimal_digit).collect();
-    // Python float accepts an underscore only between decimal digits.
+    // Accept underscores only between decimal digits.
     let bytes = value.as_bytes();
     for (offset, byte) in bytes.iter().enumerate() {
         if *byte == b'_' {
@@ -30,7 +30,7 @@ pub(crate) fn ascii_decimal_digit(character: char) -> char {
         return character;
     }
     // Each Unicode decimal digit block contains ten consecutive code points.
-    // Python float accepts these digits, including the Unicode 16 blocks.
+    // Accept these decimal digits, including the Unicode 16 blocks.
     const DECIMAL_ZEROES: &[u32] = &[
         0x660, 0x6f0, 0x7c0, 0x966, 0x9e6, 0xa66, 0xae6, 0xb66, 0xbe6, 0xc66, 0xce6, 0xd66, 0xde6,
         0xe50, 0xed0, 0xf20, 0x1040, 0x1090, 0x17e0, 0x1810, 0x1946, 0x19d0, 0x1a80, 0x1a90,
@@ -147,7 +147,7 @@ fn character(header: &Element, run: Option<&Element>) -> Value {
     })
 }
 
-// Python's default :g formatter rounds to six significant digits and switches
+// The display formatter rounds to six significant digits and switches
 // to exponent notation below 1e-4 or at 1e6, after rounding.
 fn general_number(value: f64) -> String {
     let scientific = format!("{value:.5e}");

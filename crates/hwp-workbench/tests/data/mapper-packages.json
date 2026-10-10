@@ -1,5 +1,5 @@
 {
-  "provenance": "Frozen Python operation.convert outputs from existing self-authored tests/data sources; compare expanded bytes and member order, not ZIP compression.",
+  "provenance": "Frozen pre-port conversion outputs from existing self-authored tests/data sources (origin in git history); compare expanded bytes and member order, not ZIP compression.",
   "cases": [
     {
       "source": "fixtures-make_hwp-a1462a4723a91114.hwp",

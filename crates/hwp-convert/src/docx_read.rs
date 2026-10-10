@@ -552,7 +552,7 @@ impl<'a> Reader<'a> {
             self.document.loss("unsupportedImageTypes", 1);
             return Ok(None);
         }
-        // Python shares media bytes. Vec-backed Rust images need an allocation
+        // Each mapped image owns media bytes and needs an allocation
         // budget when many drawings refer to one large package member.
         self.mapped_image_bytes = self
             .mapped_image_bytes

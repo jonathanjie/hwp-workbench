@@ -1,29 +1,23 @@
 {
   "name": "hwp-workbench",
-  "version": "0.1.0-alpha.1",
+  "version": "0.2.0-alpha.2",
   "private": true,
   "description": "Internal HWP/HWPX editing workbench — preservation-first development alpha",
-  "main": "desktop/main.cjs",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "start": "electron .",
-    "test": "python3 scripts/run-tests.py",
-    "fixtures": "python3 scripts/generate-fixtures.py",
-    "check": "node desktop/check.cjs && node --check scripts/package-mac.cjs && bash -n scripts/hwp-workbench && node --check scripts/package-mac-tauri.mjs && node --check scripts/third-party-notices.mjs",
+    "start": "npm run build:frontend && cargo run -p hwp-workbench-app",
+    "test": "cargo test --workspace --locked && npm run test:desktop && npm run test:packaging && node --test tests/qa/*.test.mjs",
+    "check": "node desktop/check.cjs",
     "package:mac": "node scripts/package-mac-tauri.mjs",
     "test:webkit": "node scripts/test-webkit.mjs",
-    "test:electron": "node scripts/test-electron.mjs",
     "test:desktop": "node --test desktop/tests/*.test.*",
-    "test:differential": "python3 scripts/differential.py --candidate \"python3 -m hwp_workbench\"",
     "build:frontend": "node scripts/build-frontend.mjs",
-    "package:mac:electron": "node scripts/package-mac.cjs",
     "test:packaging": "node --test tests/packaging/*.test.mjs",
     "qa:native": "node scripts/qa/native-tauri.mjs"
   },
   "devDependencies": {
-    "electron": "44.5.1",
     "playwright": "1.64.0"
   },
   "license": "UNLICENSED",

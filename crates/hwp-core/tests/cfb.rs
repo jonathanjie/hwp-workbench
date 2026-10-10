@@ -2,7 +2,7 @@ use hwp_core::cfb::{p32, p64, u32, CompoundFile, END, FAT, FREE, MAGIC};
 use std::collections::BTreeMap;
 
 // Author directory topology independently; the seed has only zero-length streams.
-// Like the Python fixture, rewrite then allocates payload sectors under test.
+// Like the contract fixture, rewrite then allocates payload sectors under test.
 fn fixture(streams: &[(&str, Vec<u8>)], major: u16) -> Vec<u8> {
     let ss = if major == 3 { 512 } else { 4096 };
     let mut paths = BTreeMap::new();

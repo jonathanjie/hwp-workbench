@@ -111,7 +111,7 @@ fn test_text_checks_report_duplicate_deletion_and_reordering() {
 }
 
 #[test]
-fn text_reports_match_python_alignment_and_bounded_fallback() {
+fn text_reports_match_contract_alignment_and_bounded_fallback() {
     let cases: Vec<serde_json::Value> =
         serde_json::from_str(include_str!("data/text-reports.json")).unwrap();
     for case in cases {
@@ -125,7 +125,7 @@ fn text_reports_match_python_alignment_and_bounded_fallback() {
 }
 
 #[test]
-fn numeric_attributes_keep_python_integer_syntax_and_error_codes() {
+fn numeric_attributes_keep_bounded_integer_syntax_and_error_codes() {
     assert_eq!(integer(Some(" +１_۲ "), 0, -100, 100).unwrap(), 12);
     assert_eq!(
         integer(Some("9999999999999999999999999999"), 0, -100, 100)

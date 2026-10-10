@@ -128,7 +128,7 @@ impl Engine for RustEngine {
             return Err(Error::new("Unknown link action."));
         }
         check_size(&args, MAX_LINK_REQUEST, "Link request too large")?;
-        // The Python desktop helper exposed messages without engine error codes.
+        // Renderer errors contain messages without engine error codes.
         let invoke = || -> std::result::Result<Value, WorkbenchError> {
             hwp_workbench::agent_link::validate_document_name(name)?;
             let workspace = Workspace::new(root)?;

@@ -1,39 +1,33 @@
-name: Preservation core
+name: Rust and renderer
 on:
   push:
   pull_request:
 permissions:
   contents: read
 jobs:
-  core:
-    strategy:
-      # Report every platform; one failure should not hide the others.
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        python: ['3.11', '3.13']
-    runs-on: ${{ matrix.os }}
+  macos-arm64:
+    runs-on: macos-15
+    timeout-minutes: 45
     env:
-      # rhwp (independent reader) is needed for tests; the Electron and
-      # browser binaries are not.
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python }}
+      - name: Require Apple Silicon
+        run: test "$(uname -m)" = arm64
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy && rustup default stable
+      - run: cargo fmt --all -- --check
+      # The Tauri Cargo build script uses the renderer npm dependency.
       - run: npm ci --no-audit --no-fund
-      - run: python3 scripts/generate-fixtures.py
-      - run: python3 scripts/run-tests.py
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: npm run build:frontend
+      - run: cargo test --workspace --locked -- --include-ignored
       - run: npm run check
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: core-results-${{ matrix.os }}-${{ matrix.python }}
-          path: reports/test-results.json
-  # Desktop packaging, signing, and actual Apple Silicon UI smoke tests are
-  # explicit release gates, not implied by a successful core job.
+      - run: npm run test:desktop
+      - run: npm run test:packaging
+      - run: node --test tests/qa/*.test.mjs
+      - run: npx playwright install webkit
+      - run: npm run test:webkit

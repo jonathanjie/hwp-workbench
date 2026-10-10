@@ -50,7 +50,7 @@ fn pattern(query: &Value, regex: &Value, case_sensitive: &Value) -> Result<Patte
         for character in query.chars() {
             if escaped {
                 require(
-                    !python_digit(character) && character != 'g' && character != 'N',
+                    !unicode_digit(character) && character != 'g' && character != 'N',
                     "REGEX_UNSUPPORTED",
                     "Regex backreferences and named escapes are not supported.",
                 )?;
@@ -147,8 +147,8 @@ impl Pattern {
                 };
                 let before = text.get(..at).and_then(|prefix| prefix.chars().next_back());
                 let after = text.get(at..).and_then(|suffix| suffix.chars().next());
-                // Python Unicode word characters are letters, numbers and underscore.
-                let boundary = before.is_some_and(python_word) != after.is_some_and(python_word);
+                // Word characters are Unicode letters, numbers and underscore.
+                let boundary = before.is_some_and(unicode_word) != after.is_some_and(unicode_word);
                 match expected {
                     Assertion::Word(expected) => boundary == *expected,
                     Assertion::FinalEnd => at == text.len() || text.get(at..) == Some("\n"),
@@ -180,8 +180,8 @@ impl Pattern {
         matches
     }
 }
-fn python_word(character: char) -> bool {
-    // Alphabetic alone also includes combining marks, which Python excludes.
+fn unicode_word(character: char) -> bool {
+    // Alphabetic also includes combining marks; the word contract excludes them.
     let mut buffer = [0; 4];
     let value = character.encode_utf8(&mut buffer);
     static WORD: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
@@ -189,8 +189,8 @@ fn python_word(character: char) -> bool {
     WORD.get_or_init(|| Regex::new(r"^[\p{L}\p{N}_]$").expect("constant Unicode word class"))
         .is_match(value)
 }
-fn python_digit(character: char) -> bool {
-    // Python isdigit includes decimal digits and these nondecimal digit blocks;
+fn unicode_digit(character: char) -> bool {
+    // Digit escapes include decimal digits and these nondecimal digit blocks;
     // normalized superscripts and enclosed single digits use the ASCII check.
     if matches!(character, '\u{1369}'..='\u{1371}' | '\u{19da}' | '\u{2474}'..='\u{247c}' | '\u{2488}'..='\u{2490}' | '\u{24f5}'..='\u{24fd}' | '\u{24ff}' | '\u{2776}'..='\u{277e}' | '\u{2780}'..='\u{2788}' | '\u{278a}'..='\u{2792}' | '\u{10a40}'..='\u{10a43}' | '\u{10e60}'..='\u{10e68}' | '\u{11052}'..='\u{1105a}' | '\u{1f100}'..='\u{1f10a}')
     {
@@ -213,7 +213,7 @@ fn bad_escape(character: char, position: usize) -> WorkbenchError {
         format!("bad escape \\{character} at position {position}"),
     )
 }
-/// Translate only the permitted Python atoms. Boundary assertions are checked
+/// Translate only the permitted restricted-regex atoms. Boundary assertions are checked
 /// separately because the Rust word class also includes combining marks.
 fn translate_pattern(source: &str, insensitive: bool) -> Result<(String, Vec<(usize, Assertion)>)> {
     let characters: Vec<char> = source.chars().collect();
@@ -755,14 +755,14 @@ pub fn replace(
 fn hangul(c: char) -> bool {
     matches!(c,'\u{1100}'..='\u{11ff}'|'\u{3130}'..='\u{318f}'|'\u{ac00}'..='\u{d7a3}')
 }
-fn python_whitespace(character: char) -> bool {
+fn unicode_whitespace(character: char) -> bool {
     character.is_whitespace() || matches!(character, '\u{1c}'..='\u{1f}')
 }
 fn normalise_label(label: &str) -> String {
     let label = label
         .nfc()
         .collect::<String>()
-        .split(python_whitespace)
+        .split(unicode_whitespace)
         .filter(|part| !part.is_empty())
         .collect::<Vec<_>>()
         .join(" ");

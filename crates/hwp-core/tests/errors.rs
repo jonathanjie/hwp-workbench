@@ -18,7 +18,7 @@ fn error_json_matches_cli_and_mcp_detail() {
 }
 
 #[test]
-fn limits_recovery_and_require_match_python() {
+fn limits_recovery_and_require_match_contract() {
     assert_eq!(
         (MAX_FILE, MAX_EXPANDED, MAX_PART, MAX_NODES),
         (

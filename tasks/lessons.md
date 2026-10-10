@@ -225,3 +225,15 @@
 - **Trigger:** The first real user could not edit a normal government form. 한글 writes a default script pair (`Scripts/headerScripts.js`, `Scripts/sourceScripts.js`: document bindings and an empty `OnDocument_New`) into ordinary HWPX files, and the HWPX reader blocked every file with a `Scripts/` part. The HWP reader already exempted 한글's default stub; our self-authored fixtures had no scripts, so 527 tests and the differential runner all passed.
 - **Rule:** Before a release, open and edit at least one HWP and one HWPX file saved by 한글 (a public form will do), not only generated fixtures. When a safety check blocks editing, compare it with the equivalent check for the other format.
 - **Why:** Synthetic fixtures contain only what we thought of; real files carry the defaults of the program that wrote them.
+
+### Freeze source before counting baseline tests
+- **Date:** 2026-10-10
+- **Trigger:** C1 test discovery compiled files while edits were in progress and could not supply a valid baseline.
+- **Rule:** Count baseline tests from an unchanged snapshot before editing. If editing has started, use a read-only Git archive in `work/`, retain the discovery log, then remove that snapshot. Run final gates after source changes are complete.
+- **Why:** A build can read different files at different times and mix revisions.
+
+### Serialize checks that rebuild the renderer
+- **Date:** 2026-10-10
+- **Trigger:** C1 ran clippy beside WebKit; the Tauri build script replaced the HTTP test frontend with the production bridge, and a page reload failed.
+- **Rule:** Run Rust app builds and clippy before WebKit. Do not run them beside a browser suite that serves `app/dist/`; both write that folder. Confirm bridge errors before changing renderer code.
+- **Why:** Independent test commands can share mutable build output.

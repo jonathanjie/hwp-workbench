@@ -5,33 +5,6 @@ import vm from 'node:vm';
 
 const tauriSource = await fs.readFile(new URL('../tauri-bridge.js', import.meta.url), 'utf8').catch(() => '');
 const httpSource = await fs.readFile(new URL('../http-bridge.js', import.meta.url), 'utf8').catch(() => '');
-const preloadSource = await fs.readFile(new URL('../preload.cjs', import.meta.url), 'utf8');
-
-function preload() {
-  const calls = [];
-  let api;
-  const electron = {
-    contextBridge: {exposeInMainWorld: (name, value) => {
-      assert.equal(name, 'hwp');
-      api = value;
-    }},
-    ipcRenderer: {
-      invoke: async (channel, ...args) => {
-        calls.push({channel, args});
-        return 'result';
-      },
-      on: () => {},
-      removeListener: () => {}
-    },
-    webUtils: {getPathForFile: file => file.path}
-  };
-  vm.runInNewContext(preloadSource, {require: name => {
-    assert.equal(name, 'electron');
-    return electron;
-  }});
-  return {api, calls};
-}
-
 function createBridge(kind, options = {}) {
   const listeners = new Map();
   const calls = [];
@@ -78,9 +51,9 @@ for (const kind of ['tauri', 'http']) {
   const bridge = options => createBridge(kind, options);
   const test = (name, run) => nodeTest(`${kind}: ${name}`, run);
 
-  test('bridge preserves the exact preload API and command argument names', async () => {
+  test('bridge preserves the same renderer API and command argument names', async () => {
     const {api, calls} = bridge({results: {document_bytes: [0, 127, 255]}});
-    const reference = preload();
+    const reference = createBridge(kind === 'tauri' ? 'http' : 'tauri', {results: {document_bytes: [0, 127, 255]}});
     const methods = {
       keyScheme: ['keyboard_scheme', {scheme: 'windows'}, ['windows']],
       agentsStatus: ['agents_status', undefined, []],
@@ -123,12 +96,8 @@ for (const kind of ['tauri', 'http']) {
         assert.equal(result, 'result');
       }
       assert.deepEqual(JSON.parse(JSON.stringify(calls.at(-1))), JSON.parse(JSON.stringify({command, args})));
-      assert.equal(await reference.api[method](...values), 'result');
-      const [group, ...action] = command.split('_');
-      assert.deepEqual(JSON.parse(JSON.stringify(reference.calls.at(-1))), {
-        channel: `${group}:${action.join('-')}`,
-        args: values
-      });
+      await reference.api[method](...values);
+      assert.deepEqual(JSON.parse(JSON.stringify(reference.calls.at(-1))), JSON.parse(JSON.stringify(calls.at(-1))));
     }
   });
 
@@ -149,7 +118,7 @@ for (const kind of ['tauri', 'http']) {
     assert.deepEqual(JSON.parse(JSON.stringify(inboxes)), [{rows: []}]);
   });
 
-  test('documentBytes returns the Uint8Array exposed by Electron', async () => {
+  test('documentBytes returns native bytes as a Uint8Array', async () => {
     const {api} = bridge({results: {document_bytes: [0, 127, 255]}});
     const bytes = await api.documentBytes();
     assert.equal(Object.prototype.toString.call(bytes), '[object Uint8Array]');

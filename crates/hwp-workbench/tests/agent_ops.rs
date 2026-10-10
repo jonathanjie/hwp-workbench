@@ -449,7 +449,7 @@ fn fill_uses_native_span_instead_of_clamped_preview_span() {
     );
 }
 #[test]
-fn python_regex_escapes_unicode_classes_and_boundaries() {
+fn restricted_regex_escapes_unicode_classes_and_boundaries() {
     let d = section("a&#x345; ! Iİıi é 한글");
     for (query, count) in [
         (r"\ba\b", 1),
@@ -473,7 +473,7 @@ fn python_regex_escapes_unicode_classes_and_boundaries() {
     );
 }
 #[test]
-fn python_regex_permitted_escapes_and_exact_errors() {
+fn restricted_regex_permitted_escapes_and_exact_errors() {
     let d = section("😀 ! [] abc Iİıi ſK");
     for (query, count) in [
         (r"\U0001F600", 1),
@@ -513,7 +513,7 @@ fn python_regex_permitted_escapes_and_exact_errors() {
     }
 }
 #[test]
-fn python_regex_anchors_control_atoms_and_digit_restrictions() {
+fn restricted_regex_anchors_control_atoms_and_digit_restrictions() {
     let mut d = section("a");
     d.nodes[0].text = "a\n".into();
     let r = agent_ops::search(&d, &json!("$"), &json!(true), &json!(true), &json!(100)).unwrap();

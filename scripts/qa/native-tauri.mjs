@@ -153,8 +153,7 @@ async function exists(file, mode = constants.F_OK) {
   try { await fs.access(file, mode); return true; } catch { return false; }
 }
 function processes() { return parseProcesses(run('/bin/ps', ['-axo', 'pid=,ppid=,rss=,comm='])); }
-function isWorkbench(row) { return ['HWP Workbench', 'hwp-workbench', 'Electron'].includes(path.basename(row.command)) &&
-  (path.basename(row.command) !== 'Electron' || row.command.includes('HWP Workbench.app')); }
+function isWorkbench(row) { return ['HWP Workbench', 'hwp-workbench', 'hwp-workbench-app'].includes(path.basename(row.command)); }
 function isWebKit(row) { return /com\.apple\.WebKit\.(?:WebContent|GPU|Networking)(?:\b|$)/.test(row.command); }
 
 async function until(description, seconds, read) {

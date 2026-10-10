@@ -94,7 +94,7 @@ fn namespace(name: &QualifiedName, namespaces: &mut BTreeMap<String, String>) {
         }
     }
 }
-// Python constructs dynamic attributes before each element's fixed defaults.
+// Dynamic attributes precede each element's fixed defaults.
 fn attribute_order(name: &str) -> &'static [&'static str] {
     match name {
         "hp:tbl" => &[

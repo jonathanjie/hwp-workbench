@@ -39,7 +39,7 @@ fn read_package_with_limits(
         }
     })?;
     // The core preservation archive does not reject symlink modes. Conversion
-    // follows the stricter Python package policy before reading any payload.
+    // follows the stricter contract package policy before reading any payload.
     let mut metadata = ZipArchive::new(Cursor::new(payload)).map_err(bad_zip)?;
     for index in 0..metadata.len() {
         let member = metadata.by_index_raw(index).map_err(bad_zip)?;
@@ -140,7 +140,7 @@ pub fn integer(value: Option<&str>, default: i64, minimum: i64, maximum: i64) ->
     let Some(value) = value else {
         return Ok(default);
     };
-    let value = python_integer(value)?;
+    let value = bounded_integer(value)?;
     require(
         value >= minimum && value <= maximum,
         "LIMIT",
@@ -159,7 +159,7 @@ const DECIMAL_ZERO: &[u32] = &[
     0x11da0, 0x11f50, 0x16130, 0x16a60, 0x16ac0, 0x16b50, 0x16d70, 0x1ccf0, 0x1d7ce, 0x1d7d8,
     0x1d7e2, 0x1d7ec, 0x1d7f6, 0x1e140, 0x1e2f0, 0x1e4f0, 0x1e5f1, 0x1e950, 0x1fbf0,
 ];
-// Python rejects decimal strings above its default conversion limit, including
+// Bound decimal strings before parsing, including
 // leading zeroes. Keep that malformed-number behavior before range validation.
 const MAX_INTEGER_DIGITS: usize = 4300;
 fn decimal_digit(character: char) -> Option<u32> {
@@ -173,7 +173,7 @@ fn decimal_digit(character: char) -> Option<u32> {
     let difference = code.checked_sub(*DECIMAL_ZERO.get(index)?)?;
     (difference < 10).then_some(difference)
 }
-fn python_integer(text: &str) -> Result<i64> {
+fn bounded_integer(text: &str) -> Result<i64> {
     let invalid = || WorkbenchError::new("BAD_XML", "Invalid numeric document attribute.");
     let text = text.trim();
     let (negative, digits) = if let Some(text) = text.strip_prefix('-') {

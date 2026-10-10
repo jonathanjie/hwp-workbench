@@ -4,7 +4,7 @@ Describe the expected result and current result. Include whether the problem aff
 
 ## Reproduction
 
-App version, macOS/CPU, Python/Node version, HWP/HWPX version where known, and exact command or UI sequence. Record public-fixture source and hash where possible.
+App version, macOS/CPU, Rust/Node version, HWP/HWPX version where known, and exact command or UI sequence. Record public-fixture source and hash where possible.
 
 ## Evidence
 

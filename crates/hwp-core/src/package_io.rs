@@ -742,7 +742,7 @@ fn metadata_archive<'a>(
     layout: &ArchiveLayout,
 ) -> Result<ZipArchive<Cursor<Cow<'a, [u8]>>>> {
     let mut bytes = Cow::Borrowed(original);
-    // Python identifies members by the raw header name and ignores Info-ZIP
+    // Identify members by the raw header name and ignore Info-ZIP
     // Unicode Path aliases. Prevent zip's alias decoder from changing that key;
     // this shadow header is never serialized or exposed as document content.
     for entry in &layout.entries {

@@ -117,7 +117,7 @@ fn test_docx_distinct_numbering_converts_in_seconds() {
     let started = rustix::time::clock_gettime(rustix::time::ClockId::ProcessCPUTime);
     let output = write_docx(&document).unwrap();
     let finished = rustix::time::clock_gettime(rustix::time::ClockId::ProcessCPUTime);
-    // Match Python's process_time budget; host scheduling is not CPU work.
+    // Match the CPU-time budget; host scheduling is not CPU work.
     let elapsed = (finished.tv_sec - started.tv_sec) as f64
         + (finished.tv_nsec - started.tv_nsec) as f64 / 1_000_000_000.0;
     assert!(

@@ -1,4 +1,4 @@
-Apple Silicon Mac installation — bundled Python and Node; no Homebrew required.
+Apple Silicon Mac installation — bundled native runtime; no Homebrew required.
 
 # HWP Workbench 설치
 
@@ -21,7 +21,7 @@ Apple Silicon Mac installation — bundled Python and Node; no Homebrew required
    포함되지 않습니다. 글꼴 설치만으로 동일한 페이지 배치를 보장하지는 않습니다.
 5. 앱의 **Agents** 카드에서 Claude Code 또는 Codex를 선택합니다. 문서가 있는
    폴더를 지정하고 표시된 설정 명령을 본인의 터미널이나 에이전트에서 실행합니다.
-   Python, Node.js 또는 Homebrew를 따로 설치할 필요가 없습니다. Claude Code와
+   추가 런타임 또는 Homebrew를 따로 설치할 필요가 없습니다. Claude Code와
    Codex 클라이언트는 각각 설치되어 있어야 합니다.
 
 이 앱은 개발자 알파입니다. 공식 제출 전에는 저장한 파일을 Windows 한글에서 열어

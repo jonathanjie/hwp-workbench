@@ -39,8 +39,7 @@ This builds the frontend and the release binary, then writes `dist-mac/HWP Workb
 For development:
 
 ```bash
-npm run build:frontend                  # renderer into app/dist
-cargo run -p hwp-workbench-app          # the desktop app
+npm start                              # build renderer and run the desktop app
 cargo run -p hwp-workbench -- --help    # the CLI
 ```
 
@@ -86,24 +85,22 @@ MCP tools: `hwp_read`, `hwp_search`, `hwp_replace`, `hwp_fill`, `hwp_set`, `hwp_
 | `app/src-tauri` | Tauri shell; the app binary is also the CLI (`Resources/bin/hwp-workbench`) |
 | `desktop/` | The renderer (HTML/CSS/JS) |
 | `third_party/rhwp` | Vendored rhwp 0.8.7 library (MIT) |
-| `engine/`, `desktop/main.cjs` | Python engine and Electron shell: the reference implementation for differential tests |
 
 ## Tests
 
 ```bash
-cargo test --workspace                       # Rust engine, app backend, CLI and MCP
-cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --locked -- --include-ignored # Rust engine, app backend, CLI and MCP
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
 npm run check && npm run test:desktop        # renderer unit tests
 npm run test:webkit                          # 13 app workflows in WebKit against the Rust backend
 npm run test:packaging                       # packaging and licence notices
-python3 scripts/run-tests.py                 # Python reference engine
-python3 scripts/differential.py --candidate target/debug/hwp-workbench   # Rust against Python, 97 cases
 npm run qa:native                            # packaged app with real keys; nobody may type during the run
 ```
 
 Results, gates and open follow-ups are in [docs/plans/2026-10-10-rust-tauri-rewrite.md](docs/plans/2026-10-10-rust-tauri-rewrite.md). Contributors and coding agents: read [AGENTS.md](AGENTS.md) and [tasks/lessons.md](tasks/lessons.md) first.
 
-The bundled sample documents in `fixtures/generated/` are self-authored test files, not real or certified government forms. Public sample documents are listed in `fixtures/public-manifest.json` and downloaded on demand; they are not redistributed.
+The bundled sample documents in `fixtures/generated/` are self-authored test files, not real or certified government forms. Public sample documents are listed in `fixtures/public-manifest.json` and downloaded on demand with `node scripts/fetch-public-fixtures.mjs`; they are not redistributed. Their Rust corpus checks run when the files are present.
 
 ## Licence
 

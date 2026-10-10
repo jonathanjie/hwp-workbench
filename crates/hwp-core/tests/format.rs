@@ -79,7 +79,7 @@ fn number_retains_finite_values_and_ignores_unreadable_native_fields() {
 }
 
 #[test]
-fn line_spacing_uses_native_units_and_python_precision() {
+fn line_spacing_uses_native_units_and_contract_precision() {
     let original = fixture("review-form.hwpx");
     let document = Document::new(&original, "form.hwpx").expect("fixture opens");
     let header = std::str::from_utf8(document.part("Contents/header.xml").expect("header exists"))

@@ -29,7 +29,7 @@
     try {
       return await tauri.core.invoke(command, args);
     } catch (failure) {
-      // Tauri rejects with JSON values; Electron exposes an Error to callers.
+      // Convert backend JSON rejections into Error messages for the renderer.
       throw new Error(failure?.message ?? String(failure));
     }
   };

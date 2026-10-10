@@ -81,7 +81,7 @@ fn test_authored_hwpx_opens_and_renders_in_rhwp() {
     assert_fixture_and_example("review-form.hwpx", "review.patch.json", hwpx());
 }
 
-// Frozen Python oracle classifications, recorded before the Rust reader existed.
+// Frozen contract oracle classifications, recorded before the Rust reader existed.
 // Rejected and unsupported fixtures are separately reported, never counted as edits.
 fn oracle_classification() -> Value {
     serde_json::from_str(ORACLE_CLASSIFICATION).unwrap()

@@ -96,7 +96,7 @@ test('CLI symlink is relative and resolves to the app executable', async t => {
   assert.equal(await fs.realpath(link), await fs.realpath(path.join(root, 'Contents/MacOS/HWP Workbench')));
   await checkBundleContent(root, 'HWP Workbench');
 });
-for (const member of ['Contents/Resources/engine.py', 'Contents/Resources/node_modules/file', 'Contents/Frameworks/Electron Framework.framework/file']) {
+for (const member of ['Contents/Resources/engine.py', 'Contents/Resources/node_modules/file', 'Contents/Frameworks/Unexpected Framework.framework/file']) {
   test(`content check refuses ${member}`, async t => {
     const {checkBundleContent} = await packaging();
     const root = await temporary(t);

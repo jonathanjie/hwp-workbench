@@ -73,19 +73,14 @@ fn default_bundle_path_is_outside_checkout_and_signed_app_resources() {
 }
 
 #[test]
-fn app_identifier_matches_tauri_and_version_mismatch_is_explicit() {
+fn app_identifier_and_version_match_tauri_and_workspace() {
     let configuration: serde_json::Value =
         serde_json::from_str(include_str!("../../../app/src-tauri/tauri.conf.json")).unwrap();
     assert_eq!(configuration["identifier"], mcpb::APP_IDENTIFIER);
     let app_version = configuration["version"].as_str().unwrap();
     let server_version = hwp_workbench::service::VERSION;
-    if app_version != server_version {
-        // R9c open issue: keep the existing versions; fail on any new mismatch.
-        assert_eq!(
-            (app_version, server_version),
-            ("0.2.0-alpha.1", "0.1.0-alpha.1")
-        );
-    }
+    assert_eq!(app_version, server_version);
+    assert_eq!(server_version, env!("CARGO_PKG_VERSION"));
 }
 
 #[test]
@@ -110,10 +105,7 @@ fn test_build_archive_manifest_no_overwrite_and_packaged_startup() {
         manifest["compatibility"],
         serde_json::json!({"platforms":["darwin"]})
     );
-    assert!(!manifest["long_description"]
-        .as_str()
-        .unwrap()
-        .contains("Python"));
+    assert_eq!(manifest["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(
         manifest["user_config"]["workspace_directory"]["type"],
         "directory"

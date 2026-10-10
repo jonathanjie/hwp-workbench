@@ -592,7 +592,7 @@ fn short_reference_duplicate_and_complete_patch_checks_are_atomic() {
 }
 
 #[test]
-fn inspect_and_diff_shapes_follow_python_field_order() {
+fn inspect_and_diff_shapes_follow_contract_field_order() {
     for bytes in [hwpx(), hwp(true)] {
         let document = document(&bytes);
         let inspection = document.inspect();

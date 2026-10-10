@@ -7,9 +7,10 @@ import {fileURLToPath} from 'node:url';
 import {spawn, spawnSync} from 'node:child_process';
 import {createInterface} from 'node:readline';
 import {buildFrontend} from './build-frontend.mjs';
+import {cargoCommand, rustRpc} from './rust-cli.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const cargoWrapper = process.env.HWP_WORKBENCH_CARGO_WRAPPER || path.resolve(root, '../../hwp-workbench/work/cargo/cargo-offline.sh');
+const cargoWrapper = cargoCommand;
 const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
 const checks = [];
 const skipped = [];
@@ -18,7 +19,7 @@ const pageConsole = [];
 const hostLog = [];
 const notTested = ['Native WKWebView/Tauri shell', 'OS menus, real dialogs, clipboard and Finder',
   'OS file-open and second-instance delivery (backend handoff is tested)', 'Chromium CDP IME input (unavailable in WebKit)',
-  'Real Korean IME (manual: scripts/qa/real-ime.mjs)', 'Hancom reopen/layout', 'Signing/packaging'];
+  'Real Korean IME (manual: npm run qa:native)', 'Hancom reopen/layout', 'Signing/packaging'];
 let temporary;
 let profile;
 let browser;
@@ -28,13 +29,13 @@ let window;
 let currentWorkflow;
 
 function run(command, args) {
-  const result = spawnSync(command, args, {cwd: root, stdio: 'inherit', shell: false});
+  const result = spawnSync(command, args, {cwd: root, stdio: ['ignore', 'inherit', 'inherit'], shell: false});
   if (result.error) throw result.error;
   assert.equal(result.status, 0, `${command} failed`);
 }
 async function startHost() {
-  // Cargo uses the approved offline wrapper, including its configured shared target path.
-  run(cargoWrapper, ['build', '-p', 'app-testhost']);
+  // Cargo metadata supplies the target directory, including a configured shared target path.
+  run(cargoWrapper, ['build', '--locked', '-p', 'app-testhost']);
   const metadata = spawnSync(cargoWrapper, ['metadata', '--no-deps', '--format-version', '1'], {cwd: root, encoding: 'utf8', shell: false});
   assert.equal(metadata.status, 0, metadata.stderr);
   const binary = path.join(JSON.parse(metadata.stdout).target_directory, 'debug', process.platform === 'win32' ? 'app-testhost.exe' : 'app-testhost');
@@ -121,14 +122,7 @@ async function waitDocument(name) {
 }
 
 function engineRequest(directory, method, args) {
-  const python = process.env.HWP_WORKBENCH_PYTHON || 'python3';
-  const result = spawnSync(python, ['-m', 'hwp_workbench', 'rpc', '--root', directory], {
-    cwd: root, shell: false, encoding: 'utf8',
-    env: {...process.env, PYTHONPATH: path.join(root, 'engine'), PYTHONUTF8: '1'},
-    input: JSON.stringify({method, args})
-  });
-  assert.equal(result.status, 0, result.stderr);
-  return JSON.parse(result.stdout);
+  return rustRpc(directory, method, args);
 }
 
 // The backend writes agent files after the click handler returns.
@@ -169,27 +163,7 @@ async function waitPreviewText(text) {
 function lockedFixture(file) {
   // A self-authored UI regression fixture with one editable and one locked
   // field match. This fixture is not public-corpus or Hancom qualification.
-  const python = process.env.HWP_WORKBENCH_PYTHON || 'python3';
-  const script = String.raw`
-import re, sys, zipfile
-source, output = sys.argv[1:]
-with zipfile.ZipFile(source) as original, zipfile.ZipFile(output, 'w') as edited:
-    for info in original.infolist():
-        data = original.read(info.filename)
-        if info.filename == 'Contents/section0.xml':
-            counter = [0]
-            def text(match):
-                counter[0] += 1
-                if counter[0] == 1:
-                    return b'<hp:t>C2 match editable</hp:t>'
-                if counter[0] == 2:
-                    return b'<hp:fieldBegin><hp:t>C2 match locked</hp:t></hp:fieldBegin>'
-                return match.group(0)
-            data = re.sub(rb'<hp:t>.*?</hp:t>', text, data, flags=re.S)
-        edited.writestr(info, data)
-`;
-  const result = spawnSync(python, ['-c', script, path.join(root, 'fixtures/generated/review-form.hwpx'), file], {encoding: 'utf8'});
-  assert.equal(result.status, 0, result.stderr);
+  run(cargoWrapper, ['run', '--locked', '--quiet', '-p', 'hwp-core', '--example', 'locked-fixture', '--', file]);
 }
 
 const workflows = {
@@ -730,7 +704,6 @@ if (args.length === 1 && args[0] === '--list') {
     try {
       temporary = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'hwp-webkit-')));
       profile = path.join(temporary, 'profile');
-      run(process.env.HWP_WORKBENCH_PYTHON || 'python3', ['scripts/generate-fixtures.py']);
       await buildFrontend({testBuild: true});
       hostInfo = await startHost();
       browser = await webkit.launch({headless: true});

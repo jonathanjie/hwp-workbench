@@ -1,11 +1,11 @@
-// Keep the renderer's named document API identical to the Electron preload.
+// Keep the renderer's named document API identical across the desktop and test host.
 (() => {
   const tauri = window.__TAURI__;
   const invoke = async (command, args) => {
     try {
       return await tauri.core.invoke(command, args);
     } catch (failure) {
-      // Tauri rejects with JSON values; Electron exposes an Error to callers.
+      // Convert backend JSON rejections into Error messages for the renderer.
       throw new Error(failure?.message ?? String(failure));
     }
   };

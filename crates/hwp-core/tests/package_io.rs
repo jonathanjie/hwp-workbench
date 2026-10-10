@@ -368,7 +368,7 @@ fn deflate_suffix_and_stored_budgets_are_checked() {
     assert_eq!(first_central as u32, offset);
 }
 #[test]
-fn unicode_path_aliases_keep_python_raw_member_names() {
+fn unicode_path_aliases_keep_contract_raw_member_names() {
     let mut crc = flate2::Crc::new();
     crc.update(b"legacy");
     let mut extra = vec![1];

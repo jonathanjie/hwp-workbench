@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-// Match the Electron convenience cache: eight documents and 128 KiB per image.
+// Match the desktop convenience cache: eight documents and 128 KiB per image.
 const MAX_RECENT: usize = 8;
 const MAX_PNG_BYTES: usize = 128 * 1024;
 const PNG_PREFIX: &str = "data:image/png;base64,";

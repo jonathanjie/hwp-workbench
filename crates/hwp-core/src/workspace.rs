@@ -523,7 +523,7 @@ impl Workspace {
                 continue;
             }
             names.push(name.to_owned());
-            // Keep Python's semantics: limit zero collects all matches.
+            // A zero limit collects all matches.
             if names.len() == limit {
                 break;
             }
@@ -797,7 +797,7 @@ impl Workspace {
         let (_, original_info) = read_identity(&mut source)?;
         let original_hash = original_info.hash.clone();
         if !exchange(parent, displaced, name, "rollback_exchange")? {
-            // This mirrors Python's check-then-rename on volumes without swap.
+            // Use check-then-rename on volumes without atomic swap.
             // A writer can still race the final check and rename syscall.
             let restored = self.checked_recovery_rename(
                 parent,

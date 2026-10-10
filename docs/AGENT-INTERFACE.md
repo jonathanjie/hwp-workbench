@@ -1,6 +1,6 @@
 # Agent interface
 
-Version 0.1.0-alpha.1. CLI, desktop RPC and MCP call the same `service.invoke()` operations. All saves retain the native format. The preview and engine reopen checks do not certify Hancom layout or interoperability.
+Version 0.2.0-alpha.2. CLI, desktop RPC and MCP call the same Rust `service::invoke()` operations. All saves retain the native format. The preview and engine reopen checks do not certify Hancom layout or interoperability.
 
 ## Use from Claude Code, Codex or Claude Desktop
 
@@ -10,7 +10,7 @@ with no chat panel inside it.
 **Skill (Claude Code and Codex).** Install the recipes from this checkout:
 
 ```bash
-./scripts/hwp-workbench skill install
+hwp-workbench skill install
 ```
 
 Choose `--target claude` or `--target codex` for one client. Use `--dry-run` to
@@ -20,8 +20,8 @@ Detailed install and uninstall rules are below.
 **MCP one-liner.** Print the exact setup for your client, then run its output:
 
 ```bash
-./scripts/hwp-workbench mcp-config --client claude-code --root /absolute/path/to/document-folder
-./scripts/hwp-workbench mcp-config --client codex --root /absolute/path/to/document-folder
+hwp-workbench mcp-config --client claude-code --root /absolute/path/to/document-folder
+hwp-workbench mcp-config --client codex --root /absolute/path/to/document-folder
 ```
 
 Claude Code setup is `claude mcp add hwp-workbench --scope user -- <absolute CLI>
@@ -32,16 +32,12 @@ The directory must exist. `/` and the home directory itself are refused; choose
 a documents subfolder. `--client json` prints a `mcpServers` JSON block and
 `--client claude-desktop` prints the absolute bundle path.
 
-**Claude Desktop bundle.** On macOS with Python 3.11 or newer:
-
-```bash
-python3 scripts/build-mcpb.py
-```
-
-Double-click `dist/hwp-workbench.mcpb` and choose a document folder. The folder
-setting is required and has no default. Add `mcpb/icon.png` before distribution.
-Archive contents and extracted-server startup are tested; client installation
-is unverified. See the bundle details below.
+**Claude Desktop bundle.** Use the app's Agents panel to build and reveal
+`hwp-workbench-<version>.mcpb` in the app data directory. The bundle contains
+the Rust CLI, its icon and manifest. Choose a document folder during installation.
+The folder setting is required and has no default. Archive contents and
+extracted-server startup are tested; Claude Desktop installation is unverified.
+See the bundle details below.
 
 After saving a reviewed result, `open RESULT --root DIRECTORY` requests visual
 review. Desktop event handling belongs to the desktop branch; see its contract
@@ -81,7 +77,7 @@ Short references map to full native node IDs in `references`, for example:
 {"s0:t0": "Contents/section0.xml#text:0"}
 ```
 
-`sN` counts sections with text in document order; `tN` counts text nodes within that section. References and full IDs are scoped to the source revision. Editing operations and patches accept **full node IDs only**. Use the mapping or the IDs from `search`; do not guess them.
+`sN` counts sections with text in document order; `tN` counts text nodes within that section. References and full IDs are scoped to the source revision. Editing operations and patches accept full native IDs or source-scoped short references. Use the current read mapping or IDs from `search`; do not guess them.
 
 `total`, `offset` and `limit` count text nodes, including cell runs. A page can start or end within a table row. `nextOffset` is the next node index, or `null` at the end. Limits are 1–1000 nodes per call and offsets 0–100,000. `warnings` contains codes only; call compact inspect for warning details. Line breaks and grid separators in document text are escaped in this view.
 
@@ -132,7 +128,7 @@ HWP and HWPX both allow length changes inside an existing plain-text run. An HWP
 
 `save {path, patch, acknowledgeRisks: true, backupDirectory?}` replaces the opened native file. It accepts the same patch or preview envelope as `apply`. It checks the complete patch, source hash, exact expected text, native format and self-reparse before writing. An independent-reader reopen failure or missing edited text returns `VERIFY_FAILED`. An unavailable reader is reported as unavailable; empty-text searches remain independently unverified. Neither case is proof of Hancom compatibility.
 
-Before replacement, the engine keeps the original bytes in `<document folder>/.hwp-workbench/backups/` by default. `backupDirectory` (CLI `--backup-dir`) can select another folder **inside the approved workspace**. A desktop caller can select its user-data backup folder only when that folder is within its approved engine workspace; this change does not grant access outside the workspace or wire desktop Save. New backup folders use mode `0700`; backups use mode `0600` and exclusive, non-overwriting creation. Names are `<stem>.<UTC yyyymmddThhmmssZ>-<6 hex>.<ext>`. The newest ten backups for the exact document name are kept; other names, symlinks and directories are left intact. A failed save can leave a previous-version backup, but does not publish unverified document bytes.
+Before replacement, the engine keeps the original bytes in `<document folder>/.hwp-workbench/backups/` by default. `backupDirectory` (CLI `--backup-dir`) can select another folder **inside the approved workspace**. A desktop caller can select its user-data backup folder only when that folder is within its approved engine workspace; this does not grant access outside the workspace. Desktop Save calls this same operation. New backup folders use mode `0700`; backups use mode `0600` and exclusive, non-overwriting creation. Names are `<stem>.<UTC yyyymmddThhmmssZ>-<6 hex>.<ext>`. The newest ten backups for the exact document name are kept; other names, symlinks and directories are left intact. A failed save can leave a previous-version backup, but does not publish unverified document bytes.
 
 The source hash is checked again before backup and before atomic replacement in the same folder. The file mode is retained, the folder is synced, and the returned hash is read from disk. Recovery bytes remain available until those checks succeed. The result is `{saved: true, path, previousSha256, sha256, backup, independentCheck, warnings}`. Read the saved revision before another edit. Hash checks refuse changes already present at the checks; they do not lock out another application writing concurrently.
 
@@ -170,15 +166,15 @@ Each document subcommand accepts `--root DIRECTORY` (default: current directory)
 Examples using the generated, self-authored fixtures:
 
 ```bash
-./scripts/hwp-workbench read fixtures/generated/review-form.hwpx --limit 40
-./scripts/hwp-workbench search fixtures/generated/review-form.hwpx --query '기관명'
-./scripts/hwp-workbench replace fixtures/generated/review-form.hwpx \
+hwp-workbench read fixtures/generated/review-form.hwpx --limit 40
+hwp-workbench search fixtures/generated/review-form.hwpx --query '기관명'
+hwp-workbench replace fixtures/generated/review-form.hwpx \
   --find '검토 중' --replace-with '확정'  # Preview only.
-./scripts/hwp-workbench replace fixtures/generated/review-form.hwpx \
+hwp-workbench replace fixtures/generated/review-form.hwpx \
   --find '검토 중' --replace-with '확정' \
   -o work/review-edited.hwpx --acknowledge-risks
-./scripts/hwp-workbench fill fixtures/generated/review-form.hwpx --json work/fields.json
-./scripts/hwp-workbench set fixtures/generated/legacy-review.hwp \
+hwp-workbench fill fixtures/generated/review-form.hwpx --json work/fields.json
+hwp-workbench set fixtures/generated/legacy-review.hwp \
   --node-id 'BodyText/Section0#record:1:text:0' --text '마리나체인 검토 완'
 ```
 
@@ -194,22 +190,18 @@ rejects traversal and symlink components before launch. It is a CLI-only desktop
 action; RPC and MCP do not expose process launch.
 
 On macOS, if `HWP Workbench.app` exists in `/Applications` or `~/Applications`,
-the CLI runs `open -a "HWP Workbench" <absolute document path>`. Otherwise a source
-checkout with installed Electron launches
-`<repo>/node_modules/.bin/electron <repo> --open <absolute document path>` detached,
-with standard streams disconnected. Success returns
-`{"opened": true, "via": "app"}` or `{"opened": true, "via": "electron"}`.
+the CLI runs `open -a "HWP Workbench" <absolute document path>`. Otherwise a built
+source checkout launches `<repo>/target/debug/hwp-workbench-app --open <absolute document path>`
+detached, with standard streams disconnected. Build it with `npm run build:frontend`
+and `cargo build -p hwp-workbench-app` using the default target folder. Success returns
+`{"opened": true, "via": "app"}` or `{"opened": true, "via": "source-app"}`.
 Errors include a recovery hint. Success confirms dispatch, not that a document
 has rendered or passed a compatibility check.
 
-The desktop branch must acquire `app.requestSingleInstanceLock()` before creating
-windows and quit the secondary process if the lock is refused. It must handle
-the initial `--open` argument, `second-instance` argv containing `--open PATH`,
-and macOS `open-file` events (call `event.preventDefault()`). Queue paths received
-before app readiness, then open through the existing document-grant flow and
-show/focus the review window. Do not bypass the desktop path/format checks or
-discard staged changes when switching documents. These desktop handlers are
-outside this branch and are not tested by the CLI subprocess mocks.
+Tauri handles initial `--open` arguments, macOS file-open events and single-instance
+delivery. The app queues paths until renderer readiness, uses its existing
+document-grant flow, and requests confirmation before discarding staged changes.
+CLI launch tests use injected launchers and do not start the GUI.
 
 ## Agent link file contract
 
@@ -230,18 +222,18 @@ The notation above specifies field names and structure; files contain valid JSON
 
 Session, proposal and outcome reads are each bounded to 2 MiB. At most 200 files matching the complete document-name/timestamp/hex proposal filename are read per call; outcome files do not count as proposals. The bounded candidate list is sorted by filename but is not a paginated complete inbox. If a proposal is omitted, its outcome has not been checked. A broken, oversized, nonregular or symlink proposal appears as `status: "unreadable"`; unreadable proposal metadata is null and its operation count is 0. An unsafe link/proposals directory is refused. JSON parse failures do not crash the report.
 
-A valid proposal without an outcome is `pending`, or `stale` when its source hash differs. An outcome with the current proposal byte digest and exact node partition supplies `accepted`, `declined` or `partial`. Missing digest fields, stale digests, invalid partitions and unreadable outcomes return `needsReview`. These statuses report the recorded decision; they do not prove a saved output or Hancom qualification. No desktop Agent link UI is added by this engine/skill task; session publishing and blue-pencil accept/decline review belong to the desktop integration.
+A valid proposal without an outcome is `pending`, or `stale` when its source hash differs. An outcome with the current proposal byte digest and exact node partition supplies `accepted`, `declined` or `partial`. Missing digest fields, stale digests, invalid partitions and unreadable outcomes return `needsReview`. These statuses report the recorded decision; they do not prove a saved output or Hancom qualification. The desktop Agent link panel publishes sessions and records reviewed accept/decline outcomes through the same validated backend.
 
 ## Install the agent skill
 
 ```bash
-./scripts/hwp-workbench skill install
-./scripts/hwp-workbench skill install --target codex --dry-run
-./scripts/hwp-workbench skill status
-./scripts/hwp-workbench skill uninstall
+hwp-workbench skill install
+hwp-workbench skill install --target codex --dry-run
+hwp-workbench skill status
+hwp-workbench skill uninstall
 ```
 
-Install defaults to both targets (`--target all`). It copies `skills/hwp-workbench/` into `~/.claude/skills/hwp-workbench/` and/or `~/.codex/skills/hwp-workbench/`. It replaces `{{HWP_WORKBENCH}}` in both Markdown files with the absolute `scripts/hwp-workbench` path and appends `<!-- installed by hwp-workbench <version> -->` to `SKILL.md`. Keep this checkout at that path or reinstall after moving it.
+Install defaults to both targets (`--target all`). It copies `skills/hwp-workbench/` into `~/.claude/skills/hwp-workbench/` and/or `~/.codex/skills/hwp-workbench/`. It replaces `{{HWP_WORKBENCH}}` in both Markdown files with the absolute running CLI executable path and appends `<!-- installed by hwp-workbench <version> -->` to `SKILL.md`. Keep this checkout at that path or reinstall after moving it.
 
 All selected targets are checked before writes. An existing folder without this marker is refused; symlink parents, folders and marker files are not followed. A marked folder is backed up under its agent's `skills/.hwp-workbench-backup-<random>/skill/` before replacement; `install` returns these paths in `backups`. `--dry-run` validates targets and reports destinations without creating anything. Uninstall removes only currently marked folders, preserves unmarked folders and symlinks, and retains prior backups.
 
@@ -249,16 +241,16 @@ Status prints JSON `{claude: {installed, version, path}, codex: {installed, vers
 
 ## Claude Desktop bundle
 
-Build with `python3 scripts/build-mcpb.py`. It creates `dist/hwp-workbench.mcpb`
-and refuses an existing output. It includes only `manifest.json`, Python engine
-source and `mcpb/icon.png` as `icon.png` when present. Add that PNG before
-distribution; the manifest references it even when it is absent.
+The app's Agents panel creates a versioned bundle in
+`~/Library/Application Support/io.github.jonathanjie.hwp-workbench/`.
+`HWP_WORKBENCH_DATA_HOME` can select another app data folder. Existing output
+files are refused. The signed application is never changed.
 
-On macOS with Python 3.11 or newer, double-click the `.mcpb` and choose an approved
-document folder. The required folder setting has no default. The bundle starts
-the same stdio MCP server; it does not include Electron or the optional rhwp
-runtime. Independent rhwp checks report unavailable in this minimal bundle.
-Claude Desktop installation has not been tested by the archive/startup tests.
+The archive contains `manifest.json`, `icon.png` and `server/hwp-workbench`,
+with the current workspace version. It runs the same stdio MCP server and
+bundled rhwp verification worker. On macOS, double-click the bundle and choose
+an approved document folder; the required setting has no default.
+Claude Desktop installation has not been qualified by archive/startup tests.
 
 ## Recoverable errors
 
@@ -344,9 +336,9 @@ The result contains:
 {
   "from": "docx",
   "to": "hwpx",
-  "route": ["docx → hwpx (Python direct mapper)"],
+  "route": ["docx → hwpx (direct mapper)"],
   "engineReports": [
-    {"engine":"Python direct mapper","from":"docx","to":"hwpx","unsupported":{},"layoutCertified":false,"scope":"..."}
+    {"engine":"direct mapper","from":"docx","to":"hwpx","unsupported":{},"layoutCertified":false,"scope":"..."}
   ],
   "textCheck": {
     "performed":true,"source":"source document","scope":"...","normalisation":"...","comparison":"...",
@@ -362,8 +354,8 @@ The result contains:
 
 Numbers above illustrate the shape, not measured document results. Published outputs add `output` and `outputSha256`. Without both output and acknowledgement, those keys are absent and no output is written. Output must use the requested target extension, and the parent directory must exist inside the workspace. Existing files are refused.
 
-Native exports put rhwp's unmodified `lossReport` inside `engineReports`. Python mapper reports name encountered unsupported features and properties with counts. A zero-loss backend report does not erase another stage's losses. Text results report paragraph sequences, including empty paragraphs; inline DOCX page breaks form logical paragraph boundaries. Missing/changed/added detail arrays are capped at 1000 entries and 120-character previews; use their count fields and `detailsTruncated` to assess larger results. These checks do not validate fields, revision semantics, object appearance or Hancom layout.
+Native exports put rhwp's unmodified `lossReport` inside `engineReports`. Mapper reports name encountered unsupported features and properties with counts. A zero-loss backend report does not erase another stage's losses. Text results report paragraph sequences, including empty paragraphs; inline DOCX page breaks form logical paragraph boundaries. Missing/changed/added detail arrays are capped at 1000 entries and 120-character previews; use their count fields and `detailsTruncated` to assess larger results. These checks do not validate fields, revision semantics, object appearance or Hancom layout.
 
 Missing required optional tools return `available: false`, an engine reason and `textCheck.performed: false`; no file is written. LibreOffice timeout returns `LIBREOFFICE_TIMEOUT` after 60 seconds, while other execution failures return `LIBREOFFICE_FAILED`. It uses private copies and a fresh temporary profile; it never uses the person's office profile. DOC/ODT/RTF reports identify the DOCX intermediate as the text-check source and include `legacyImportUnverified: 1`. Directly reading the original legacy text is not implemented.
 
-Real LibreOffice tests are opt-in with `HWP_WORKBENCH_LIBREOFFICE_TESTS=1`. Leave the variable unset in normal `python3 scripts/run-tests.py` runs. Execute opt-in qualification on an external host where LibreOffice can register and run; this restricted macOS worker cannot do that without a crash dialog.
+Real LibreOffice tests are opt-in with `HWP_WORKBENCH_LIBREOFFICE_TESTS=1`. Leave the variable unset in normal `cargo test --workspace --locked` runs. Execute opt-in qualification on an external host where LibreOffice can register and run; this restricted macOS worker cannot do that without a crash dialog.

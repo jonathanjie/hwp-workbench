@@ -9,7 +9,7 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-// The renderer receives at most the same 64 MiB native source as Electron.
+// The renderer receives at most the same 64 MiB native source as desktop.
 pub const MAX_DOCUMENT_BYTES: u64 = 64 * 1024 * 1024;
 
 fn io_error(error: rustix::io::Errno) -> Error {

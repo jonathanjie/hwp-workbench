@@ -292,7 +292,7 @@ fn export(
         "VERIFY_FAILED",
         "rhwp exported the wrong format.",
     )?;
-    reports.push(json!({"engine":"rhwp","to":target,"lossReport":loss,"scope":"rhwp export losses; does not cover Python import losses or certify layout"}));
+    reports.push(json!({"engine":"rhwp","to":target,"lossReport":loss,"scope":"rhwp export losses; does not cover mapper import losses or certify layout"}));
     Ok(Some(result))
 }
 
@@ -434,7 +434,7 @@ pub fn convert_with_backends(
             current = "hwpx";
         }
         if current == "docx" {
-            route.push("docx → hwpx (Python direct mapper)".into());
+            route.push("docx → hwpx (direct mapper)".into());
             let model = model
                 .as_ref()
                 .ok_or_else(|| WorkbenchError::new("NOT_DOCX", "Missing DOCX model."))?;
@@ -443,7 +443,7 @@ pub fn convert_with_backends(
             reports.push(mapper_report("docx", "hwpx", model));
         }
         if target == "docx" {
-            route.push("hwpx → docx (Python direct mapper)".into());
+            route.push("hwpx → docx (direct mapper)".into());
             let model = read_hwpx(&content)?;
             merge_unsupported(&mut unsupported, &model.unsupported);
             content = mapper_package::normalize(&write_docx(&model)?, "docx")?;

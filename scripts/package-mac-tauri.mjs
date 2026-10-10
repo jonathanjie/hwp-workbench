@@ -138,7 +138,7 @@ export async function checkBundleContent(application, productName) {
     for (const entry of await fs.readdir(directory, {withFileTypes: true})) {
       const file = path.join(directory, entry.name);
       const relative = path.relative(application, file).split(path.sep).join('/');
-      if (/\.py$/i.test(entry.name) || entry.name.toLowerCase() === 'node_modules' || /electron/i.test(entry.name)) forbidden.push(relative);
+      if (/\.py$/i.test(entry.name) || entry.name.toLowerCase() === 'node_modules' || relative.startsWith('Contents/Frameworks/')) forbidden.push(relative);
       if (entry.isSymbolicLink()) {
         const allowed = relative === 'Contents/Resources/bin/hwp-workbench' && await fs.readlink(file) === `../../MacOS/${productName}`;
         if (!allowed) forbidden.push(`${relative} (unexpected symlink)`);

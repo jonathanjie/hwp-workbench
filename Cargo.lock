@@ -2233,6 +2233,7 @@ name = "hwp-verify"
 version = "0.2.0-alpha.2"
 dependencies = [
  "base64 0.23.1",
+ "hwp-core",
  "rhwp",
  "rustix",
  "serde",

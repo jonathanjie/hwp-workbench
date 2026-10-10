@@ -11,7 +11,7 @@ use crate::{agent_link, agent_ops, convert_operation};
 
 /// Maximum native bytes returned by the desktop-only memory preview (64 MiB).
 pub const MAX_PREVIEW_BYTES: usize = 64 * 1024 * 1024;
-pub const VERSION: &str = "0.1.0-alpha.1";
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 const OPERATIONS: &[&str] = &[
     "inspect", "extract", "validate", "plan", "apply", "save", "read", "search", "replace", "fill",
     "set", "propose", "session", "convert",
@@ -251,7 +251,7 @@ pub fn invoke(root: impl AsRef<Path>, method: &str, args: &Value) -> Result<Valu
         .map_err(|error| source_error(error, args))
 }
 
-// Python reports descriptor-relative OS failures with the source leaf name.
+// Report descriptor-relative OS failures with the source leaf name.
 // Keep that public text without changing the shared workspace's error codes.
 fn source_error(mut error: WorkbenchError, args: &Value) -> WorkbenchError {
     if error.code == "READ_FAILED" {
@@ -286,7 +286,7 @@ fn inspect(document: &Document) -> Value {
     if let Some(nodes) = result.get_mut("nodes").and_then(Value::as_array_mut) {
         for node in nodes {
             if let Some(style) = node.get_mut("style").and_then(Value::as_object_mut) {
-                // Python min/max selects its integer argument at a clamp bound.
+                // Keep the integer representation at a clamp bound.
                 if let Some(size) = style.get("size").and_then(Value::as_f64) {
                     if size == 5.0 {
                         style.insert("size".into(), json!(5));

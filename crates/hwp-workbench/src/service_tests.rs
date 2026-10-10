@@ -447,7 +447,7 @@ fn test_output_format_enforced() {
 }
 
 #[test]
-fn workspace_errors_keep_python_errno_and_leaf_name() {
+fn workspace_errors_keep_contract_errno_and_leaf_name() {
     let (folder, _, args) = setup("hwpx");
     std::os::unix::fs::symlink("form.hwpx", folder.path().join("link.hwpx")).unwrap();
     let mut args = args;
@@ -462,7 +462,7 @@ fn workspace_errors_keep_python_errno_and_leaf_name() {
 }
 
 #[test]
-fn preview_size_bounds_keep_python_integer_types() {
+fn preview_size_bounds_keep_bounded_integer_types() {
     let (folder, bytes, _) = setup("hwpx");
     let package = hwp_core::package_io::ZipPackage::new(&bytes).unwrap();
     let document = Document::new(&bytes, "fixture").unwrap();

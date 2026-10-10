@@ -457,7 +457,7 @@ impl<'a> Writer<'a> {
                         .attr("colSpan", cell.colspan)
                         .attr("rowSpan", cell.rowspan),
                 );
-                // Python's slice tolerates a span beyond the widths array. Keep that
+                // A span can extend beyond the widths array. Keep that
                 // writer behavior; reopening the malformed grid fails closed.
                 let start = cell.column.min(widths.len());
                 let end = cell.column.saturating_add(cell.colspan).min(widths.len());

@@ -37,7 +37,7 @@ pub struct Recovery {
     pub hint: String,
     pub retryable: bool,
 }
-/// Return the Python oracle recovery hint and retry policy.
+/// Return the stable recovery hint and retry policy.
 pub fn recovery(code: &str) -> Recovery {
     let (hint, retryable) = match code {
  "SOURCE_CHANGED" => ("Read or inspect the document again and rebuild the patch for its current SHA-256 before saving.", true),
@@ -59,8 +59,8 @@ pub fn recovery(code: &str) -> Recovery {
  "BAD_PATH" => ("Supply a nonempty regular-file path inside the configured workspace.", true),
  "BAD_ROOT" => ("Choose an existing document subfolder as the workspace root, such as ~/Documents/HWP.", true),
  "OPEN_FORMAT" => ("Choose an existing regular .hwp or .hwpx file inside the approved workspace.", true),
- "APP_UNAVAILABLE" => ("Install HWP Workbench.app in /Applications or ~/Applications, or install Electron in this source checkout.", true),
- "OPEN_FAILED" => ("Check the desktop app or Electron installation, then retry opening the document.", true),
+ "APP_UNAVAILABLE" => ("Install HWP Workbench.app in /Applications or ~/Applications, or build the source app with npm run build:frontend and cargo build -p hwp-workbench-app.", true),
+ "OPEN_FAILED" => ("Check the desktop app installation or source build, then retry opening the document.", true),
  "OUTSIDE_WORKSPACE" => ("Use a path inside the configured workspace; relative traversal is prohibited.", true),
  "UNSAFE_PATH" => ("Use an existing parent directory and regular file path without symlink components.", true),
  "READ_FAILED" => ("Check that the source exists inside the workspace and is readable without symlinks.", true),

@@ -1,6 +1,6 @@
 # Rust engine and Tauri shell rewrite
 
-Status: approved by the product owner on 2026-10-10 ("yes rewrite in rhwp; use multiple Sol subagents in parallel").
+Status: cut-over implemented on 2026-10-10; original plan approved by the product owner on 2026-10-10 ("yes rewrite in rhwp; use multiple Sol subagents in parallel").
 Branch: `feat/rust` (worktree `hwp-workbench-worktrees/rust`), based on `feat/desktop-ux` 63096d4.
 
 ## Goal
@@ -15,6 +15,8 @@ Targets, measured on Apple Silicon at the cut-over gate:
 | DMG | 182 MB | ≤ 30 MB |
 | Engine call latency (inspect, 6-page HWPX) | one Python process per call | in-process, ≤ 50 ms warm |
 | Idle memory, one document open | not measured | measured and reported |
+
+This plan preserves rewrite history below. The C1 cut-over makes Rust canonical; retired implementations and commands are no longer available. Current checks are in `docs/TESTING.md`, with C1 execution details in `work/results/C1.json`.
 
 ## Decisions
 
@@ -105,10 +107,10 @@ R1–R9 are merged into `feat/rust`, with R9 split into R9a (Rust engine inside 
 2. Keyboard: WKWebView's default Tab order skips buttons and checkboxes. R8b gave the review dialog buttons explicit tab stops; check every dialog in the packaged app.
 3. Both engines reject an absolute path that goes through a symlinked parent of the workspace (for example `/var` → `/private/var`, `/tmp` → `/private/tmp`), while the same file under its real path works. Agents often pass such paths. Resolve the path's parent folders the same way as the root, without following a symlink at the final component; record the difference from Python as an approved difference.
 4. Preview of fonts that rhwp has no width table for (for example Apple SD Gothic Neo, used by our own samples): rhwp gives each Latin letter half the font size and stretches the glyph to fit (`lengthAdjust="spacingAndGlyphs"`), so narrow letters look bold. Check a public document that uses 함초롬바탕/돋움 or 맑은 고딕 (rhwp has tables for these), then decide between measuring missing fonts in the renderer and reporting it upstream. Consider a missing-font warning that points to the free official fonts.
-5. Version and labels: the CLI reports `0.1.0-alpha.1` (kept equal to Python for the differential), the app `0.2.0-alpha.1`, and conversion reports still name the "Python direct mapper". Align at cut-over and approve the differences.
+5. Completed at C1 cut-over: workspace/app/CLI/skill/bundle version is `0.2.0-alpha.2`, and conversion labels use "direct mapper". Historical mismatch: the CLI reported `0.1.0-alpha.1` (kept equal to Python for the differential), the app `0.2.0-alpha.1`, and conversion reports still name the "Python direct mapper". Align at cut-over and approve the differences.
 6. In-process preview cannot be stopped early; check with a large document whether a dropped preview delays the next command.
 7. Install guide: replace the manual Claude Desktop JSON step with the app's bundle button once G4 covers it; test the first open of a downloaded DMG on the cofounder's Mac.
-8. Cut-over: decide when to remove Electron, the Python engine and the Python packaging from the repository. Until then they stay as the differential oracle.
+8. Completed at C1 cut-over: removed Electron, the Python engine, their packaging and the differential runner. Frozen authored inputs and model/package snapshots remain as Rust regression evidence; new fixtures are built in Rust.
 9. Distribution: Developer ID signing and notarization need an Apple Developer account (user decision).
 
 ## Resume point

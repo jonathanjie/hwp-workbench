@@ -494,7 +494,7 @@ impl<'a> Reader<'a> {
             .parts
             .get(&name)
             .ok_or_else(|| WorkbenchError::new("NOT_HWPX", "Missing HWPX image part."))?;
-        // Python shares immutable bytes. Rust's model owns a Vec per image,
+        // The rich model owns a Vec per image,
         // so repeated references need a combined allocation budget.
         self.image_bytes = self.image_bytes.saturating_add(source.len());
         require(
@@ -544,7 +544,7 @@ impl<'a> Reader<'a> {
         )?;
         let (mut style, numbering) =
             self.para_style(self.paras.get(&key(node.get("paraPrIDRef"))).copied())?;
-        // Python's short-circuit keeps pageBreakBefore in the style when pageBreak is explicit.
+        // Keep pageBreakBefore in the style when pageBreak is explicit.
         let page_break = if node.get("pageBreak") == Some("1") {
             true
         } else {

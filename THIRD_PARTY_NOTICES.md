@@ -1,5 +1,29 @@
 # Third-party materials and distribution
 
+The current Apple Silicon developer alpha uses the Rust engine, vendored rhwp
+0.8.7 (MIT) and Tauri 2 (MIT or Apache-2.0). The renderer uses `@rhwp/core`
+0.8.7 (MIT). No font files or public/user documents are bundled. Self-authored
+fixtures are examples, not qualified Hancom documents. Playwright is test-only.
+
+`scripts/third-party-notices.mjs` reads Cargo's normal runtime dependency
+closure, checks its licence allowlist, and generates notices for every bundled
+dependency. The package retains them under `Contents/Resources/notices/`.
+Five unmodified Tauri dependencies use MPL-2.0: cssparser, cssparser-macros,
+dtoa-short, selectors and option-ext. Their exact source versions and licence
+texts are included in generated notices; source changes require separate review.
+The rhwp source and revision are in `third_party/rhwp`; upstream documentation
+is archived under `docs/plans/rhwp-0.8.7/mydocs/`, with compile-time include paths
+adjusted and one binding comment clarified. Executable library logic is unchanged; its compiled blank
+template is part of upstream library source. The renderer build copies only
+its JavaScript/WASM runtime. This document is not a complete release SBOM.
+
+## Historical pre-cut-over inventory
+
+The inventory below describes the retired 2026-10-09 package. Its paths, runtime
+requirements and packaging actions are historical and do not describe the
+current app. Keep this record for provenance; current distribution uses the
+generated Rust dependency notices above.
+
 HWP Workbench is a private developer alpha. The Apple Silicon package includes
 Electron, the rhwp adapter, and a pinned CPython runtime. This inventory describes
 the supplied runtime; it is not a complete SBOM or a release-license approval.

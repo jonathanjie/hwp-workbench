@@ -1,8 +1,8 @@
 use super::*;
 use crate::process::{invoke_with_limits, Limits};
 
-fn python(script: &str) -> WorkerCommand {
-    WorkerCommand::new("python3", vec!["-c".into(), script.into()])
+fn node(script: &str) -> WorkerCommand {
+    WorkerCommand::new("node", vec!["-e".into(), script.into()])
 }
 
 fn limits() -> Limits {
@@ -19,7 +19,7 @@ fn test_output_cap_stops_child() {
         "probe",
         None,
         None,
-        &python("import sys; sys.stdout.buffer.write(b'x'*65536); sys.stdout.flush()"),
+        &node("process.stdout.write('x'.repeat(65536))"),
         limits(),
     )
     .unwrap_err();
@@ -36,7 +36,7 @@ fn test_timeout_stops_child() {
         "probe",
         None,
         None,
-        &python("import time; time.sleep(10)"),
+        &node("setTimeout(() => {}, 10000)"),
         settings,
     )
     .unwrap_err();
@@ -46,14 +46,14 @@ fn test_timeout_stops_child() {
 
 #[test]
 fn drains_output_while_sending_large_input() {
-    let script = "import sys; sys.stdout.write(' '*262144); sys.stdout.flush(); sys.stderr.write(' '*262144); sys.stderr.flush(); data=sys.stdin.buffer.read(); print('{\"bytes\":'+str(len(data))+'}')";
+    let script = "process.stdout.write(' '.repeat(262144)); process.stderr.write(' '.repeat(262144)); let bytes=0; process.stdin.on('data', data => bytes+=data.length); process.stdin.on('end', () => console.log(JSON.stringify({bytes})))";
     let settings = Limits {
         timeout: std::time::Duration::from_secs(5),
         max_output: 1024 * 1024,
     };
     let payload = vec![0xff; 1024 * 1024];
     let result =
-        invoke_with_limits(&payload, "probe", None, None, &python(script), settings).unwrap();
+        invoke_with_limits(&payload, "probe", None, None, &node(script), settings).unwrap();
     assert_eq!(
         result["bytes"],
         payload.len() + 4 + b"{\"op\":\"probe\"}".len()
@@ -67,7 +67,7 @@ fn stderr_counts_towards_output_bound() {
         "probe",
         None,
         None,
-        &python("import sys; sys.stderr.write('x'*65536); sys.stderr.flush()"),
+        &node("process.stderr.write('x'.repeat(65536))"),
         limits(),
     )
     .unwrap_err();
@@ -83,7 +83,7 @@ fn timeout_covers_child_after_pipes_close() {
         "probe",
         None,
         None,
-        &python("import os,time; os.close(0); os.close(1); os.close(2); time.sleep(10)"),
+        &node("const fs=require('node:fs'); [0,1,2].forEach(fd => fs.closeSync(fd)); setTimeout(() => {}, 10000)"),
         settings,
     )
     .unwrap_err();
@@ -94,34 +94,38 @@ fn timeout_covers_child_after_pipes_close() {
 fn validates_response_and_exit_status() {
     for (script, code, message) in [
         (
-            "print('not JSON')",
+            "console.log('not JSON')",
             "INDEPENDENT_PROTOCOL",
             "rhwp returned invalid JSON.",
         ),
         (
-            "print('[]')",
+            "console.log('[]')",
             "INDEPENDENT_PROTOCOL",
             "rhwp returned a non-object response.",
         ),
         (
-            "print('{\"error\":3}')",
+            "console.log('{\"error\":3}')",
             "INDEPENDENT_PROTOCOL",
             "Invalid rhwp error response.",
         ),
         (
-            "import sys; print('{}'); sys.exit(2)",
+            "console.log('{}'); process.exitCode=2",
             "INDEPENDENT_FAILED",
             "rhwp exited without a valid result.",
         ),
-        ("print('{\"error\":{}}')", "RHWP_FAILED", "rhwp failed."),
         (
-            "import sys; sys.stdout.buffer.write(b'\\xff')",
+            "console.log('{\"error\":{}}')",
+            "RHWP_FAILED",
+            "rhwp failed.",
+        ),
+        (
+            "process.stdout.write(Buffer.from([255]))",
             "INDEPENDENT_PROTOCOL",
             "rhwp returned invalid JSON.",
         ),
     ] {
         let error =
-            invoke_with_limits(b"x", "probe", None, None, &python(script), limits()).unwrap_err();
+            invoke_with_limits(b"x", "probe", None, None, &node(script), limits()).unwrap_err();
         assert_eq!(error.code, code);
         assert_eq!(error.message, message);
     }

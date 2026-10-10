@@ -3,7 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
-// These extensions are the MIME allowlist in desktop/protocol.cjs. Only
+// These extensions are the renderer asset allowlist. Only
 // renderer roots are scanned: backend code and tests are never bundled.
 const rendererExtensions = new Set(['.html', '.css', '.js', '.svg', '.png', '.wasm']);
 

@@ -32,10 +32,13 @@ fn direct(frame: &[u8]) -> Value {
 fn fake(result: Value) -> WorkerCommand {
     let encoded = serde_json::to_string(&result).unwrap();
     WorkerCommand::new(
-        "python3",
+        "node",
         vec![
-            "-c".into(),
-            format!("import sys; sys.stdin.buffer.read(); print({encoded:?})").into(),
+            "-e".into(),
+            format!(
+                "process.stdin.resume(); process.stdin.on('end', () => console.log({encoded:?}))"
+            )
+            .into(),
         ],
     )
 }
@@ -108,7 +111,7 @@ fn test_apply_reports_missing_text() {
 
 #[test]
 fn test_apply_reports_unavailable_parser() {
-    let observed = json!({"available": false, "reason": "Node.js is unavailable."});
+    let observed = json!({"available": false, "reason": "Verification worker is unavailable."});
     assert_eq!(
         check_output(fixture(), &BTreeMap::new(), &fake(observed.clone())),
         observed
@@ -166,16 +169,19 @@ fn test_exports_have_loss_report_and_native_bytes() {
 
 #[test]
 fn test_table_cell_edit_is_found_in_full_text() {
-    // Use the frozen Python writer to retain the oracle's native edit behavior.
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let result = std::process::Command::new("python3")
-        .current_dir(&root)
-        .env("PYTHONPATH", root.join("engine"))
-        .args(["-c", "from pathlib import Path; import sys; from hwp_workbench.document import Document; d=Document(Path('fixtures/generated/review-form.hwpx').read_bytes()); n=next(n for n in d.nodes if n.role=='table-cell'); d.patch({'schemaVersion':1,'baseSha256':d.hash,'operations':[{'op':'set_text','nodeId':n.id,'expectedText':n.text,'text':'Changed cell 😀 — longer text'}]}); sys.stdout.buffer.write(d.serialize(True))"])
-        .output().unwrap();
-    assert!(result.status.success());
+    let mut document = hwp_core::document::Document::new(fixture(), "form.hwpx").unwrap();
+    let node = document
+        .nodes
+        .iter()
+        .find(|node| node.role == "table-cell")
+        .unwrap()
+        .clone();
     let replacement = "Changed cell 😀 — longer text";
-    let observed = probe(&result.stdout, &worker()).unwrap();
+    document.patch(&json!({"schemaVersion": 1, "baseSha256": document.hash, "operations": [
+        {"op": "set_text", "nodeId": node.id, "expectedText": node.text, "text": replacement}
+    ]})).unwrap();
+    let output = document.serialize(true).unwrap();
+    let observed = probe(&output, &worker()).unwrap();
     for section in observed["sections"].as_array().unwrap() {
         for paragraph in section["paragraphs"].as_array().unwrap() {
             assert!(!paragraph["text"].as_str().unwrap().contains(replacement));
@@ -183,7 +189,7 @@ fn test_table_cell_edit_is_found_in_full_text() {
     }
     assert!(observed["fullText"].as_str().unwrap().contains(replacement));
     let edits = BTreeMap::from([("node".into(), replacement.into())]);
-    let check = check_output(&result.stdout, &edits, &worker());
+    let check = check_output(&output, &edits, &worker());
     assert_eq!(check["editedTextsFound"], true);
     assert_eq!(check["editMethods"], json!({"node": "fullText"}));
 }

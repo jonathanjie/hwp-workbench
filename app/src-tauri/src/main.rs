@@ -83,7 +83,7 @@ impl<R: Runtime> Dialogs for NativeHost<R> {
     }
 }
 // rfd exposes no default-button setter. Put the safe default first, then map
-// the selected label back to the original Electron button index.
+// the selected label back to the original desktop button index.
 fn dialog_order(buttons: &[&str], default: usize) -> app_core::Result<Vec<usize>> {
     if buttons.get(default).is_none() {
         return Err(Error::new("Invalid message buttons"));

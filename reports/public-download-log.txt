@@ -1,3 +1,0 @@
-Not downloaded: pyhwp-aligns.hwp <urlopen error [Errno -3] Temporary failure in name resolution>
-Not downloaded: pyhwp-borderfill.hwp <urlopen error [Errno -3] Temporary failure in name resolution>
-Not downloaded: hwp-cli-report-tables.hwpx <urlopen error [Errno -3] Temporary failure in name resolution>

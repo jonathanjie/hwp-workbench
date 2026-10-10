@@ -63,7 +63,7 @@ const strings = {
     busy: 'Processing…', bridge: 'Desktop bridge unavailable', sourceChanged: 'Source changed · reopen',
     notHwp: 'not an HWP 5 file', invalidDocument: 'unsupported or invalid document',
     tooLarge: 'limit exceeded', existingOutput: 'copy exists · choose a new name',
-    python: 'Python unavailable', timeout: 'processing timed out · retry',
+    timeout: 'processing timed out · retry',
     engineFailed: 'document operation failed', previewFailed: 'Page preview unavailable · structure view',
     fontRisk: 'Font identity and metrics unverified · no bundled fonts',
     tableRisk: 'Tables retained · full layout and structure editing unavailable',
@@ -140,7 +140,7 @@ const strings = {
     busy: '처리 중…', bridge: '데스크톱 연결 없음', sourceChanged: '원본 변경됨 · 다시 불러오기',
     notHwp: 'HWP 5 파일 아님', invalidDocument: '미지원 또는 잘못된 문서',
     tooLarge: '한도 초과', existingOutput: '사본 존재 · 새 이름 필요',
-    python: 'Python 사용 불가', timeout: '처리 시간 초과 · 재시도',
+    timeout: '처리 시간 초과 · 재시도',
     engineFailed: '문서 작업 실패', previewFailed: '쪽 미리보기 사용 불가 · 구조 보기',
     fontRisk: '글꼴 식별 및 폭 미검증 · 포함된 글꼴 없음',
     tableRisk: '표 보존 · 전체 배치 및 구조 편집 미지원',
@@ -229,9 +229,6 @@ export function errorReason(error) {
   }
   if (/limit|too large|64 MiB/i.test(message)) {
     return t('tooLarge');
-  }
-  if (/Python/i.test(message)) {
-    return t('python');
   }
   if (/timed out/i.test(message)) {
     return t('timeout');

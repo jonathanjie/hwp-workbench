@@ -168,7 +168,7 @@ impl Document {
 
     pub fn inspect(&self) -> Value {
         let nodes: Vec<Value> = self.nodes.iter().map(|node| {
-            // Struct field order is the Python dataclass order.
+            // Struct field order preserves the established JSON key order.
             serde_json::json!({"id":node.id,"text":self.current_text(node),"part":node.part,"role":node.role,
                 "editable":node.editable,"paragraph":node.paragraph,"style":node.style,"anchor":node.anchor,
                 "paragraphRecordIndex":node.paragraph_record_index,"textStart":node.text_start,"textEnd":node.text_end})

@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {spawnSync} from 'node:child_process';
+import {rustRpc} from '../../scripts/rust-cli.mjs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {previewNodes} from '../preview.js';
@@ -10,12 +10,7 @@ import {mapTextRuns} from '../hit-map.js';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
 function rpc(method, args) {
-  const result = spawnSync(process.env.HWP_WORKBENCH_PYTHON || 'python3', ['-m', 'hwp_workbench', 'rpc', '--root', root], {
-    cwd: root, shell: false, encoding: 'utf8', input: JSON.stringify({method, args}),
-    env: {...process.env, PYTHONPATH: path.join(root, 'engine')}
-  });
-  assert.equal(result.status, 0, result.stderr);
-  return JSON.parse(result.stdout);
+  return rustRpc(root, method, args);
 }
 
 test('native staged bytes render edited text and retain body and table hit identities without a GUI', async t => {

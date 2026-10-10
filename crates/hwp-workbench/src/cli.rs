@@ -85,7 +85,7 @@ fn target() -> Arg {
 pub fn parser() -> Command {
     let mut parser = Command::new("hwp-workbench")
         .about("Local HWP/HWPX preservation editor — development alpha.")
-        .version("0.1.0-alpha.1")
+        .version(env!("CARGO_PKG_VERSION"))
         .subcommand_required(true)
         .disable_help_subcommand(true)
         .subcommand(
@@ -565,7 +565,7 @@ where
                 version
                     .get("version")
                     .and_then(Value::as_str)
-                    .unwrap_or("0.1.0-alpha.1")
+                    .unwrap_or(env!("CARGO_PKG_VERSION"))
             );
             return 0;
         }
@@ -581,7 +581,7 @@ where
             let _ = writeln!(
                 errors,
                 "{}",
-                crate::mcp::python_json(&json!({"error":error.as_json()}))
+                crate::mcp::contract_json(&json!({"error":error.as_json()}))
             );
             2
         }

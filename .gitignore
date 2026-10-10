@@ -1,7 +1,5 @@
 node_modules
 dist/
-__pycache__/
-*.py[cod]
 .DS_Store
 .env*
 *.pem
@@ -16,19 +14,15 @@ fixtures/public/*
 *.hwpx
 !fixtures/generated/*.hwp
 !fixtures/generated/*.hwpx
-reports/ui-test-workspace/
-
-reports/cli-smoke-workspace/
-
 # Local agent and scratch state
 work/
 .claude/settings.local.json
-outputs/mac-arm64/
+outputs/
 
 # Rust builds (workers use a shared target folder outside the repo)
 /target/
 
-# Self-authored, deterministic inputs for the Rust differential oracle
+# Self-authored, frozen inputs for Rust regression tests
 !tests/data/*.hwp
 !tests/data/*.hwpx
 !tests/data/*.docx

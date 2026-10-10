@@ -119,7 +119,7 @@ impl RichDocument {
             .collect()
     }
 }
-/// Traverse nested tables in the same row/cell order as the Python model.
+/// Traverse nested tables in the same row/cell order as the contract model.
 pub fn paragraphs(blocks: &[Block]) -> impl Iterator<Item = &Paragraph> {
     let mut pending: Vec<&Block> = blocks.iter().rev().collect();
     std::iter::from_fn(move || {

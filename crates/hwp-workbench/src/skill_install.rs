@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 /// Bound ownership-marker reads to 2 MiB; skills are not document inputs.
 const MAX_SKILL_FILE: usize = 2 * 1024 * 1024;
 const TARGETS: [&str; 2] = ["claude", "codex"];
-const VERSION: &str = "0.1.0-alpha.1";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 const DIRECTORY_FLAGS: OFlags = OFlags::RDONLY
     .union(OFlags::DIRECTORY)
     .union(OFlags::NOFOLLOW)
