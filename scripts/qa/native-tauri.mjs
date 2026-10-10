@@ -234,12 +234,18 @@ async function qualify(options, helper, initial, report) {
   let workspace = null;
   let pid = null;
   let launched = false;
+  let windowId = null;
   let sourceMayHaveChanged = false;
   let phase = 'prepare fixture copies and CLI read';
   const owned = new Map();
   const ime = (...args) => JSON.parse(run(helper, args, (options.timeout + 10) * 1000));
   const ax = (command, id) => ime(command, pid, ...(id === undefined ? [] : [id]));
   const value = id => ax('ax-value', id);
+  // Plain text spans (file name, format, page counter) have no AX DOM id in WebKit.
+  const texts = () => ime('ax-texts', pid);
+  const PAGE_COUNTER = /^\d+\s*\/\s*[1-9]\d*$/;
+  // The change count is a span inside the Changes tab; WebKit exposes it in the tab title.
+  const changeCount = () => /(\d+)\s*$/.exec(String(ax('ax-find', 'changesTab').title ?? ''))?.[1] ?? '';
   const remember = rows => {
     for (const row of rows) {
       if (!owned.has(row.pid)) {
@@ -290,16 +296,18 @@ async function qualify(options, helper, initial, report) {
   const rendered = async (filename, observe = () => {}) => {
     await until(`document ${filename}`, options.timeout, () => {
       observe();
-      return value('filename') === filename;
+      return texts().includes(filename);
     });
     await until('page counter', options.timeout, () => {
       observe();
-      return /^\d+\s*\/\s*[1-9]\d*$/.test(String(value('pageCounter')));
+      return texts().some(item => PAGE_COUNTER.test(item.trim()));
     });
   };
 
   try {
-    workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'hwp-native-qa-'));
+    // The engine compares paths with the canonical workspace root, and macOS
+    // temporary folders sit behind the /var -> /private/var symlink.
+    workspace = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'hwp-native-qa-')));
     report.workspace = workspace;
     const files = FIXTURES.map(name => path.join(workspace, name));
     for (let index = 0; index < FIXTURES.length; index += 1) {
@@ -327,6 +335,7 @@ async function qualify(options, helper, initial, report) {
     report.pid = pid;
     remember(ownedProcesses(processes(), pid));
     const window = ime('wait-window', pid, options.timeout);
+    windowId = window.id;
     report.timings.windowSeconds = (performance.now() - start) / 1000;
     record('on-screen window', true, {window, elapsedSeconds: report.timings.windowSeconds});
     phase = 'first document rendered';
@@ -381,7 +390,7 @@ async function qualify(options, helper, initial, report) {
     await openSlip();
     await clear('textEdit');
     type('textEdit', 'g', 'k', 's', 'r', 'm', 'f', 'enter:cmd');
-    await until('composition edit staged and slip closed', options.timeout, () => !present('textEdit') && String(value('changeCount')) === '1');
+    await until('composition edit staged and slip closed', options.timeout, () => !present('textEdit') && changeCount() === '1');
     // Reading the reopened slip checks the model's staged text, not an AX
     // concatenation of removed and inserted diff fragments.
     await openSlip('한글');
@@ -389,7 +398,7 @@ async function qualify(options, helper, initial, report) {
     await closeSlip();
     const actual = {value: present('textEdit') ? value('textEdit') : null, staged: [stagedText]};
     record('slip: Cmd+Enter during composition (WebKit ordering outcome)',
-      compareResult(actual, {value: null, staged: ['한글']}) && String(value('changeCount')) === '1',
+      compareResult(actual, {value: null, staged: ['한글']}) && changeCount() === '1',
       {expected: {value: null, staged: ['한글']}, actual});
 
     phase = 'save flow';
@@ -400,8 +409,14 @@ async function qualify(options, helper, initial, report) {
       if (hash(await fs.readFile(files[0])) !== beforeHash) return true;
       const confirm = present('confirmSave');
       if (confirm?.frame?.width > 0 && confirm.frame.height > 0 && !confirmed) {
-        const checked = value('acknowledge');
-        if (checked !== true && checked !== 1) ax('ax-click', 'acknowledge');
+        // The sheet slides in, and a click during that animation can miss the
+        // checkbox. Click, then wait for the tick, so a slow click never toggles twice.
+        await pause(500);
+        const ticked = () => [true, 1].includes(value('acknowledge'));
+        for (let attempt = 0; attempt < 4 && !ticked(); attempt += 1) {
+          ax('ax-click', 'acknowledge');
+          await until('acknowledgement ticked', 1.5, ticked).catch(() => false);
+        }
         await until('enabled save confirmation', options.timeout, () => present('confirmSave')?.enabled);
         ax('ax-click', 'confirmSave');
         confirmed = true;
@@ -409,7 +424,17 @@ async function qualify(options, helper, initial, report) {
       return false;
     });
     await rendered(FIXTURES[0]);
-    await until('save reopened and staged edits cleared', options.timeout, () => String(value('changeCount')) === '0');
+    // With no staged edits the side panel closes and its Changes tab leaves the
+    // Accessibility tree; then the toolbar must show no edit counter either.
+    const noStagedEdits = () => {
+      try {
+        return changeCount() === '0';
+      } catch (error) {
+        if (error.code !== 'AX_NOT_FOUND') throw error;
+        return !texts().some(item => /^\d+\s*edits?$|^수정\s*\d+$/i.test(item.trim()));
+      }
+    };
+    await until('save reopened and staged edits cleared', options.timeout, noStagedEdits);
     report.timings.saveSeconds = (performance.now() - saveStart) / 1000;
     const afterHash = hash(await fs.readFile(files[0]));
     const afterText = run(cli, ['read', files[0], '--root', workspace, '--format', 'text']);
@@ -442,7 +467,7 @@ async function qualify(options, helper, initial, report) {
     if (!secondNode) throw new Error('Second sample has no editable text to confirm render');
     await until('second document text rendered', options.timeout, () => {
       observe();
-      return ax('ax-find-text', secondNode.text).enabled && String(value('format')).toLowerCase() === secondDocument.format;
+      return ax('ax-find-text', secondNode.text).enabled && texts().some(item => item.trim().toLowerCase() === secondDocument.format);
     });
     // Record repeated process observations during and after the handoff.
     for (let sample = 0; sample < 10; sample += 1) {
@@ -450,12 +475,19 @@ async function qualify(options, helper, initial, report) {
       await pause(100);
     }
     record('second open uses running instance', observations.every(pids => pids.length === 1 && pids[0] === originalPid),
-      {filename: value('filename'), observations});
+      {filenameShown: texts().includes(FIXTURES[1]), observations});
     record('second fixture bytes retained', hash(await fs.readFile(files[1])) === report.fixtures[1].sha256);
     report.timings.secondOpenSeconds = (performance.now() - secondStart) / 1000;
     remember(ownedProcesses(processes(), pid));
   } catch (error) {
     record(phase, false, {reason: error.message});
+    if (windowId !== null && workspace) {
+      const screenshot = path.join(workspace, 'failure.png');
+      try {
+        run('/usr/sbin/screencapture', ['-o', '-x', '-l', String(windowId), screenshot]);
+        report.failureScreenshot = screenshot;
+      } catch { /* The window may already be gone; the recorded reason stands. */ }
+    }
   } finally {
     // Each cleanup step is independent. A failed restore must not leave the app.
     if (sourceMayHaveChanged) {

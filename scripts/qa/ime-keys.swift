@@ -171,6 +171,7 @@ func description(_ element: AXUIElement) -> [String: Any] {
     let bounds: Any = rect.map { ["x": $0.minX, "y": $0.minY, "width": $0.width, "height": $0.height] } ?? NSNull()
     return ["domId": attribute(element, "AXDOMIdentifier") as? String ?? "",
             "role": attribute(element, kAXRoleAttribute) as? String ?? "",
+            "title": attribute(element, kAXTitleAttribute) as? String ?? "",
             "frame": bounds, "value": textValue(element),
             "focused": attribute(element, kAXFocusedAttribute) as? Bool ?? false,
             "enabled": attribute(element, kAXEnabledAttribute) as? Bool ?? true]
@@ -197,7 +198,12 @@ func click(_ element: AXUIElement, pid: pid_t) {
           rect.minX.isFinite, rect.minY.isFinite, rect.width.isFinite, rect.height.isFinite else {
         fail("AX_FRAME", "Target is disabled or has no usable frame")
     }
-    let point = CGPoint(x: rect.midX, y: rect.midY)
+    // WebKit reports a checkbox frame that spans its whole label row, and part
+    // of that row does not toggle the box. Click the box itself, as a person would.
+    let isToggle = [kAXCheckBoxRole, kAXRadioButtonRole].contains(attribute(element, kAXRoleAttribute) as? String ?? "")
+    let point = isToggle
+        ? CGPoint(x: rect.minX + min(rect.height, rect.width) / 2, y: rect.midY)
+        : CGPoint(x: rect.midX, y: rect.midY)
     guard NSScreen.screens.contains(where: { screen in
         // AX/CG coordinates start at the upper left of the main screen.
         let top = NSScreen.screens.first?.frame.maxY ?? 0
@@ -243,11 +249,24 @@ func nativeCommand(_ args: [String]) -> Bool {
               "currentSource": currentSource(), "instances": apps])
         return true
     }
-    let commands = ["ax-find", "ax-click", "ax-value", "ax-focused", "ax-processes", "ax-click-text", "ax-find-text", "wait-window", "guarded-keys"]
+    let commands = ["ax-find", "ax-click", "ax-value", "ax-focused", "ax-processes", "ax-click-text", "ax-find-text", "wait-window", "guarded-keys", "ax-texts"]
     guard commands.contains(command) else { return false }
     guard args.count >= 2, let pid = Int32(args[1]), pid > 0 else { fail("ARGUMENT", "\(command) requires a positive app PID") }
     let app = appElement(pid)
     switch command {
+    case "ax-texts":
+        // WebKit folds plain <span id=...> text into unnamed AXStaticText,
+        // so labels such as the file name are found by their text.
+        guard args.count == 2 else { fail("ARGUMENT", "ax-texts <pid>") }
+        var texts: [String] = []
+        walk(app) { element in
+            if attribute(element, kAXRoleAttribute) as? String == kAXStaticTextRole,
+               let value = attribute(element, kAXValueAttribute) as? String, !value.isEmpty {
+                texts.append(value)
+            }
+            return false
+        }
+        json(texts)
     case "ax-focused":
         guard args.count == 2 else { fail("ARGUMENT", "ax-focused <pid>") }
         json(description(focused(app)))
