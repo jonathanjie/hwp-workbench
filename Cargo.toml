@@ -58,6 +58,9 @@ tauri-plugin-clipboard-manager = "=2.3.3"
 unsafe_code = "forbid"
 
 [profile.release]
+# Full-speed code: layout and verification run on every save. At the default
+# opt-level the binary is 10.1 MB (7.5 MB with "z"), far inside the 60 MB app
+# budget. Keep unwinding: hwp-verify catches rhwp panics.
 lto = true
 codegen-units = 1
 strip = true
