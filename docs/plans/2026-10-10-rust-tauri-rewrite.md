@@ -112,6 +112,8 @@ R1–R9 are merged into `feat/rust`, with R9 split into R9a (Rust engine inside 
 7. Install guide: replace the manual Claude Desktop JSON step with the app's bundle button once G4 covers it; test the first open of a downloaded DMG on the cofounder's Mac.
 8. Completed at C1 cut-over: removed Electron, the Python engine, their packaging and the differential runner. Frozen authored inputs and model/package snapshots remain as Rust regression evidence; new fixtures are built in Rust.
 9. Distribution: Developer ID signing and notarization need an Apple Developer account (user decision).
+10. Page hit map: a layout run that crosses two native nodes (same character style) opens the node where it starts, so a trailing "(인)" in a name cell opens the name text. Split such runs with `charX` when an owner needs the second node by click. Runs without `secIdx` (headers, footers, repeated table header rows) still map to no node.
+11. Edit slip: symbol characters in the Private Use Area (for example U+F0FE, drawn as ☑ by the page renderer) show as fallback boxes in the slip. Show the same symbol the page shows, without changing the stored character.
 
 ### First real user form (2026-10-10)
 
@@ -120,7 +122,7 @@ A real government form (HWPX, saved by 한글) could not be edited. Two causes, 
 - 한글's default script stub (`Scripts/headerScripts.js`, `Scripts/sourceScripts.js`) blocked the whole file. HWPX now exempts the exact stub by SHA-256, as HWP already did (`DEFAULT_SCRIPT_STUB`, info).
 - Nine text nodes contained `hp:fwSpace`, including the consent rows. Childless `fwSpace`, `nbSpace`, `tab`, `lineBreak` and `hyphen` are now editable placeholders (U+FDD0..U+FDEF) that save their original bytes; see `docs/plans/2026-10-10-inline-space-markers.md` and `docs/AGENT-INTERFACE.md`.
 
-Result on a local copy (the form itself is private and is not in the repository): 570/570 text nodes editable; a consent box ticked and saved in place with a backup; all 14 fixed-width markers byte-identical; only the edited section part changed.
+Result on a local copy (the form itself is private and is not in the repository): 570/570 text nodes editable; a consent box ticked and saved in place with a backup; all 14 fixed-width markers byte-identical; only the edited section part changed. The packaged-app check then found that the page hit map reached only 323 of 506 nonempty nodes; scoping the match to each top-level paragraph raised this to 503 (see follow-up 10), and the same consent edit was made by clicking in the app and verified with the CLI.
 
 ## Resume point
 

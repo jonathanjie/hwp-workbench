@@ -238,3 +238,9 @@
 - **Trigger:** C1 ran clippy beside WebKit; the Tauri build script replaced the HTTP test frontend with the production bridge, and a page reload failed.
 - **Rule:** Run Rust app builds and clippy before WebKit. Do not run them beside a browser suite that serves `app/dist/`; both write that folder. Confirm bridge errors before changing renderer code.
 - **Why:** Independent test commands can share mutable build output.
+
+### "Editable" must include "clickable on the page"
+- **Date:** 2026-10-10
+- **Trigger:** After the marker fix, the engine reported 570/570 editable nodes and every test passed, but the packaged app showed 284 of 944 text runs on the real form as "Locked": the page hit map lost its place in tables and text boxes, so 5 of 6 consent rows could not be clicked. The WebKit check passed because it clicked the one consent row that did map.
+- **Rule:** On a real multi-page form, count page text runs that map to no node (`mapTextRuns` over all pages) and the nodes no run reaches, not one sample node. Run the packaged app on it before a release.
+- **Why:** Engine editability and renderer hit mapping are separate layers; a node can be editable and still unreachable.
